@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoenix Heli-Flight — Maintenance Forms</title>
+<style>
+  :root{
+    --ink:#1c2b24;
+    --paper:#fbfaf6;
+    --panel:#ffffff;
+    --line:#dfe2da;
+    --accent:#c05a2c;
+    --grey-strong:#6b6558;
+    --radius:10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-size:14px;}
+  #app{max-width:1000px;margin:0 auto;padding:20px 24px 60px;}
+
+  .dark-banner{
+    background:#12172b; color:#fff; display:flex; align-items:center; justify-content:space-between;
+    padding:10px 20px; border-bottom:2px solid var(--ink); margin:0 0 20px;
+  }
+  .db-left{display:flex;align-items:center;gap:10px;}
+  .db-icon{font-size:20px;}
+  .db-title{font-weight:800;font-size:16px;letter-spacing:.3px;color:#fff;}
+  .db-right{display:flex;align-items:center;gap:10px;}
+  .db-icon-btn{
+    background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;width:34px;height:34px;
+    border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;
+  }
+  .db-icon-btn:hover{background:rgba(255,255,255,.1);}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:18px;}
+
+  .home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:6px;}
+  .home-btn{
+    background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:26px 18px;
+    cursor:pointer;text-align:center;font-size:16px;font-weight:700;color:var(--ink);
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color .15s, transform .1s;
+  }
+  .home-btn:hover{border-color:var(--accent);transform:translateY(-1px);}
+  .home-btn .hb-icon{font-size:34px;}
+
+  .back-btn{
+    background:none;border:none;color:var(--grey-strong);cursor:pointer;font-size:13px;font-weight:600;
+    padding:4px 0;margin-bottom:10px;display:inline-flex;align-items:center;gap:4px;
+  }
+  .back-btn:hover{color:var(--ink);}
+
+  h2.form-title{margin:0 0 4px;font-size:19px;}
+  p.form-sub{margin:0 0 18px;color:var(--grey-strong);font-size:12.5px;}
+
+  .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 16px;margin-bottom:14px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11.5px;color:var(--grey-strong);font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+  .field input, .field select, .field textarea{
+    padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-size:13.5px;background:var(--panel);color:var(--ink);
+    font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:70px;}
+  .field.span2{grid-column:span 2;}
+  .field.span3{grid-column:span 3;}
+
+  .yn-group{display:flex;align-items:center;gap:16px;padding:9px 0;}
+  .yn-group .yn-label{font-size:13px;flex:1;min-width:220px;}
+  .yn-opt{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;}
+
+  .check-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13.5px;}
+  .check-row input{width:16px;height:16px;}
+
+  .btn{
+    padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+    cursor:pointer;font-size:13.5px;color:var(--ink);font-weight:600;
+  }
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.small{padding:6px 11px;font-size:12.5px;}
+  .btn.danger{color:#b0281e;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+
+  .settings-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .settings-tab{
+    padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
+    cursor:pointer;font-size:12.5px;font-weight:600;color:var(--grey-strong);
+  }
+  .settings-tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+  table.list-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.list-table th{text-align:left;padding:6px 8px;color:var(--grey-strong);font-size:11px;text-transform:uppercase;border-bottom:2px solid var(--line);}
+  table.list-table td{padding:6px 8px;border-bottom:1px solid var(--line);}
+  table.list-table td input{width:100%;padding:5px 6px;border:1px solid var(--line);border-radius:5px;font-size:12.5px;}
+  table.list-table .rm-btn{border:none;background:none;color:#b0281e;cursor:pointer;font-size:16px;line-height:1;}
+  .add-row-btn{margin-top:8px;}
+
+  .note{font-size:11.5px;color:var(--grey-strong);line-height:1.5;}
+
+  #gate{position:fixed;inset:0;background:var(--paper);z-index:100;display:flex;align-items:center;justify-content:center;}
+  #gate.hidden{display:none;}
+  .gate-box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px;width:90%;max-width:320px;text-align:center;}
+  .gate-box h2{margin:0 0 6px;font-size:18px;}
+  .gate-box p{margin:0 0 16px;font-size:12.5px;color:var(--grey-strong);}
+  .gate-box input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-size:14px;margin-bottom:10px;}
+  .gate-box button{width:100%;padding:9px 10px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:14px;cursor:pointer;}
+  .gate-error{color:#b0281e;font-size:12px;min-height:16px;margin-bottom:6px;}
+
+  #printArea{display:none;}
+  @page{margin:12mm;}
+  @media print{
+    #gate, #app{display:none !important;}
+    #printArea{display:block !important;}
+  }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-box">
+    <h2 id="gateTitle">Enter password</h2>
+    <p id="gateSub">These forms are password-protected.</p>
+    <div class="gate-error" id="gateError"></div>
+    <form id="gateForm" autocomplete="on">
+      <input type="text" id="gateUser" name="username" value="AME Maintenance Forms" autocomplete="username" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <input type="password" id="gatePass" name="password" placeholder="Password" autocomplete="current-password">
+      <input type="password" id="gatePass2" placeholder="Confirm password" style="display:none;" autocomplete="new-password">
+      <button id="gateBtn" type="submit">Unlock</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="dark-banner">
+    <div class="db-left">
+      <span class="db-icon">🚁</span>
+      <span class="db-title">Phoenix Heli-Flight — Maintenance Forms</span>
+    </div>
+    <div class="db-right">
+      <button class="db-icon-btn" id="settingsBtn" title="Settings">⚙</button>
+      <button class="db-icon-btn" id="lockBtn" title="Lock">🔒</button>
+    </div>
+  </div>
+
+  <div id="viewHome">
+    <div class="panel">
+      <p class="note" style="margin-bottom:14px;">Choose a form below. Dropdowns (aircraft, AMEs, pilots) are managed from Settings and shared with every station.</p>
+      <div class="home-grid">
+        <button class="home-btn" data-view="trackbalance"><span class="hb-icon">🎯</span>MR Track &amp; Balance Check List</button>
+        <button class="home-btn" data-view="majormod"><span class="hb-icon">🛠️</span>Major Modifications</button>
+        <button class="home-btn" data-view="minormod"><span class="hb-icon">🔧</span>Minor Modifications</button>
+        <button class="home-btn" data-view="tolerance"><span class="hb-icon">⏳</span>Tolerance</button>
+        <button class="home-btn" data-view="anticipation"><span class="hb-icon">✈️</span>Anticipation of Aircraft Behaviour after Maintenance</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="viewSettings" style="display:none;"></div>
+  <div id="viewTolerance" style="display:none;"></div>
+  <div id="viewTrackBalance" style="display:none;"></div>
+  <div id="viewMajorMod" style="display:none;"></div>
+  <div id="viewMinorMod" style="display:none;"></div>
+  <div id="viewAnticipation" style="display:none;"></div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+(function(){
+  // ---------- storage: Supabase (same project as AME Work Schedule) with localStorage cache ----------
+  // Every key here is prefixed "forms:" so this app can share the same Supabase table
+  // (app_data, a plain key/value store) without ever colliding with the schedule app's keys.
+  const SUPABASE_URL = 'https://frlehxadkvgwzyxovwua.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_ioAPLi8DWuC0HCUUYEeQ3Q_dildZYKI';
+  const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
+
+  async function storageGet(key){
+    if(SUPABASE_CONFIGURED){
+      try{
+        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?key=eq.' + encodeURIComponent(key) + '&select=value', {
+          headers: { apikey: SUPABASE_ANON_KEY }
+        });
+        if(res.ok){
+          const rows = await res.json();
+          if(rows && rows.length){
+            try{ localStorage.setItem('cache:'+key, rows[0].value); }catch(e){}
+            return rows[0].value;
+          }
+          return null;
+        }
+      }catch(e){ /* offline — fall back to cache */ }
+    }
+    try{ return localStorage.getItem('cache:'+key); }catch(e){ return null; }
+  }
+
+  // Every write is chained onto this single queue so two saves fired close together
+  // always reach the network in the order they were made — otherwise an older, smaller
+  // snapshot could land after a newer one and silently overwrite it.
+  let __storageWriteQueue = Promise.resolve();
+
+  async function storageSet(key, value){
+    try{ localStorage.setItem('cache:'+key, value); }catch(e){}
+    if(!SUPABASE_CONFIGURED) return true;
+    const doWrite = async ()=>{
+      try{
+        await fetch(SUPABASE_URL + '/rest/v1/app_data', {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify({ key: key, value: value })
+        });
+      }catch(e){ /* best effort — local cache above still has it */ }
+    };
+    __storageWriteQueue = __storageWriteQueue.then(doWrite, doWrite);
+    await __storageWriteQueue;
+    return true;
+  }
+
+  async function sha256(text){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function escapeHTML(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function todayISO(){
+    const d = new Date();
+    const m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return d.getFullYear()+'-'+m+'-'+day;
+  }
+  function fmtDateNice(iso){
+    if(!iso) return '';
+    const parts = iso.split('-'); if(parts.length!==3) return iso;
+    const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return parseInt(parts[2],10)+'-'+MONTHS[parseInt(parts[1],10)-1]+'-'+parts[0];
+  }
+
+  const PHOENIX_LOGO_DATA_URI = 'data:image/png;base64,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';
+
+  // ---------- app state ----------
+  let state = {
+    settings: {
+      aircraft: [], // {reg, make, model, serial}
+      ames: [],     // {name, aca}
+      pilots: [],   // {name, license}
+      reasons: [],  // [string,...]
+      company: { owner:'Phoenix Heli-Flight Inc.', orgName:'Phoenix Heli-Flight', orgAddress:'1001 Saline Cr. Pkwy\nFort McMurray, Alberta\nT9H 0H8 Canada', phfApproval:'AMO 100-96' }
+    }
+  };
+
+  function defaultSettings(){
+    return {
+      aircraft: [
+        {reg:'C-FANK', make:'Airbus Helicopters', model:'AS350B2', serial:''},
+        {reg:'C-FHLF', make:'Airbus Helicopters', model:'AS350B2', serial:''},
+        {reg:'C-FHLO', make:'Airbus Helicopters', model:'AS350B3', serial:'4480'},
+        {reg:'C-FNFU', make:'Airbus Helicopters', model:'AS350B2', serial:''}
+      ],
+      ames: [],
+      pilots: [],
+      reasons: ['Aircraft leaving on a job off base', 'Parts on order', 'Awaiting engineering approval'],
+      company: { owner:'Phoenix Heli-Flight Inc.', orgName:'Phoenix Heli-Flight', orgAddress:'1001 Saline Cr. Pkwy\nFort McMurray, Alberta\nT9H 0H8 Canada', phfApproval:'AMO 100-96' }
+    };
+  }
+
+  async function loadSettings(){
+    try{
+      const raw = await storageGet('forms:settings', true);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        state.settings = Object.assign(defaultSettings(), parsed);
+      } else {
+        state.settings = defaultSettings();
+      }
+    }catch(e){
+      state.settings = defaultSettings();
+    }
+  }
+  async function saveSettings(){
+    await storageSet('forms:settings', JSON.stringify(state.settings), true);
+  }
+
+  // ---------- gate (password) ----------
+  async function initGate(){
+    const gate = document.getElementById('gate');
+    const app = document.getElementById('app');
+    const title = document.getElementById('gateTitle');
+    const sub = document.getElementById('gateSub');
+    const err = document.getElementById('gateError');
+    const p1 = document.getElementById('gatePass');
+    const p2 = document.getElementById('gatePass2');
+    const btn = document.getElementById('gateBtn');
+
+    if(!SUPABASE_CONFIGURED){
+      err.textContent = 'Heads up: this copy isn\'t connected to the shared database yet (still using this browser only).';
+    }
+
+    let existingHash = await storageGet('forms:app_password', true);
+    const settingUp = !existingHash;
+    if(settingUp){
+      title.textContent = 'Set a password';
+      sub.textContent = 'Create a password to protect these forms. Anyone who has this link and the password can view and submit them.';
+      p2.style.display = 'block';
+      btn.textContent = 'Set password';
+      p1.autocomplete = 'new-password';
+      p2.autocomplete = 'new-password';
+    } else {
+      title.textContent = 'Enter password';
+      sub.textContent = 'These forms are password-protected.';
+      p2.style.display = 'none';
+      btn.textContent = 'Unlock';
+      p1.autocomplete = 'current-password';
+    }
+
+    function unlock(){
+      gate.classList.add('hidden');
+      app.style.display = 'block';
+      loadSettings().then(showHome);
+      initAutoLock();
+    }
+
+    document.getElementById('gateForm').onsubmit = async (e)=>{
+      e.preventDefault();
+      err.textContent = '';
+      if(settingUp){
+        if(!p1.value || p1.value.length<4){ err.textContent='Use at least 4 characters.'; return; }
+        if(p1.value !== p2.value){ err.textContent='Passwords do not match.'; return; }
+        const hash = await sha256(p1.value);
+        await storageSet('forms:app_password', hash, true);
+        unlock();
+      } else {
+        const hash = await sha256(p1.value);
+        if(hash === existingHash){ unlock(); }
+        else { err.textContent = 'Incorrect password.'; p1.value=''; }
+      }
+    };
+  }
+
+  // ---------- auto-lock: a real reload, plus a catch-up check for backgrounded/sleeping tabs ----------
+  let sessionTimeoutMinutes = 30;
+  let inactivityTimer = null;
+  let lastActivityAt = Date.now();
+  function lockApp(){ location.reload(); }
+  function resetInactivityTimer(){
+    lastActivityAt = Date.now();
+    if(inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(lockApp, sessionTimeoutMinutes * 60 * 1000);
+  }
+  ['mousemove','keydown','mousedown','scroll','touchstart'].forEach(evt=>{
+    document.addEventListener(evt, ()=>{ if(document.getElementById('app').style.display !== 'none') resetInactivityTimer(); }, {passive:true});
+  });
+  function checkStaleOnReturn(){
+    if(document.getElementById('app').style.display === 'none') return;
+    if((Date.now() - lastActivityAt) >= sessionTimeoutMinutes * 60 * 1000) lockApp();
+  }
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') checkStaleOnReturn(); });
+  window.addEventListener('focus', checkStaleOnReturn);
+  function initAutoLock(){ resetInactivityTimer(); }
+  document.getElementById('lockBtn').onclick = ()=> location.reload();
+
+  // ---------- view routing ----------
+  const VIEWS = ['Home','Settings','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation'];
+  function showView(name){
+    VIEWS.forEach(v=>{
+      const el = document.getElementById('view'+v);
+      if(!el) return;
+      const isTarget = (v===name);
+      el.style.display = isTarget ? 'block' : 'none';
+      // Clear a view's content as soon as it's no longer the active one (Home's markup is
+      // static, not re-rendered, so it's left alone). Otherwise every hidden view keeps its
+      // last-rendered DOM around forever — harmless to a real mouse click, but it leaves
+      // stale duplicate elements (e.g. every form's back button shares the same class)
+      // sitting in the document, which is exactly the kind of thing that causes confusing
+      // bugs later.
+      if(!isTarget && v!=='Home') el.innerHTML = '';
+    });
+    window.scrollTo(0,0);
+  }
+  function showHome(){ showView('Home'); }
+
+  document.querySelectorAll('.home-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const v = b.dataset.view;
+      if(v==='tolerance') renderTolerance();
+      else if(v==='trackbalance') renderTrackBalance();
+      else if(v==='majormod') renderModForm('MajorMod', 'Major');
+      else if(v==='minormod') renderModForm('MinorMod', 'Minor');
+      else if(v==='anticipation') renderAnticipation();
+    });
+  });
+  document.getElementById('settingsBtn').onclick = renderSettings;
+
+  function backButton(){
+    return '<button class="back-btn" onclick="window.__formsNav.home()">‹ Back to forms</button>';
+  }
+  window.__formsNav = { home: showHome };
+
+  function opts(list, valueFn, labelFn, placeholder){
+    let html = '<option value="">' + escapeHTML(placeholder||'Select…') + '</option>';
+    list.forEach(item=>{
+      html += '<option value="'+escapeHTML(valueFn(item))+'">'+escapeHTML(labelFn(item))+'</option>';
+    });
+    return html;
+  }
+
+  // ---------- print helper ----------
+  function openPrint(bodyHTML){
+    document.getElementById('printArea').innerHTML = bodyHTML;
+    setTimeout(()=> window.print(), 50);
+  }
+  const PRINT_STYLES = '<style>' +
+    '*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}' +
+    '.pf-head{display:flex;align-items:flex-start;justify-content:center;gap:18px;margin-bottom:14px;}' +
+    '.pf-logo{height:64px;width:auto;}' +
+    '.pf-title-block{text-align:center;}' +
+    '.pf-title-block h1{font-size:22px;margin:0 0 2px;}' +
+    '.pf-title-block .pf-sub{font-size:11px;color:#444;font-style:italic;}' +
+    '.pf-box{border:1px solid #000;padding:14px 16px;font-size:12.5px;line-height:1.7;}' +
+    '.pf-row{display:flex;flex-wrap:wrap;gap:4px 26px;margin-bottom:2px;}' +
+    '.pf-field{white-space:nowrap;}' +
+    '.pf-field b{margin-right:4px;}' +
+    '.pf-underline{display:inline-block;min-width:120px;border-bottom:1px solid #000;padding:0 4px;}' +
+    '.pf-yn{margin-left:6px;}' +
+    '.pf-check{display:inline-block;width:11px;height:11px;border:1.3px solid #000;text-align:center;line-height:10px;font-size:10px;margin-right:3px;position:relative;top:1px;}' +
+    '.pf-check.on::after{content:"X";font-weight:800;}' +
+    '.pf-reasonbox{border:1px solid #000;min-height:70px;padding:6px 8px;margin:6px 0 10px;font-size:12px;white-space:pre-wrap;}' +
+    '.pf-statement{font-size:11px;margin-top:10px;}' +
+    '.pf-run{border:1px solid #000;padding:10px 14px;margin-top:14px;page-break-inside:avoid;}' +
+    '.pf-run h3{margin:0 0 8px;font-size:13.5px;}' +
+    '.pf-runchecks{display:flex;flex-wrap:wrap;gap:6px 24px;margin-bottom:12px;}' +
+    '.pf-runcheck{display:flex;align-items:center;gap:6px;font-size:12.5px;}' +
+    '.pf-signline{display:flex;gap:30px;flex-wrap:wrap;font-size:12px;margin-top:8px;}' +
+    '.pf-signline .sl{flex:1;min-width:200px;border-bottom:1px solid #000;padding-bottom:14px;}' +
+    '.pf-desc-field{margin:6px 0;font-size:12px;}' +
+    '.pf-desc-field .lbl{font-weight:700;}' +
+    '.pf-worktext{border:1px solid #000;min-height:80px;padding:6px 8px;margin:8px 0;font-size:12px;white-space:pre-wrap;}' +
+    '.pf-instr{font-size:9.5px;color:#333;margin:6px 0 12px;line-height:1.4;}' +
+    '@page{margin:12mm;}' +
+  '</style>';
+
+  // ---------- Settings ----------
+  let settingsTab = 'aircraft';
+  function renderSettings(){
+    showView('Settings');
+    const el = document.getElementById('viewSettings');
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Settings</h2>' +
+        '<p class="form-sub">Shared by every station — changes here update the dropdowns on all four forms.</p>' +
+        '<div class="settings-tabs" id="settingsTabs"></div>' +
+        '<div id="settingsBody"></div>' +
+      '</div>';
+    const tabs = [
+      {key:'aircraft', label:'Aircraft'},
+      {key:'ames', label:'AMEs'},
+      {key:'pilots', label:'Pilots'},
+      {key:'reasons', label:'Tolerance reasons'},
+      {key:'company', label:'Company info'},
+    ];
+    const tabsEl = document.getElementById('settingsTabs');
+    tabsEl.innerHTML = tabs.map(t=>'<button class="settings-tab'+(t.key===settingsTab?' active':'')+'" data-tab="'+t.key+'">'+t.label+'</button>').join('');
+    tabsEl.querySelectorAll('.settings-tab').forEach(b=>{
+      b.onclick = ()=>{ settingsTab = b.dataset.tab; renderSettings(); };
+    });
+    renderSettingsBody();
+  }
+
+  function renderSettingsBody(){
+    const body = document.getElementById('settingsBody');
+    const s = state.settings;
+    if(settingsTab==='aircraft'){
+      body.innerHTML =
+        '<table class="list-table"><thead><tr><th>Registration</th><th>Make</th><th>Model</th><th>Serial #</th><th></th></tr></thead><tbody id="aircraftRows"></tbody></table>' +
+        '<button class="btn small add-row-btn" id="addAircraftBtn">+ Add aircraft</button>' +
+        '<div class="btn-row"><button class="btn primary" id="saveAircraftBtn">Save</button></div>';
+      const rows = document.getElementById('aircraftRows');
+      s.aircraft.forEach((a,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><input data-i="'+i+'" data-f="reg" value="'+escapeHTML(a.reg)+'"></td>' +
+          '<td><input data-i="'+i+'" data-f="make" value="'+escapeHTML(a.make)+'"></td>' +
+          '<td><input data-i="'+i+'" data-f="model" value="'+escapeHTML(a.model)+'"></td>' +
+          '<td><input data-i="'+i+'" data-f="serial" value="'+escapeHTML(a.serial)+'"></td>' +
+          '<td><button class="rm-btn" data-i="'+i+'">✕</button></td>';
+        rows.appendChild(tr);
+      });
+      rows.querySelectorAll('input').forEach(inp=>{
+        inp.oninput = ()=>{ s.aircraft[inp.dataset.i][inp.dataset.f] = inp.value; };
+      });
+      rows.querySelectorAll('.rm-btn').forEach(btn=>{
+        btn.onclick = ()=>{ s.aircraft.splice(parseInt(btn.dataset.i,10),1); renderSettingsBody(); };
+      });
+      document.getElementById('addAircraftBtn').onclick = ()=>{ s.aircraft.push({reg:'',make:'',model:'',serial:''}); renderSettingsBody(); };
+      document.getElementById('saveAircraftBtn').onclick = async ()=>{ await saveSettings(); flashSaved('saveAircraftBtn'); };
+    } else if(settingsTab==='ames'){
+      body.innerHTML =
+        '<table class="list-table"><thead><tr><th>Name</th><th>ACA #</th><th></th></tr></thead><tbody id="ameRows"></tbody></table>' +
+        '<button class="btn small add-row-btn" id="addAmeBtn">+ Add AME</button>' +
+        '<div class="btn-row"><button class="btn primary" id="saveAmeBtn">Save</button></div>';
+      const rows = document.getElementById('ameRows');
+      s.ames.forEach((a,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><input data-i="'+i+'" data-f="name" value="'+escapeHTML(a.name)+'"></td>' +
+          '<td><input data-i="'+i+'" data-f="aca" value="'+escapeHTML(a.aca)+'"></td>' +
+          '<td><button class="rm-btn" data-i="'+i+'">✕</button></td>';
+        rows.appendChild(tr);
+      });
+      rows.querySelectorAll('input').forEach(inp=>{
+        inp.oninput = ()=>{ s.ames[inp.dataset.i][inp.dataset.f] = inp.value; };
+      });
+      rows.querySelectorAll('.rm-btn').forEach(btn=>{
+        btn.onclick = ()=>{ s.ames.splice(parseInt(btn.dataset.i,10),1); renderSettingsBody(); };
+      });
+      document.getElementById('addAmeBtn').onclick = ()=>{ s.ames.push({name:'',aca:''}); renderSettingsBody(); };
+      document.getElementById('saveAmeBtn').onclick = async ()=>{ await saveSettings(); flashSaved('saveAmeBtn'); };
+    } else if(settingsTab==='pilots'){
+      body.innerHTML =
+        '<table class="list-table"><thead><tr><th>Name</th><th>License #</th><th></th></tr></thead><tbody id="pilotRows"></tbody></table>' +
+        '<button class="btn small add-row-btn" id="addPilotBtn">+ Add pilot</button>' +
+        '<div class="btn-row"><button class="btn primary" id="savePilotBtn">Save</button></div>';
+      const rows = document.getElementById('pilotRows');
+      s.pilots.forEach((p,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><input data-i="'+i+'" data-f="name" value="'+escapeHTML(p.name)+'"></td>' +
+          '<td><input data-i="'+i+'" data-f="license" value="'+escapeHTML(p.license)+'"></td>' +
+          '<td><button class="rm-btn" data-i="'+i+'">✕</button></td>';
+        rows.appendChild(tr);
+      });
+      rows.querySelectorAll('input').forEach(inp=>{
+        inp.oninput = ()=>{ s.pilots[inp.dataset.i][inp.dataset.f] = inp.value; };
+      });
+      rows.querySelectorAll('.rm-btn').forEach(btn=>{
+        btn.onclick = ()=>{ s.pilots.splice(parseInt(btn.dataset.i,10),1); renderSettingsBody(); };
+      });
+      document.getElementById('addPilotBtn').onclick = ()=>{ s.pilots.push({name:'',license:''}); renderSettingsBody(); };
+      document.getElementById('savePilotBtn').onclick = async ()=>{ await saveSettings(); flashSaved('savePilotBtn'); };
+    } else if(settingsTab==='reasons'){
+      body.innerHTML =
+        '<p class="note" style="margin-bottom:10px;">These appear as quick-pick options on the Tolerance form — "Other" is always available there too for anything not listed.</p>' +
+        '<table class="list-table"><thead><tr><th>Reason</th><th></th></tr></thead><tbody id="reasonRows"></tbody></table>' +
+        '<button class="btn small add-row-btn" id="addReasonBtn">+ Add reason</button>' +
+        '<div class="btn-row"><button class="btn primary" id="saveReasonBtn">Save</button></div>';
+      const rows = document.getElementById('reasonRows');
+      s.reasons.forEach((r,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><input data-i="'+i+'" value="'+escapeHTML(r)+'"></td>' +
+          '<td><button class="rm-btn" data-i="'+i+'">✕</button></td>';
+        rows.appendChild(tr);
+      });
+      rows.querySelectorAll('input').forEach(inp=>{
+        inp.oninput = ()=>{ s.reasons[inp.dataset.i] = inp.value; };
+      });
+      rows.querySelectorAll('.rm-btn').forEach(btn=>{
+        btn.onclick = ()=>{ s.reasons.splice(parseInt(btn.dataset.i,10),1); renderSettingsBody(); };
+      });
+      document.getElementById('addReasonBtn').onclick = ()=>{ s.reasons.push(''); renderSettingsBody(); };
+      document.getElementById('saveReasonBtn').onclick = async ()=>{ await saveSettings(); flashSaved('saveReasonBtn'); };
+    } else if(settingsTab==='company'){
+      const c = s.company;
+      body.innerHTML =
+        '<div class="field-grid">' +
+          '<div class="field"><label>Owner name (shown on Modification reports)</label><input id="coOwner" value="'+escapeHTML(c.owner)+'"></div>' +
+          '<div class="field"><label>PHF approval number (Tolerance form default)</label><input id="coPhf" value="'+escapeHTML(c.phfApproval)+'"></div>' +
+          '<div class="field"><label>Organization name</label><input id="coOrgName" value="'+escapeHTML(c.orgName)+'"></div>' +
+          '<div class="field span2"><label>Organization address</label><textarea id="coOrgAddress" rows="3">'+escapeHTML(c.orgAddress)+'</textarea></div>' +
+        '</div>' +
+        '<div class="btn-row"><button class="btn primary" id="saveCoBtn">Save</button></div>';
+      document.getElementById('saveCoBtn').onclick = async ()=>{
+        c.owner = document.getElementById('coOwner').value;
+        c.phfApproval = document.getElementById('coPhf').value;
+        c.orgName = document.getElementById('coOrgName').value;
+        c.orgAddress = document.getElementById('coOrgAddress').value;
+        await saveSettings();
+        flashSaved('saveCoBtn');
+      };
+    }
+  }
+  function flashSaved(btnId){
+    const b = document.getElementById(btnId);
+    if(!b) return;
+    const orig = b.textContent;
+    b.textContent = 'Saved ✓';
+    setTimeout(()=>{ if(document.getElementById(btnId)) document.getElementById(btnId).textContent = orig; }, 1200);
+  }
+
+  // ---------- Tolerance form ----------
+  function renderTolerance(){
+    showView('Tolerance');
+    const el = document.getElementById('viewTolerance');
+    const s = state.settings;
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Tolerance Approval Form</h2>' +
+        '<p class="form-sub">Appendix "M" — D.I.R. Appendix to MCM</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Date</label><input type="date" id="tolDate" value="'+todayISO()+'"></div>' +
+          '<div class="field"><label>REG #</label><select id="tolReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
+          '<div class="field"><label>AME</label><select id="tolAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
+          '<div class="field"><label>Part name</label><input id="tolPartName"></div>' +
+          '<div class="field"><label>Part #</label><input id="tolPartNo" value="N/A"></div>' +
+          '<div class="field"><label>Serial #</label><input id="tolSerial" value="N/A"></div>' +
+        '</div>' +
+        '<div class="yn-group"><span class="yn-label">Special inspection to be carried out while on tolerance</span>' +
+          '<label class="yn-opt"><input type="radio" name="tolSpecial" value="Yes"> Yes</label>' +
+          '<label class="yn-opt"><input type="radio" name="tolSpecial" value="No" checked> No</label></div>' +
+        '<div class="yn-group"><span class="yn-label">Any inspection required before granting the tolerance</span>' +
+          '<label class="yn-opt"><input type="radio" name="tolPreInsp" value="Yes"> Yes</label>' +
+          '<label class="yn-opt"><input type="radio" name="tolPreInsp" value="No" checked> No</label></div>' +
+        '<div class="check-row"><input type="checkbox" id="tolAdCheck" checked><label for="tolAdCheck">Ensure all applicable airworthiness directives are performed</label></div>' +
+        '<div class="field-grid" style="margin-top:10px;">' +
+          '<div class="field span2"><label>Reason for tolerance (quick pick)</label><select id="tolReasonPick">'+opts(s.reasons, r=>r, r=>r, 'Other / type below…')+'</select></div>' +
+        '</div>' +
+        '<div class="field"><label>Reason for tolerance</label><textarea id="tolReasonText" rows="3"></textarea></div>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>A/F time</label><input id="tolAfTime"></div>' +
+          '<div class="field"><label>TSN/TSO</label><input id="tolTsn" value="N/A"></div>' +
+          '<div class="field"><label>Not to exceed TTAF</label><input id="tolTtaf"></div>' +
+          '<div class="field"><label>Not to exceed calendar date</label><input type="date" id="tolCalendar"></div>' +
+          '<div class="field"><label>ACA #</label><input id="tolAca"></div>' +
+          '<div class="field"><label>Signature date</label><input type="date" id="tolSigDate" value="'+todayISO()+'"></div>' +
+          '<div class="field"><label>PHF approval number</label><input id="tolPhf" value="'+escapeHTML(s.company.phfApproval)+'"></div>' +
+        '</div>' +
+        '<div class="btn-row"><button class="btn primary" id="tolPrintBtn">Prepare PDF</button></div>' +
+      '</div>';
+
+    document.getElementById('tolReg').onchange = ()=>{};
+    document.getElementById('tolAme').onchange = (e)=>{
+      const found = s.ames.find(a=>a.name===e.target.value);
+      if(found && found.aca) document.getElementById('tolAca').value = found.aca;
+    };
+    document.getElementById('tolReasonPick').onchange = (e)=>{
+      if(e.target.value) document.getElementById('tolReasonText').value = e.target.value;
+    };
+
+    document.getElementById('tolPrintBtn').onclick = ()=>{
+      const yn = (name)=> document.querySelector('input[name="'+name+'"]:checked').value;
+      const chk = (yesNo, want)=> '<span class="pf-check'+(yesNo===want?' on':'')+'"></span>'+want;
+      const data = {
+        date: fmtDateNice(document.getElementById('tolDate').value),
+        reg: document.getElementById('tolReg').value,
+        ame: document.getElementById('tolAme').value,
+        partName: document.getElementById('tolPartName').value,
+        partNo: document.getElementById('tolPartNo').value,
+        serial: document.getElementById('tolSerial').value,
+        special: yn('tolSpecial'),
+        preInsp: yn('tolPreInsp'),
+        adDone: document.getElementById('tolAdCheck').checked,
+        reason: document.getElementById('tolReasonText').value,
+        afTime: document.getElementById('tolAfTime').value,
+        tsn: document.getElementById('tolTsn').value,
+        ttaf: document.getElementById('tolTtaf').value,
+        calendar: fmtDateNice(document.getElementById('tolCalendar').value),
+        aca: document.getElementById('tolAca').value,
+        sigDate: fmtDateNice(document.getElementById('tolSigDate').value),
+        phf: document.getElementById('tolPhf').value,
+      };
+      const html = PRINT_STYLES +
+        '<div class="pf-head">' +
+          '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+          '<div class="pf-title-block"><h1>Tolerance Approval Form</h1><div class="pf-sub">Appendix &quot;M&quot; — D.I.R. Appendix to MCM</div></div>' +
+        '</div>' +
+        '<div class="pf-box">' +
+          '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
+            '<span class="pf-field"><b>REG #:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+          '<div class="pf-row"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+escapeHTML(data.ame)+'</span></span></div>' +
+          '<div class="pf-row"><span class="pf-field"><b>Part name:</b><span class="pf-underline" style="min-width:260px;">'+escapeHTML(data.partName)+'</span></span></div>' +
+          '<div class="pf-row"><span class="pf-field"><b>Part #:</b><span class="pf-underline">'+escapeHTML(data.partNo)+'</span></span>' +
+            '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span></div>' +
+          '<div class="pf-row" style="margin-top:8px;">Special inspection to be carried out while on tolerance: '+chk(data.special,'Yes')+' &nbsp; '+chk(data.special,'No')+'</div>' +
+          '<div class="pf-row">Any inspection required before granting the tolerance: '+chk(data.preInsp,'Yes')+' &nbsp; '+chk(data.preInsp,'No')+'</div>' +
+          '<div class="pf-row">Ensure all applicable airworthiness directives are performed: <span class="pf-check'+(data.adDone?' on':'')+'"></span></div>' +
+          '<div style="margin-top:8px;font-size:12px;"><b>Reason for tolerance:</b></div>' +
+          '<div class="pf-reasonbox">'+escapeHTML(data.reason)+'</div>' +
+          '<div class="pf-row"><span class="pf-field"><b>A/F time:</b><span class="pf-underline">'+escapeHTML(data.afTime)+'</span></span>' +
+            '<span class="pf-field"><b>TSN/TSO:</b><span class="pf-underline">'+escapeHTML(data.tsn)+'</span></span></div>' +
+          '<div class="pf-row">Life remaining with tolerance — <b>Not to exceed TTAF:</b><span class="pf-underline">'+escapeHTML(data.ttaf)+'</span> &nbsp; <b>Calendar:</b><span class="pf-underline">'+escapeHTML(data.calendar)+'</span></div>' +
+          '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>SIG:</b><span class="pf-underline" style="min-width:160px;">&nbsp;</span></span>' +
+            '<span class="pf-field"><b>ACA #:</b><span class="pf-underline">'+escapeHTML(data.aca)+'</span></span>' +
+            '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.sigDate)+'</span></span></div>' +
+          '<div class="pf-row"><span class="pf-field"><b>PHF approval number:</b><span class="pf-underline">'+escapeHTML(data.phf)+'</span></span></div>' +
+          '<div class="pf-statement">The tolerance described above has been approved as per the CARs Standard 625.86 Maintenance Schedule.</div>' +
+          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>PRM SIG:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
+        '</div>';
+      openPrint(html);
+    };
+  }
+
+  // ---------- MR Track & Balance Check List ----------
+  function renderTrackBalance(){
+    showView('TrackBalance');
+    const el = document.getElementById('viewTrackBalance');
+    const s = state.settings;
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">MR Track &amp; Balance Check List</h2>' +
+        '<p class="form-sub">Fill in the header once — the printed sheet repeats the run checklist below it for however many runs you need.</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Date</label><input type="date" id="tbDate" value="'+todayISO()+'"></div>' +
+          '<div class="field"><label>WR #</label><input id="tbWr"></div>' +
+          '<div class="field"><label>A/C registration</label><select id="tbReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
+          '<div class="field"><label>Pilot name</label><select id="tbPilot">'+opts(s.pilots, p=>p.name, p=>p.name)+'</select></div>' +
+          '<div class="field"><label>AME name</label><select id="tbAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
+          '<div class="field"><label>Number of runs to print (4–6)</label><input type="number" id="tbRuns" min="4" max="6" value="5"></div>' +
+        '</div>' +
+        '<div class="btn-row"><button class="btn primary" id="tbPrintBtn">Prepare PDF</button></div>' +
+      '</div>';
+
+    document.getElementById('tbPrintBtn').onclick = ()=>{
+      const data = {
+        date: fmtDateNice(document.getElementById('tbDate').value),
+        wr: document.getElementById('tbWr').value,
+        reg: document.getElementById('tbReg').value,
+        pilot: document.getElementById('tbPilot').value,
+        ame: document.getElementById('tbAme').value,
+      };
+      let runs = parseInt(document.getElementById('tbRuns').value, 10);
+      if(!runs || runs<4) runs = 4;
+      if(runs>6) runs = 6;
+
+      let runsHTML = '';
+      for(let i=1;i<=runs;i++){
+        runsHTML +=
+          '<div class="pf-run">' +
+            '<h3>Run #'+i+'</h3>' +
+            '<div class="pf-runchecks">' +
+              '<span class="pf-runcheck"><span class="pf-check"></span>Weight change</span>' +
+              '<span class="pf-runcheck"><span class="pf-check"></span>Pitch Link Adjustment</span>' +
+              '<span class="pf-runcheck"><span class="pf-check"></span>Tab Adjustment</span>' +
+              '<span class="pf-runcheck"><span class="pf-check"></span>Tool Check</span>' +
+            '</div>' +
+            '<div class="pf-signline">' +
+              '<span class="sl"><b>DCC</b> (Pilot signature) &nbsp; Lic #: ________________</span>' +
+              '<span class="sl"><b>MR</b> (AME signature &amp; stamp)</span>' +
+            '</div>' +
+          '</div>';
+      }
+
+      const html = PRINT_STYLES +
+        '<div class="pf-head">' +
+          '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+          '<div class="pf-title-block"><h1>MR Track &amp; Balance Check List</h1></div>' +
+        '</div>' +
+        '<div class="pf-box">' +
+          '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
+            '<span class="pf-field"><b>WR #:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span></div>' +
+          '<div class="pf-row"><span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+          '<div class="pf-row"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot)+'</span></span>' +
+            '<span class="pf-field"><b>AME:</b><span class="pf-underline">'+escapeHTML(data.ame)+'</span></span></div>' +
+        '</div>' +
+        runsHTML;
+      openPrint(html);
+    };
+  }
+
+  // ---------- Major / Minor Modification report (shared Standard 571 Appendix L layout) ----------
+  function renderModForm(viewKey, label){
+    showView(viewKey);
+    const el = document.getElementById('view'+viewKey);
+    const s = state.settings;
+    const idp = viewKey; // id prefix so Major/Minor fields never collide in the DOM
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">'+label+' Repair or '+label+' Modification Report</h2>' +
+        '<p class="form-sub">Rapport de réparation '+(label==='Major'?'majeure':'mineure')+' ou de modification '+(label==='Major'?'majeure':'mineure')+' — for instructions, see Standard 571 Appendix L.</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Registration</label><select id="'+idp+'Reg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
+          '<div class="field"><label>Make</label><input id="'+idp+'Make"></div>' +
+          '<div class="field"><label>Model</label><input id="'+idp+'Model"></div>' +
+          '<div class="field"><label>Serial #</label><input id="'+idp+'Serial"></div>' +
+          '<div class="field span2"><label>Owner</label><input id="'+idp+'Owner" value="'+escapeHTML(s.company.owner)+'"></div>' +
+        '</div>' +
+        '<div class="yn-group"><span class="yn-label">Type of work</span>' +
+          '<label class="yn-opt"><input type="radio" name="'+idp+'Type" value="Modification" checked> Modification</label>' +
+          '<label class="yn-opt"><input type="radio" name="'+idp+'Type" value="Repair"> Repair</label></div>' +
+        '<div class="field-grid">' +
+          '<div class="field span3"><label>Name &amp; address of person/organization who accomplished the work</label>' +
+            '<textarea id="'+idp+'OrgBlock" rows="3">'+escapeHTML(s.company.orgName+'\n'+s.company.orgAddress)+'</textarea></div>' +
+        '</div>' +
+        '<h3 style="margin:16px 0 6px;font-size:14px;">Description of work accomplished</h3>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Modification / Work Order No.</label><input id="'+idp+'WorkOrder"></div>' +
+          '<div class="field"><label>Component / Part No.</label><input id="'+idp+'PartNo"></div>' +
+          '<div class="field"><label>Component Serial No.</label><input id="'+idp+'CompSerial"></div>' +
+          '<div class="field span3"><label>Location / System affected</label><input id="'+idp+'Location"></div>' +
+          '<div class="field span3"><label>Description</label><textarea id="'+idp+'DescText" rows="4"></textarea></div>' +
+        '</div>' +
+        '<div class="check-row"><input type="checkbox" id="'+idp+'FuncCheck" checked><label for="'+idp+'FuncCheck">System/Functional check has been completed</label></div>' +
+        '<div class="field-grid" style="margin-top:8px;">' +
+          '<div class="field"><label>Date of completion</label><input type="date" id="'+idp+'CompDate" value="'+todayISO()+'"></div>' +
+        '</div>' +
+        '<div class="btn-row"><button class="btn primary" id="'+idp+'PrintBtn">Prepare PDF</button></div>' +
+      '</div>';
+
+    document.getElementById(idp+'Reg').onchange = (e)=>{
+      const found = s.aircraft.find(a=>a.reg===e.target.value);
+      if(found){
+        document.getElementById(idp+'Make').value = found.make||'';
+        document.getElementById(idp+'Model').value = found.model||'';
+        document.getElementById(idp+'Serial').value = found.serial||'';
+      }
+    };
+
+    document.getElementById(idp+'PrintBtn').onclick = ()=>{
+      const type = document.querySelector('input[name="'+idp+'Type"]:checked').value;
+      const chk = (val, want)=> '<span class="pf-check'+(val===want?' on':'')+'"></span>'+want;
+      const data = {
+        reg: document.getElementById(idp+'Reg').value,
+        make: document.getElementById(idp+'Make').value,
+        model: document.getElementById(idp+'Model').value,
+        serial: document.getElementById(idp+'Serial').value,
+        owner: document.getElementById(idp+'Owner').value,
+        orgBlock: document.getElementById(idp+'OrgBlock').value,
+        workOrder: document.getElementById(idp+'WorkOrder').value,
+        partNo: document.getElementById(idp+'PartNo').value,
+        compSerial: document.getElementById(idp+'CompSerial').value,
+        location: document.getElementById(idp+'Location').value,
+        descText: document.getElementById(idp+'DescText').value,
+        funcCheck: document.getElementById(idp+'FuncCheck').checked,
+        compDate: fmtDateNice(document.getElementById(idp+'CompDate').value),
+      };
+      const html = PRINT_STYLES +
+        '<div class="pf-head">' +
+          '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+          '<div class="pf-title-block"><h1>'+label+' Repair or '+label+' Modification Report</h1>' +
+          '<div class="pf-sub">Rapport de réparation '+(label==='Major'?'majeure':'mineure')+' ou de modification '+(label==='Major'?'majeure':'mineure')+'</div></div>' +
+        '</div>' +
+        '<div class="pf-instr">For instructions, see Standard 571 Appendix L • Pour les instructions, consulter l\'appendice L de la norme 571</div>' +
+        '<div class="pf-box">' +
+          '<div class="pf-row"><b>1. Aircraft</b></div>' +
+          '<div class="pf-row"><span class="pf-field"><b>Make:</b><span class="pf-underline">'+escapeHTML(data.make)+'</span></span>' +
+            '<span class="pf-field"><b>Model:</b><span class="pf-underline">'+escapeHTML(data.model)+'</span></span>' +
+            '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span>' +
+            '<span class="pf-field"><b>Registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+          '<div class="pf-row" style="margin-top:8px;"><b>2. Owner:</b><span class="pf-underline" style="min-width:260px;">'+escapeHTML(data.owner)+'</span></div>' +
+          '<div class="pf-row" style="margin-top:8px;"><b>3. Type of work:</b> '+chk(type,'Modification')+' &nbsp; '+chk(type,'Repair')+'</div>' +
+          '<div class="pf-desc-field" style="margin-top:8px;"><span class="lbl">4. Name &amp; address of person/organization who accomplished the work:</span></div>' +
+          '<div class="pf-reasonbox">'+escapeHTML(data.orgBlock)+'</div>' +
+          '<div class="pf-row"><b>5. Description of work accomplished</b></div>' +
+          '<div class="pf-desc-field"><span class="lbl">Modification / Work Order No.:</span> '+escapeHTML(data.workOrder)+'</div>' +
+          '<div class="pf-desc-field"><span class="lbl">Component / Part No.:</span> '+escapeHTML(data.partNo)+'</div>' +
+          '<div class="pf-desc-field"><span class="lbl">Component Serial No.:</span> '+escapeHTML(data.compSerial)+'</div>' +
+          '<div class="pf-desc-field"><span class="lbl">Location / System affected:</span> '+escapeHTML(data.location)+'</div>' +
+          '<div class="pf-worktext">'+escapeHTML(data.descText)+'</div>' +
+          '<div class="pf-row"><span class="pf-check'+(data.funcCheck?' on':'')+'"></span> System/Functional check has been completed</div>' +
+          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span>' +
+            '<span class="pf-field"><b>Date of completion:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
+        '</div>';
+      openPrint(html);
+    };
+  }
+
+  // ---------- Anticipation of Aircraft Behaviour after Maintenance ----------
+  // Rebuilt from the original dynamic (XFA) PDF's own field definitions — its captions,
+  // dropdown option lists, and field order were extracted directly from the form's
+  // embedded XML, not guessed, since that PDF format can't be rendered as an image.
+  function nowDatetimeLocal(){
+    const d = new Date();
+    const pad = n=>String(n).padStart(2,'0');
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+  function fmtDatetimeNice(val){
+    if(!val) return '';
+    const d = new Date(val);
+    if(isNaN(d)) return val;
+    const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const pad = n=>String(n).padStart(2,'0');
+    return d.getDate()+'-'+MONTHS[d.getMonth()]+'-'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+  const ANT_ACTION1 = ['Start - Ground run to idle.', 'Start and shut down'];
+  const ANT_ACTION2 = [
+    "If no leak, wait for AME's confirmation and accelerate to flight idle for 5 minutes",
+    "If no abnormal behaviour, wait for AME's confirmation and accelerate to flight idle.",
+    "Wait for AME's confirmation and shut down"
+  ];
+  const ANT_MAINT_TYPES = ['Replacement', 'Repair', 'Adjustement', 'Modification', 'Inspection'];
+
+  function renderAnticipation(){
+    showView('Anticipation');
+    const el = document.getElementById('viewAnticipation');
+    const s = state.settings;
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Anticipation of Aircraft Behaviour after Maintenance Form</h2>' +
+        '<p class="form-sub">Filled out by the AME before a post-maintenance ground run, so the pilot knows what to watch for.</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Date/Time</label><input type="datetime-local" id="antDateTime" value="'+nowDatetimeLocal()+'"></div>' +
+          '<div class="field"><label>Aircraft Reg</label><select id="antReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
+          '<div class="field"><label>Work Report #</label><input id="antWr" maxlength="6"></div>' +
+          '<div class="field"><label>Maintenance performed</label><select id="antMaintType">'+opts(ANT_MAINT_TYPES, x=>x, x=>x)+'</select></div>' +
+        '</div>' +
+        '<div class="field"><label>Description of maintenance performed</label><textarea id="antDesc" rows="4"></textarea></div>' +
+        '<div class="panel" style="background:#fff3ea;border-color:#c05a2c;margin:14px 0;">' +
+          '<b>Caution:</b> Maintenance Tests are A High Risk Activity' +
+        '</div>' +
+        '<h3 style="margin:10px 0 6px;font-size:14px;">Pilot Action to Take</h3>' +
+        '<div class="field-grid">' +
+          '<div class="field span2"><label>Initial action</label><select id="antAction1">'+opts(ANT_ACTION1, x=>x, x=>x)+'</select></div>' +
+          '<div class="field span2"><label>Then</label><select id="antAction2">'+opts(ANT_ACTION2, x=>x, x=>x)+'</select></div>' +
+          '<div class="field span3"><label>Additional instructions to the pilot</label><textarea id="antAction3" rows="3"></textarea></div>' +
+        '</div>' +
+        '<div class="field"><label>What abnormalities can the pilot anticipate to happen?</label><textarea id="antAbnormal" rows="4"></textarea></div>' +
+        '<div class="btn-row"><button class="btn primary" id="antPrintBtn">Prepare PDF</button></div>' +
+      '</div>';
+
+    document.getElementById('antPrintBtn').onclick = ()=>{
+      const data = {
+        dateTime: fmtDatetimeNice(document.getElementById('antDateTime').value),
+        reg: document.getElementById('antReg').value,
+        wr: document.getElementById('antWr').value,
+        maintType: document.getElementById('antMaintType').value,
+        desc: document.getElementById('antDesc').value,
+        action1: document.getElementById('antAction1').value,
+        action2: document.getElementById('antAction2').value,
+        action3: document.getElementById('antAction3').value,
+        abnormal: document.getElementById('antAbnormal').value,
+      };
+      const html = PRINT_STYLES +
+        '<div class="pf-head">' +
+          '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+          '<div class="pf-title-block"><h1>Anticipation of Aircraft Behaviour<br>after Maintenance Form</h1></div>' +
+        '</div>' +
+        '<div class="pf-box">' +
+          '<div class="pf-row"><span class="pf-field"><b>Date/Time:</b><span class="pf-underline">'+escapeHTML(data.dateTime)+'</span></span>' +
+            '<span class="pf-field"><b>Aircraft Reg:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
+            '<span class="pf-field"><b>Work Report:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span></div>' +
+          '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>Maintenance performed:</b><span class="pf-underline">'+escapeHTML(data.maintType)+'</span></span></div>' +
+          '<div class="pf-worktext">'+escapeHTML(data.desc)+'</div>' +
+          '<div class="pf-statement" style="border:1.5px solid #000;padding:6px 8px;font-size:13px;font-weight:700;margin:10px 0;">Caution: Maintenance Tests are A High Risk Activity</div>' +
+          '<div class="pf-row"><b>Pilot Action to Take:</b></div>' +
+          '<div class="pf-desc-field">'+escapeHTML(data.action1)+'</div>' +
+          '<div class="pf-desc-field">'+escapeHTML(data.action2)+'</div>' +
+          (data.action3 ? '<div class="pf-desc-field" style="white-space:pre-wrap;">'+escapeHTML(data.action3)+'</div>' : '') +
+          '<div class="pf-row" style="margin-top:8px;"><b>What Abnormalities Can the Pilot Anticipate to Happen?</b></div>' +
+          '<div class="pf-worktext">'+escapeHTML(data.abnormal)+'</div>' +
+          '<div class="pf-signline" style="margin-top:18px;">' +
+            '<span class="sl"><b>Pilot Signature:</b></span>' +
+            '<span class="sl"><b>AME Signature:</b></span>' +
+          '</div>' +
+        '</div>';
+      openPrint(html);
+    };
+  }
+
+  window.__formsApp = { state, storageGet, storageSet, sha256, escapeHTML, todayISO, fmtDateNice, loadSettings, saveSettings, PHOENIX_LOGO_DATA_URI, SUPABASE_CONFIGURED };
+
+  // init
+  initGate();
+})();
+</script>
+</body>
+</html>
