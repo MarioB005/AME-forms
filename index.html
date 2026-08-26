@@ -434,6 +434,10 @@
     '.pf-runcheck{display:flex;align-items:center;gap:6px;font-size:12.5px;}' +
     '.pf-signline{display:flex;gap:30px;flex-wrap:wrap;font-size:12px;margin-top:8px;}' +
     '.pf-signline .sl{flex:1;min-width:200px;border-bottom:1px solid #000;padding-bottom:14px;}' +
+    '.pf-signblock{display:flex;gap:40px;flex-wrap:wrap;margin-top:10px;}' +
+    '.pf-signgroup{flex:1;min-width:260px;}' +
+    '.pf-signheading{font-weight:800;font-size:13.5px;margin-bottom:6px;}' +
+    '.pf-signfields{font-size:12.5px;white-space:nowrap;}' +
     '.pf-desc-field{margin:6px 0;font-size:12px;}' +
     '.pf-desc-field .lbl{font-weight:700;}' +
     '.pf-worktext{border:1px solid #000;min-height:80px;padding:6px 8px;margin:8px 0;font-size:12px;white-space:pre-wrap;}' +
@@ -735,24 +739,30 @@
               '<span class="pf-runcheck"><span class="pf-check"></span>Weight change</span>' +
               '<span class="pf-runcheck"><span class="pf-check"></span>Pitch Link Adjustment</span>' +
               '<span class="pf-runcheck"><span class="pf-check"></span>Tab Adjustment</span>' +
-              '<span class="pf-runcheck"><span class="pf-check"></span>Tool Check</span>' +
+              '<span class="pf-runcheck">Tool Check — AME initials: <span class="pf-underline"></span></span>' +
             '</div>' +
-            '<div class="pf-signline">' +
-              '<span class="sl"><b>DCC</b> (Pilot signature) &nbsp; Lic #: ________________</span>' +
-              '<span class="sl"><b>MR</b> (AME signature &amp; stamp)</span>' +
+            '<div class="pf-signblock">' +
+              '<div class="pf-signgroup">' +
+                '<div class="pf-signheading">MR</div>' +
+                '<div class="pf-signfields">AME Signature: <span class="pf-underline" style="min-width:220px;">&nbsp;</span> &nbsp; Lic #: <span class="pf-underline" style="min-width:110px;">&nbsp;</span></div>' +
+              '</div>' +
+              '<div class="pf-signgroup">' +
+                '<div class="pf-signheading">DCC</div>' +
+                '<div class="pf-signfields">Pilot Signature: <span class="pf-underline" style="min-width:220px;">&nbsp;</span> &nbsp; Lic #: <span class="pf-underline" style="min-width:110px;">&nbsp;</span></div>' +
+              '</div>' +
             '</div>' +
           '</div>';
       }
 
-      const html = PRINT_STYLES +
+      const html = PRINT_STYLES + '<style>@page{size:landscape;}</style>' +
         '<div class="pf-head">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
           '<div class="pf-title-block"><h1>MR Track &amp; Balance Check List</h1></div>' +
         '</div>' +
         '<div class="pf-box">' +
           '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
-            '<span class="pf-field"><b>WR #:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span></div>' +
-          '<div class="pf-row"><span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+            '<span class="pf-field"><b>WR #:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span>' +
+            '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
           '<div class="pf-row"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot)+'</span></span>' +
             '<span class="pf-field"><b>AME:</b><span class="pf-underline">'+escapeHTML(data.ame)+'</span></span></div>' +
         '</div>' +
