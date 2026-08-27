@@ -1151,7 +1151,7 @@
       const html = PRINT_STYLES + antStyles +
         '<div class="pf-fillpage ant-print">' +
         '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
-        '<div class="pf-head">' +
+        '<div class="pf-head pf-headleft">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
           '<div class="pf-title-block"><h1>Anticipation of Aircraft Behaviour<br>after Maintenance Form</h1></div>' +
         '</div>' +
@@ -1168,12 +1168,10 @@
           (data.action3 ? '<div class="pf-desc-field" style="white-space:pre-wrap;">'+escapeHTML(data.action3)+'</div>' : '') +
           '<div class="pf-row" style="margin-top:16px;"><b>What Abnormalities Can the Pilot Anticipate to Happen?</b></div>' +
           '<div class="pf-worktext">'+escapeHTML(data.abnormal)+'</div>' +
-          '<div class="pf-row" style="margin-top:22px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+(data.pilotName?escapeHTML(data.pilotName):'&nbsp;')+'</span></span>' +
-            '<span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ameName?escapeHTML(data.ameName):'&nbsp;')+'</span></span></div>' +
-          '<div class="pf-signline" style="margin-top:16px;">' +
-            '<span class="sl"><b>Pilot Signature:</b></span>' +
-            '<span class="sl"><b>AME Signature:</b></span>' +
-          '</div>' +
+          '<div class="pf-row" style="margin-top:22px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ameName?escapeHTML(data.ameName):'&nbsp;')+'</span></span>' +
+            '<span class="pf-field"><b>AME Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
+          '<div class="pf-row" style="margin-top:18px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+(data.pilotName?escapeHTML(data.pilotName):'&nbsp;')+'</span></span>' +
+            '<span class="pf-field"><b>Pilot Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
         '</div>' +
         docFooterHTML('anticipation', data.revision, data.revisionDate) +
         '</div>';
