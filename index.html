@@ -463,6 +463,9 @@
     '.pf-screen-heading{font-size:22px;margin:14px 0 8px;}' +
     '.pf-stampbox{display:inline-block;width:100px;height:56px;border:1px solid #000;vertical-align:middle;margin-left:6px;}' +
     '.pf-topline{text-align:center;font-size:22px;font-weight:800;margin-bottom:2px;}' +
+    '.pf-headleft{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;}' +
+    '.pf-headleft .pf-logo{grid-column:1;justify-self:start;}' +
+    '.pf-headleft .pf-title-block{grid-column:2;text-align:center;}' +
     '.pf-fillpage{display:flex;flex-direction:column;min-height:940px;}' +
     '.pf-fillpage .pf-docfooter{margin-top:auto;padding-top:16px;}' +
     '@page{margin:12mm;}' +
@@ -668,7 +671,7 @@
         '<div class="field"><label>Reason for tolerance</label><textarea id="tolReasonText" rows="3"></textarea></div>' +
         '<div class="field-grid">' +
           '<div class="field"><label>A/F time</label><input id="tolAfTime"></div>' +
-          '<div class="field"><label>TSN/TSO</label><input id="tolTsn" value="N/A"></div>' +
+          '<div class="field"><label>TSN/TSO</label><input id="tolTsn"></div>' +
           '<div class="field"><label>Not to exceed TTAF</label><input id="tolTtaf"></div>' +
           '<div class="field"><label>Not to exceed calendar date</label><input type="date" id="tolCalendar"></div>' +
           '<div class="field"><label>AME</label><select id="tolAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
@@ -730,7 +733,7 @@
       const html = PRINT_STYLES +
         '<div class="pf-fillpage">' +
         '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
-        '<div class="pf-head">' +
+        '<div class="pf-head pf-headleft">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
           '<div class="pf-title-block"><h1>Tolerance Approval Form</h1><div class="pf-sub">Appendix &quot;M&quot; — D.I.R. Appendix to MCM</div></div>' +
         '</div>' +
@@ -747,7 +750,9 @@
           '<div class="pf-reasonbox">'+escapeHTML(data.reason)+'</div>' +
           '<div class="pf-row"><span class="pf-field"><b>A/F time:</b><span class="pf-underline">'+escapeHTML(data.afTime)+'</span></span>' +
             '<span class="pf-field"><b>TSN/TSO:</b><span class="pf-underline">'+escapeHTML(data.tsn)+'</span></span></div>' +
-          '<div class="pf-row">Life remaining with tolerance — <b>Not to exceed TTAF:</b><span class="pf-underline">'+escapeHTML(data.ttaf)+'</span> &nbsp; <b>Calendar:</b><span class="pf-underline">'+escapeHTML(data.calendar)+'</span></div>' +
+          '<div class="pf-row" style="margin-top:10px;">Life remaining with tolerance — ' +
+            '<span class="pf-field"><b>Not to exceed TTAF:</b><span class="pf-underline">'+escapeHTML(data.ttaf)+'</span></span>' +
+            '<span class="pf-field"><b>Calendar:</b><span class="pf-underline">'+escapeHTML(data.calendar)+'</span></span></div>' +
           '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ame?escapeHTML(data.ame):'&nbsp;')+'</span></span></div>' +
           '<div class="pf-row"><span class="pf-field"><b>SIG:</b><span class="pf-underline" style="min-width:160px;">&nbsp;</span></span>' +
             '<span class="pf-field"><b>ACA #:</b><span class="pf-underline">'+(data.aca?escapeHTML(data.aca):'&nbsp;')+'</span></span>' +
