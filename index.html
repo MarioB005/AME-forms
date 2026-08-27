@@ -454,6 +454,11 @@
     '.pf-instr{font-size:9.5px;color:#333;margin:6px 0 12px;line-height:1.4;}' +
     '.pf-appendix{font-size:11px;white-space:nowrap;}' +
     '.pf-docfooter{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:16px;padding-top:6px;border-top:1px solid #000;font-size:10px;}' +
+    '.pf-page2{page-break-before:always;break-before:page;padding-top:2px;}' +
+    '.pf-screenbox{padding:2px 16px;}' +
+    '.pf-screen-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;font-size:12.5px;border-bottom:1px solid #ccc;}' +
+    '.pf-screen-row:last-child{border-bottom:none;}' +
+    '.pf-screen-yn{white-space:nowrap;}' +
     '@page{margin:12mm;}' +
   '</style>';
 
@@ -828,6 +833,19 @@
   }
 
   // ---------- Major / Minor Modification report (shared Standard 571 Appendix L layout) ----------
+  const MOD_SCREENING_ITEMS = [
+    'Structural strength / Stiffness',
+    'Powerplant operation',
+    'Rotor/drive-system operation',
+    'Performance',
+    'Flight characteristics',
+    'Flight controls',
+    'Stability or controllability',
+    'Required systems',
+    'Operating limitations',
+    'Environmental characteristics',
+    'Other qualities affecting airworthiness'
+  ];
   function renderModForm(viewKey, label){
     showView(viewKey);
     const el = document.getElementById('view'+viewKey);
@@ -864,6 +882,13 @@
         '<div class="field-grid" style="margin-top:8px;">' +
           '<div class="field"><label>Date of completion</label><input type="date" id="'+idp+'CompDate" value="'+todayISO()+'"></div>' +
         '</div>' +
+        '<h3 style="margin:18px 0 6px;font-size:14px;">Modification Screening Result</h3>' +
+        '<p class="form-sub" style="margin-top:0;">Does this modification have an appreciable effect on any of the following? (prints as page 2)</p>' +
+        MOD_SCREENING_ITEMS.map((q,i)=>
+          '<div class="yn-group"><span class="yn-label">'+escapeHTML(q)+'?</span>' +
+            '<label class="yn-opt"><input type="radio" name="'+idp+'Screen'+i+'" value="Yes"> Yes</label>' +
+            '<label class="yn-opt"><input type="radio" name="'+idp+'Screen'+i+'" value="No" checked> No</label></div>'
+        ).join('') +
         '<div class="btn-row"><button class="btn primary" id="'+idp+'PrintBtn">Prepare PDF</button></div>' +
       '</div>';
 
@@ -894,6 +919,10 @@
         funcCheck: document.getElementById(idp+'FuncCheck').checked,
         compDate: fmtDateNice(document.getElementById(idp+'CompDate').value),
       };
+      const screening = MOD_SCREENING_ITEMS.map((q,i)=>({
+        q: q,
+        val: document.querySelector('input[name="'+idp+'Screen'+i+'"]:checked').value
+      }));
       const html = PRINT_STYLES +
         '<div class="pf-head">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
@@ -920,6 +949,25 @@
           '<div class="pf-row"><span class="pf-check'+(data.funcCheck?' on':'')+'"></span> System/Functional check has been completed</div>' +
           '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span>' +
             '<span class="pf-field"><b>Date of completion:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
+        '</div>' +
+        '<div class="pf-page2">' +
+          '<div class="pf-head">' +
+            '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+            '<div class="pf-title-block"><h1>Modification Screening Result</h1></div>' +
+          '</div>' +
+          '<div class="pf-instr">Does this modification have an appreciable effect on any of the following?</div>' +
+          '<div class="pf-box">' +
+            '<div class="pf-row"><span class="pf-field"><b>Registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
+              '<span class="pf-field"><b>Modification / Work Order No.:</b><span class="pf-underline">'+escapeHTML(data.workOrder)+'</span></span></div>' +
+          '</div>' +
+          '<div class="pf-box pf-screenbox">' +
+            screening.map(item=>
+              '<div class="pf-screen-row"><span>'+escapeHTML(item.q)+'?</span>' +
+                '<span class="pf-screen-yn">'+chk(item.val,'Yes')+' &nbsp; &nbsp; '+chk(item.val,'No')+'</span></div>'
+            ).join('') +
+          '</div>' +
+          '<div class="pf-row" style="margin-top:18px;"><span class="pf-field"><b>Screened by:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span>' +
+            '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
         '</div>';
       openPrint(html);
     };
