@@ -262,7 +262,10 @@
       ames: [],
       pilots: [],
       reasons: ['Aircraft leaving on a job off base', 'Parts on order', 'Awaiting engineering approval'],
-      company: { owner:'Phoenix Heli-Flight Inc.', orgName:'Phoenix Heli-Flight', orgAddress:'1001 Saline Cr. Pkwy\nFort McMurray, Alberta\nT9H 0H8 Canada', phfApproval:'AMO 100-96' }
+      company: { owner:'Phoenix Heli-Flight Inc.', orgName:'Phoenix Heli-Flight', orgAddress:'1001 Saline Cr. Pkwy\nFort McMurray, Alberta\nT9H 0H8 Canada', phfApproval:'AMO 100-96' },
+      docControl: { revision:'', revisionDate:'' },
+      appendix: { trackbalance:'', tolerance:'', majormod:'', minormod:'', anticipation:'' },
+      trackBalanceNote: 'Work Report item "Track & Balance" to be signed. Add the "Satisfactory test flight carried out..." statement in the log book for the pilot sign.'
     };
   }
 
@@ -442,8 +445,19 @@
     '.pf-desc-field .lbl{font-weight:700;}' +
     '.pf-worktext{border:1px solid #000;min-height:80px;padding:6px 8px;margin:8px 0;font-size:12px;white-space:pre-wrap;}' +
     '.pf-instr{font-size:9.5px;color:#333;margin:6px 0 12px;line-height:1.4;}' +
+    '.pf-appendix{font-size:11px;white-space:nowrap;}' +
+    '.pf-docfooter{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:16px;padding-top:6px;border-top:1px solid #000;font-size:10px;}' +
     '@page{margin:12mm;}' +
   '</style>';
+
+  function docFooterHTML(){
+    const dc = (state.settings && state.settings.docControl) || {revision:'',revisionDate:''};
+    return '<div class="pf-docfooter">' +
+      '<span>Rev. #: <span class="pf-underline" style="min-width:50px;">'+escapeHTML(dc.revision||'')+'&nbsp;</span></span>' +
+      '<span>Page 1 of 1</span>' +
+      '<span>Date of revision: <span class="pf-underline" style="min-width:80px;">'+(dc.revisionDate?escapeHTML(fmtDateNice(dc.revisionDate)):'&nbsp;')+'</span></span>' +
+    '</div>';
+  }
 
   // ---------- Settings ----------
   let settingsTab = 'aircraft';
@@ -568,6 +582,7 @@
       document.getElementById('saveReasonBtn').onclick = async ()=>{ await saveSettings(); flashSaved('saveReasonBtn'); };
     } else if(settingsTab==='company'){
       const c = s.company;
+      const dc = s.docControl;
       body.innerHTML =
         '<div class="field-grid">' +
           '<div class="field"><label>Owner name (shown on Modification reports)</label><input id="coOwner" value="'+escapeHTML(c.owner)+'"></div>' +
@@ -575,12 +590,20 @@
           '<div class="field"><label>Organization name</label><input id="coOrgName" value="'+escapeHTML(c.orgName)+'"></div>' +
           '<div class="field span2"><label>Organization address</label><textarea id="coOrgAddress" rows="3">'+escapeHTML(c.orgAddress)+'</textarea></div>' +
         '</div>' +
+        '<h3 style="margin:18px 0 4px;font-size:14px;">Maintenance Policy Manual document control</h3>' +
+        '<p class="form-sub" style="margin-top:0;">Shown in the footer of every printed form.</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Revision #</label><input id="coRevision" value="'+escapeHTML(dc.revision)+'"></div>' +
+          '<div class="field"><label>Revision date</label><input type="date" id="coRevisionDate" value="'+escapeHTML(dc.revisionDate)+'"></div>' +
+        '</div>' +
         '<div class="btn-row"><button class="btn primary" id="saveCoBtn">Save</button></div>';
       document.getElementById('saveCoBtn').onclick = async ()=>{
         c.owner = document.getElementById('coOwner').value;
         c.phfApproval = document.getElementById('coPhf').value;
         c.orgName = document.getElementById('coOrgName').value;
         c.orgAddress = document.getElementById('coOrgAddress').value;
+        dc.revision = document.getElementById('coRevision').value;
+        dc.revisionDate = document.getElementById('coRevisionDate').value;
         await saveSettings();
         flashSaved('saveCoBtn');
       };
@@ -713,18 +736,27 @@
           '<div class="field"><label>A/C registration</label><select id="tbReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
           '<div class="field"><label>Pilot name</label><select id="tbPilot">'+opts(s.pilots, p=>p.name, p=>p.name)+'</select></div>' +
           '<div class="field"><label>AME name</label><select id="tbAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
+          '<div class="field"><label>Appendix # (Maintenance Policy Manual)</label><input id="tbAppendix" value="'+escapeHTML(s.appendix.trackbalance||'')+'"></div>' +
         '</div>' +
+        '<div class="field"><label>Note printed below the runs</label><textarea id="tbNote" rows="3">'+escapeHTML(s.trackBalanceNote||'')+'</textarea></div>' +
         '<div class="btn-row"><button class="btn primary" id="tbPrintBtn">Prepare PDF</button></div>' +
       '</div>';
 
-    document.getElementById('tbPrintBtn').onclick = ()=>{
+    document.getElementById('tbPrintBtn').onclick = async ()=>{
       const data = {
         date: fmtDateNice(document.getElementById('tbDate').value),
         wr: document.getElementById('tbWr').value,
         reg: document.getElementById('tbReg').value,
         pilot: document.getElementById('tbPilot').value,
         ame: document.getElementById('tbAme').value,
+        appendix: document.getElementById('tbAppendix').value,
+        note: document.getElementById('tbNote').value,
       };
+      // remember the appendix # and note as the new default for next time, shared across stations
+      s.appendix.trackbalance = data.appendix;
+      s.trackBalanceNote = data.note;
+      await saveSettings();
+
       const runs = 5;
 
       let runsHTML = '';
@@ -736,7 +768,7 @@
               '<span class="pf-runcheck"><span class="pf-check"></span>Weight change</span>' +
               '<span class="pf-runcheck"><span class="pf-check"></span>Pitch Link Adjustment</span>' +
               '<span class="pf-runcheck"><span class="pf-check"></span>Tab Adjustment</span>' +
-              '<span class="pf-runcheck">Tool Check — AME initials: <span class="pf-underline">&nbsp;</span></span>' +
+              '<span class="pf-runcheck">Tool Check - AME initials: <span class="pf-underline" style="min-width:45px;">&nbsp;</span></span>' +
             '</div>' +
             '<div class="pf-signblock">' +
               '<div class="pf-signgroup">' +
@@ -752,6 +784,7 @@
       }
 
       const tbStyles = '<style>' +
+          '.pf-topline{text-align:right;font-size:11px;margin-bottom:6px;}' +
           '.tb-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;}' +
           '.tb-head .pf-logo{grid-column:1;justify-self:start;}' +
           '.tb-head .pf-title-block{grid-column:2;text-align:center;}' +
@@ -764,12 +797,13 @@
           '.tb-print .pf-signblock{margin-top:5px;}' +
           '.tb-print .pf-signheading{font-size:15.5px;margin-bottom:3px;}' +
           '.tb-print .pf-signfields{font-size:14.5px;}' +
-          '.tb-print .pf-statement{font-size:13px;margin-top:8px;}' +
+          '.tb-print .pf-statement{font-size:13px;margin-top:8px;white-space:pre-wrap;}' +
           '@page{margin:9mm;}' +
         '</style>';
 
       const html = PRINT_STYLES + tbStyles +
         '<div class="tb-print">' +
+        '<div class="pf-topline">Appendix #: <span class="pf-underline" style="min-width:60px;">'+(data.appendix?escapeHTML(data.appendix):'&nbsp;')+'</span></div>' +
         '<div class="pf-head tb-head">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
           '<div class="pf-title-block"><h1>MR Track &amp; Balance Check List</h1></div>' +
@@ -782,9 +816,8 @@
             '<span class="pf-field"><b>AME:</b><span class="pf-underline">'+escapeHTML(data.ame)+'</span></span></div>' +
         '</div>' +
         runsHTML +
-        '<div class="pf-statement">' +
-          '<b>Note:</b> Work Report item &quot;Track &amp; Balance&quot; to be signed. Add the &quot;Satisfactory test flight carried out...&quot; statement in the log book for the pilot sign.' +
-        '</div>' +
+        (data.note ? '<div class="pf-statement">'+escapeHTML(data.note)+'</div>' : '') +
+        docFooterHTML() +
         '</div>';
       openPrint(html);
     };
