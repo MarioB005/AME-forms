@@ -262,7 +262,7 @@
       ames: [],
       pilots: [],
       reasons: ['Aircraft leaving on a job off base', 'Parts on order', 'Awaiting engineering approval'],
-      company: { owner:'Phoenix Heli-Flight Inc.', orgName:'Phoenix Heli-Flight', orgAddress:'1001 Saline Cr. Pkwy\nFort McMurray, Alberta\nT9H 0H8 Canada', phfApproval:'AMO 100-96', prmName:'' },
+      company: { owner:'Phoenix Heli-Flight Inc.', orgName:'Phoenix Heli-Flight', orgAddress:'1001 Saline Cr. Pkwy\nFort McMurray, Alberta\nT9H 0H8 Canada', phfApproval:'AMO 100-96', prmName:'Mario Blais' },
       docControl: {
         trackbalance:{revision:'',revisionDate:''}, tolerance:{revision:'',revisionDate:''},
         majormod:{revision:'',revisionDate:''}, minormod:{revision:'',revisionDate:''}, anticipation:{revision:'',revisionDate:''}
@@ -651,7 +651,6 @@
         '<div class="field-grid">' +
           '<div class="field"><label>Date</label><input type="date" id="tolDate" value="'+todayISO()+'"></div>' +
           '<div class="field"><label>REG #</label><select id="tolReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
-          '<div class="field"><label>AME</label><select id="tolAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
           '<div class="field"><label>Part name</label><input id="tolPartName"></div>' +
           '<div class="field"><label>Part #</label><input id="tolPartNo" value="N/A"></div>' +
           '<div class="field"><label>Serial #</label><input id="tolSerial" value="N/A"></div>' +
@@ -672,6 +671,7 @@
           '<div class="field"><label>TSN/TSO</label><input id="tolTsn" value="N/A"></div>' +
           '<div class="field"><label>Not to exceed TTAF</label><input id="tolTtaf"></div>' +
           '<div class="field"><label>Not to exceed calendar date</label><input type="date" id="tolCalendar"></div>' +
+          '<div class="field"><label>AME</label><select id="tolAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
           '<div class="field"><label>ACA #</label><input id="tolAca"></div>' +
           '<div class="field"><label>Signature date</label><input type="date" id="tolSigDate" value="'+todayISO()+'"></div>' +
           '<div class="field"><label>PHF approval number</label><input id="tolPhf" value="'+escapeHTML(s.company.phfApproval)+'"></div>' +
@@ -737,10 +737,10 @@
         '<div class="pf-box">' +
           '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
             '<span class="pf-field"><b>REG #:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
-          '<div class="pf-row"><span class="pf-field"><b>Part name:</b><span class="pf-underline" style="min-width:260px;">'+escapeHTML(data.partName)+'</span></span></div>' +
-          '<div class="pf-row"><span class="pf-field"><b>Part #:</b><span class="pf-underline">'+escapeHTML(data.partNo)+'</span></span>' +
+          '<div class="pf-row" style="margin-top:12px;"><span class="pf-field"><b>Part name:</b><span class="pf-underline" style="min-width:200px;">'+escapeHTML(data.partName)+'</span></span>' +
+            '<span class="pf-field"><b>Part #:</b><span class="pf-underline">'+escapeHTML(data.partNo)+'</span></span>' +
             '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:8px;">Special inspection to be carried out while on tolerance: '+chk(data.special,'Yes')+' &nbsp; '+chk(data.special,'No')+'</div>' +
+          '<div class="pf-row" style="margin-top:12px;">Special inspection to be carried out while on tolerance: '+chk(data.special,'Yes')+' &nbsp; '+chk(data.special,'No')+'</div>' +
           '<div class="pf-row">Any inspection required before granting the tolerance: '+chk(data.preInsp,'Yes')+' &nbsp; '+chk(data.preInsp,'No')+'</div>' +
           '<div class="pf-row">Ensure all applicable airworthiness directives are performed: <span class="pf-check'+(data.adDone?' on':'')+'"></span></div>' +
           '<div style="margin-top:8px;font-size:12px;"><b>Reason for tolerance:</b></div>' +
