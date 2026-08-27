@@ -268,7 +268,8 @@
         majormod:{revision:'',revisionDate:''}, minormod:{revision:'',revisionDate:''}, anticipation:{revision:'',revisionDate:''}
       },
       appendix: { trackbalance:'', tolerance:'', majormod:'', minormod:'', anticipation:'' },
-      trackBalanceNote: 'Work Report item "Track & Balance" to be signed. Add the "Satisfactory test flight carried out..." statement in the log book for the pilot sign.'
+      trackBalanceNote: 'Work Report item "Track & Balance" to be signed. Add the "Satisfactory test flight carried out..." statement in the log book for the pilot sign.',
+      modDescDefault: 'Performed the modification/repair described above IAW [drawing / STC / engineering order / manufacturer\'s instructions #]. Parts removed: [P/N, S/N]. Parts installed: [P/N, S/N]. All work accomplished IAW the applicable maintenance manual and approved data. Work area inspected and found satisfactory.'
     };
   }
 
@@ -459,6 +460,8 @@
     '.pf-screen-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;font-size:12.5px;border-bottom:1px solid #ccc;}' +
     '.pf-screen-row:last-child{border-bottom:none;}' +
     '.pf-screen-yn{white-space:nowrap;}' +
+    '.pf-screen-heading{font-size:22px;margin:14px 0 8px;}' +
+    '.pf-stampbox{display:inline-block;width:100px;height:56px;border:1px solid #000;vertical-align:middle;margin-left:6px;}' +
     '@page{margin:12mm;}' +
   '</style>';
 
@@ -488,6 +491,7 @@
       {key:'ames', label:'AMEs'},
       {key:'pilots', label:'Pilots'},
       {key:'reasons', label:'Tolerance reasons'},
+      {key:'templates', label:'Templates'},
       {key:'company', label:'Company info'},
     ];
     const tabsEl = document.getElementById('settingsTabs');
@@ -591,6 +595,16 @@
       });
       document.getElementById('addReasonBtn').onclick = ()=>{ s.reasons.push(''); renderSettingsBody(); };
       document.getElementById('saveReasonBtn').onclick = async ()=>{ await saveSettings(); flashSaved('saveReasonBtn'); };
+    } else if(settingsTab==='templates'){
+      body.innerHTML =
+        '<p class="form-sub" style="margin-top:0;">Starting text pre-filled into the "Description" box on the Major and Minor Modification forms — edit it to fit how your station writes these up, or clear it to start blank.</p>' +
+        '<div class="field"><label>Default description text</label><textarea id="tplModDesc" rows="5">'+escapeHTML(s.modDescDefault||'')+'</textarea></div>' +
+        '<div class="btn-row"><button class="btn primary" id="saveTplBtn">Save</button></div>';
+      document.getElementById('saveTplBtn').onclick = async ()=>{
+        s.modDescDefault = document.getElementById('tplModDesc').value;
+        await saveSettings();
+        flashSaved('saveTplBtn');
+      };
     } else if(settingsTab==='company'){
       const c = s.company;
       body.innerHTML =
@@ -876,7 +890,7 @@
           '<div class="field"><label>Component / Part No.</label><input id="'+idp+'PartNo"></div>' +
           '<div class="field"><label>Component Serial No.</label><input id="'+idp+'CompSerial"></div>' +
           '<div class="field span3"><label>Location / System affected</label><input id="'+idp+'Location"></div>' +
-          '<div class="field span3"><label>Description</label><textarea id="'+idp+'DescText" rows="4"></textarea></div>' +
+          '<div class="field span3"><label>Description</label><textarea id="'+idp+'DescText" rows="4">'+escapeHTML(s.modDescDefault||'')+'</textarea></div>' +
         '</div>' +
         '<div class="check-row"><input type="checkbox" id="'+idp+'FuncCheck" checked><label for="'+idp+'FuncCheck">System/Functional check has been completed</label></div>' +
         '<div class="field-grid" style="margin-top:8px;">' +
@@ -889,6 +903,7 @@
             '<label class="yn-opt"><input type="radio" name="'+idp+'Screen'+i+'" value="Yes"> Yes</label>' +
             '<label class="yn-opt"><input type="radio" name="'+idp+'Screen'+i+'" value="No" checked> No</label></div>'
         ).join('') +
+        '<div class="field"><label>Note addressing any of the above effects</label><textarea id="'+idp+'ScreenNote" rows="3"></textarea></div>' +
         '<div class="btn-row"><button class="btn primary" id="'+idp+'PrintBtn">Prepare PDF</button></div>' +
       '</div>';
 
@@ -923,6 +938,7 @@
         q: q,
         val: document.querySelector('input[name="'+idp+'Screen'+i+'"]:checked').value
       }));
+      const screenNote = document.getElementById(idp+'ScreenNote').value;
       const html = PRINT_STYLES +
         '<div class="pf-head">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
@@ -955,18 +971,21 @@
             '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
             '<div class="pf-title-block"><h1>Modification Screening Result</h1></div>' +
           '</div>' +
-          '<div class="pf-instr">Does this modification have an appreciable effect on any of the following?</div>' +
           '<div class="pf-box">' +
             '<div class="pf-row"><span class="pf-field"><b>Registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
               '<span class="pf-field"><b>Modification / Work Order No.:</b><span class="pf-underline">'+escapeHTML(data.workOrder)+'</span></span></div>' +
           '</div>' +
+          '<div class="pf-screen-heading">Does this modification have an appreciable effect on any of the following?</div>' +
           '<div class="pf-box pf-screenbox">' +
             screening.map(item=>
               '<div class="pf-screen-row"><span>'+escapeHTML(item.q)+'?</span>' +
                 '<span class="pf-screen-yn">'+chk(item.val,'Yes')+' &nbsp; &nbsp; '+chk(item.val,'No')+'</span></div>'
             ).join('') +
           '</div>' +
-          '<div class="pf-row" style="margin-top:18px;"><span class="pf-field"><b>Screened by:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span>' +
+          (screenNote ? '<div class="pf-desc-field" style="margin-top:14px;"><span class="lbl">Note:</span></div><div class="pf-worktext">'+escapeHTML(screenNote)+'</div>' : '') +
+          '<div class="pf-row" style="margin-top:18px;align-items:center;">' +
+            '<span class="pf-field"><b>AME Signature:</b><span class="pf-underline" style="min-width:200px;">&nbsp;</span></span>' +
+            '<span class="pf-field"><b>ACA Stamp:</b><span class="pf-stampbox"></span></span>' +
             '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
         '</div>';
       openPrint(html);
