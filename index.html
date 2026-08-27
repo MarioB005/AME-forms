@@ -265,8 +265,8 @@
       reasons: ['Aircraft leaving on a job off base', 'Parts on order', 'Awaiting engineering approval'],
       company: { owner:'Phoenix Heli-Flight Inc.', orgName:'Phoenix Heli-Flight', orgAddress:'1001 Saline Cr. Pkwy\nFort McMurray, Alberta\nT9H 0H8 Canada', phfApproval:'AMO 100-96', prmName:'Mario Blais' },
       docControl: {
-        trackbalance:{revision:'',revisionDate:''}, tolerance:{revision:'',revisionDate:''},
-        majormod:{revision:'',revisionDate:''}, minormod:{revision:'',revisionDate:''}, anticipation:{revision:'',revisionDate:''}
+        trackbalance:{revision:'',revisionDate:'',page:'Page 1 of 1'}, tolerance:{revision:'',revisionDate:'',page:'Page 1 of 1'},
+        majormod:{revision:'',revisionDate:'',page:'Page 1 of 2',page2:'Page 2 of 2'}, minormod:{revision:'',revisionDate:'',page:'Page 1 of 2',page2:'Page 2 of 2'}, anticipation:{revision:'',revisionDate:'',page:'Page 1 of 1'}
       },
       appendix: { trackbalance:'', tolerance:'', majormod:'', minormod:'', anticipation:'' },
       trackBalanceNote: 'Work Report item "Track & Balance" to be signed. Add the "Satisfactory test flight carried out..." statement in the log book for the pilot sign.',
@@ -290,6 +290,13 @@
     }catch(e){
       state.settings = defaultSettings();
     }
+    // back-fill any per-form docControl keys (e.g. "page") added after a station last saved settings —
+    // the shallow merge above replaces each form's whole docControl entry, so older saved blobs
+    // can be missing newer fields entirely.
+    const defaultDocControl = defaultSettings().docControl;
+    Object.keys(defaultDocControl).forEach(k=>{
+      state.settings.docControl[k] = Object.assign({}, defaultDocControl[k], state.settings.docControl[k]||{});
+    });
   }
   async function saveSettings(){
     await storageSet('forms:settings', JSON.stringify(state.settings), true);
@@ -688,6 +695,7 @@
           '<div class="field"><label>Appendix #</label><input id="tolAppendix" value="'+escapeHTML(s.appendix.tolerance||'')+'"></div>' +
           '<div class="field"><label>Revision #</label><input id="tolRevision" value="'+escapeHTML(s.docControl.tolerance.revision||'')+'"></div>' +
           '<div class="field"><label>Revision date</label><input type="date" id="tolRevisionDate" value="'+escapeHTML(s.docControl.tolerance.revisionDate||'')+'"></div>' +
+          '<div class="field"><label>Page label</label><input id="tolPage" value="'+escapeHTML(s.docControl.tolerance.page||'Page 1 of 1')+'"></div>' +
         '</div>' +
         '<div class="btn-row"><button class="btn primary" id="tolPrintBtn">Prepare PDF</button></div>' +
       '</div>';
@@ -726,10 +734,11 @@
         appendix: document.getElementById('tolAppendix').value,
         revision: document.getElementById('tolRevision').value,
         revisionDate: document.getElementById('tolRevisionDate').value,
+        page: document.getElementById('tolPage').value,
       };
       // remember appendix #, revision info and PRM name as the new default for next time, shared across stations
       s.appendix.tolerance = data.appendix;
-      s.docControl.tolerance = { revision: data.revision, revisionDate: data.revisionDate };
+      s.docControl.tolerance = { revision: data.revision, revisionDate: data.revisionDate, page: data.page };
       s.company.prmName = data.prmName;
       await saveSettings();
 
@@ -771,7 +780,7 @@
           '<div class="pf-row" style="margin-top:20px;"><span class="pf-field"><b>PRM Name:</b><span class="pf-underline" style="min-width:200px;">'+(data.prmName?escapeHTML(data.prmName):'&nbsp;')+'</span></span>' +
             '<span class="pf-field"><b>PRM SIG:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
         '</div>' +
-        docFooterHTML('tolerance', data.revision, data.revisionDate) +
+        docFooterHTML('tolerance', data.revision, data.revisionDate, data.page) +
         '</div>';
       openPrint(html);
     };
@@ -796,6 +805,7 @@
           '<div class="field"><label>Appendix # (Maintenance Policy Manual)</label><input id="tbAppendix" value="'+escapeHTML(s.appendix.trackbalance||'')+'"></div>' +
           '<div class="field"><label>Revision #</label><input id="tbRevision" value="'+escapeHTML(s.docControl.trackbalance.revision||'')+'"></div>' +
           '<div class="field"><label>Revision date</label><input type="date" id="tbRevisionDate" value="'+escapeHTML(s.docControl.trackbalance.revisionDate||'')+'"></div>' +
+          '<div class="field"><label>Page label</label><input id="tbPage" value="'+escapeHTML(s.docControl.trackbalance.page||'Page 1 of 1')+'"></div>' +
         '</div>' +
         '<div class="field"><label>Note printed below the runs</label><textarea id="tbNote" rows="3">'+escapeHTML(s.trackBalanceNote||'')+'</textarea></div>' +
         '<div class="btn-row"><button class="btn primary" id="tbPrintBtn">Prepare PDF</button></div>' +
@@ -812,11 +822,12 @@
         note: document.getElementById('tbNote').value,
         revision: document.getElementById('tbRevision').value,
         revisionDate: document.getElementById('tbRevisionDate').value,
+        page: document.getElementById('tbPage').value,
       };
       // remember the appendix #, note and revision info as the new default for next time, shared across stations
       s.appendix.trackbalance = data.appendix;
       s.trackBalanceNote = data.note;
-      s.docControl.trackbalance = { revision: data.revision, revisionDate: data.revisionDate };
+      s.docControl.trackbalance = { revision: data.revision, revisionDate: data.revisionDate, page: data.page };
       await saveSettings();
 
       const runs = 5;
@@ -880,7 +891,7 @@
         '</div>' +
         runsHTML +
         (data.note ? '<div class="pf-statement">'+escapeHTML(data.note)+'</div>' : '') +
-        docFooterHTML('trackbalance', data.revision, data.revisionDate) +
+        docFooterHTML('trackbalance', data.revision, data.revisionDate, data.page) +
         '</div>';
       openPrint(html);
     };
@@ -950,6 +961,8 @@
           '<div class="field"><label>Appendix #</label><input id="'+idp+'Appendix" value="'+escapeHTML(s.appendix[settingsKey]||'')+'"></div>' +
           '<div class="field"><label>Revision #</label><input id="'+idp+'Revision" value="'+escapeHTML(s.docControl[settingsKey].revision||'')+'"></div>' +
           '<div class="field"><label>Revision date</label><input type="date" id="'+idp+'RevisionDate" value="'+escapeHTML(s.docControl[settingsKey].revisionDate||'')+'"></div>' +
+          '<div class="field"><label>Page 1 label</label><input id="'+idp+'Page" value="'+escapeHTML(s.docControl[settingsKey].page||'Page 1 of 2')+'"></div>' +
+          '<div class="field"><label>Page 2 label</label><input id="'+idp+'Page2" value="'+escapeHTML(s.docControl[settingsKey].page2||'Page 2 of 2')+'"></div>' +
         '</div>' +
         '<div class="btn-row"><button class="btn primary" id="'+idp+'PrintBtn">Prepare PDF</button></div>' +
       '</div>';
@@ -983,6 +996,8 @@
         appendix: document.getElementById(idp+'Appendix').value,
         revision: document.getElementById(idp+'Revision').value,
         revisionDate: document.getElementById(idp+'RevisionDate').value,
+        page: document.getElementById(idp+'Page').value,
+        page2: document.getElementById(idp+'Page2').value,
       };
       const screening = MOD_SCREENING_ITEMS.map((q,i)=>({
         q: q,
@@ -991,7 +1006,7 @@
       const screenNote = document.getElementById(idp+'ScreenNote').value;
       // remember the appendix # and revision info as the new default for next time, shared across stations
       s.appendix[settingsKey] = data.appendix;
-      s.docControl[settingsKey] = { revision: data.revision, revisionDate: data.revisionDate };
+      s.docControl[settingsKey] = { revision: data.revision, revisionDate: data.revisionDate, page: data.page, page2: data.page2 };
       await saveSettings();
 
       const html = PRINT_STYLES +
@@ -1023,7 +1038,7 @@
           '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span>' +
             '<span class="pf-field"><b>Date of completion:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
         '</div>' +
-        docFooterHTML(settingsKey, data.revision, data.revisionDate, 'Page 1 of 2') +
+        docFooterHTML(settingsKey, data.revision, data.revisionDate, data.page) +
         '</div>' +
         '<div class="pf-page2 pf-fillpage">' +
           '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
@@ -1047,7 +1062,7 @@
             '<span class="pf-field"><b>AME Signature:</b><span class="pf-underline" style="min-width:200px;">&nbsp;</span></span>' +
             '<span class="pf-field"><b>ACA Stamp:</b><span class="pf-stampbox"></span></span>' +
             '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
-          docFooterHTML(settingsKey, data.revision, data.revisionDate, 'Page 2 of 2') +
+          docFooterHTML(settingsKey, data.revision, data.revisionDate, data.page2) +
         '</div>';
       openPrint(html);
     };
@@ -1113,6 +1128,7 @@
           '<div class="field"><label>Appendix #</label><input id="antAppendix" value="'+escapeHTML(s.appendix.anticipation||'')+'"></div>' +
           '<div class="field"><label>Revision #</label><input id="antRevision" value="'+escapeHTML(s.docControl.anticipation.revision||'')+'"></div>' +
           '<div class="field"><label>Revision date</label><input type="date" id="antRevisionDate" value="'+escapeHTML(s.docControl.anticipation.revisionDate||'')+'"></div>' +
+          '<div class="field"><label>Page label</label><input id="antPage" value="'+escapeHTML(s.docControl.anticipation.page||'Page 1 of 1')+'"></div>' +
         '</div>' +
         '<div class="btn-row"><button class="btn primary" id="antPrintBtn">Prepare PDF</button></div>' +
       '</div>';
@@ -1133,10 +1149,11 @@
         appendix: document.getElementById('antAppendix').value,
         revision: document.getElementById('antRevision').value,
         revisionDate: document.getElementById('antRevisionDate').value,
+        page: document.getElementById('antPage').value,
       };
       // remember appendix # and revision info as the new default for next time, shared across stations
       s.appendix.anticipation = data.appendix;
-      s.docControl.anticipation = { revision: data.revision, revisionDate: data.revisionDate };
+      s.docControl.anticipation = { revision: data.revision, revisionDate: data.revisionDate, page: data.page };
       await saveSettings();
 
       const antStyles = '<style>' +
@@ -1177,7 +1194,7 @@
           '<div class="pf-row" style="margin-top:18px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+(data.pilotName?escapeHTML(data.pilotName):'&nbsp;')+'</span></span>' +
             '<span class="pf-field"><b>Pilot Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
         '</div>' +
-        docFooterHTML('anticipation', data.revision, data.revisionDate) +
+        docFooterHTML('anticipation', data.revision, data.revisionDate, data.page) +
         '</div>';
       openPrint(html);
     };
