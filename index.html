@@ -1092,6 +1092,10 @@
           '<div class="field"><label>Work Report #</label><input id="antWr" maxlength="6"></div>' +
           '<div class="field"><label>Maintenance performed</label><select id="antMaintType">'+opts(ANT_MAINT_TYPES, x=>x, x=>x)+'</select></div>' +
         '</div>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Pilot name</label><select id="antPilot">'+opts(s.pilots, p=>p.name, p=>p.name)+'</select></div>' +
+          '<div class="field"><label>AME name</label><select id="antAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
+        '</div>' +
         '<div class="field"><label>Description of maintenance performed</label><textarea id="antDesc" rows="4"></textarea></div>' +
         '<div class="panel" style="background:#fff3ea;border-color:#c05a2c;margin:14px 0;">' +
           '<b>Caution:</b> Maintenance Tests are A High Risk Activity' +
@@ -1103,22 +1107,50 @@
           '<div class="field span3"><label>Additional instructions to the pilot</label><textarea id="antAction3" rows="3"></textarea></div>' +
         '</div>' +
         '<div class="field"><label>What abnormalities can the pilot anticipate to happen?</label><textarea id="antAbnormal" rows="4"></textarea></div>' +
+        '<h3 style="margin:18px 0 6px;font-size:14px;">Maintenance Policy Manual document control</h3>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Appendix #</label><input id="antAppendix" value="'+escapeHTML(s.appendix.anticipation||'')+'"></div>' +
+          '<div class="field"><label>Revision #</label><input id="antRevision" value="'+escapeHTML(s.docControl.anticipation.revision||'')+'"></div>' +
+          '<div class="field"><label>Revision date</label><input type="date" id="antRevisionDate" value="'+escapeHTML(s.docControl.anticipation.revisionDate||'')+'"></div>' +
+        '</div>' +
         '<div class="btn-row"><button class="btn primary" id="antPrintBtn">Prepare PDF</button></div>' +
       '</div>';
 
-    document.getElementById('antPrintBtn').onclick = ()=>{
+    document.getElementById('antPrintBtn').onclick = async ()=>{
       const data = {
         dateTime: fmtDatetimeNice(document.getElementById('antDateTime').value),
         reg: document.getElementById('antReg').value,
         wr: document.getElementById('antWr').value,
         maintType: document.getElementById('antMaintType').value,
+        pilotName: document.getElementById('antPilot').value,
+        ameName: document.getElementById('antAme').value,
         desc: document.getElementById('antDesc').value,
         action1: document.getElementById('antAction1').value,
         action2: document.getElementById('antAction2').value,
         action3: document.getElementById('antAction3').value,
         abnormal: document.getElementById('antAbnormal').value,
+        appendix: document.getElementById('antAppendix').value,
+        revision: document.getElementById('antRevision').value,
+        revisionDate: document.getElementById('antRevisionDate').value,
       };
-      const html = PRINT_STYLES +
+      // remember appendix # and revision info as the new default for next time, shared across stations
+      s.appendix.anticipation = data.appendix;
+      s.docControl.anticipation = { revision: data.revision, revisionDate: data.revisionDate };
+      await saveSettings();
+
+      const antStyles = '<style>' +
+          '.ant-print .pf-title-block h1{font-size:26px;}' +
+          '.ant-print .pf-box{font-size:16.5px;line-height:2;padding:18px 20px;}' +
+          '.ant-print .pf-worktext{font-size:16px;min-height:90px;margin:14px 0;}' +
+          '.ant-print .pf-desc-field{font-size:16px;margin:10px 0;}' +
+          '.ant-print .pf-signline{font-size:16px;}' +
+          '.ant-print .pf-signline .sl{padding-bottom:22px;}' +
+          '.ant-print .pf-underline{min-width:150px;}' +
+        '</style>';
+
+      const html = PRINT_STYLES + antStyles +
+        '<div class="pf-fillpage ant-print">' +
+        '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
         '<div class="pf-head">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
           '<div class="pf-title-block"><h1>Anticipation of Aircraft Behaviour<br>after Maintenance Form</h1></div>' +
@@ -1127,19 +1159,23 @@
           '<div class="pf-row"><span class="pf-field"><b>Date/Time:</b><span class="pf-underline">'+escapeHTML(data.dateTime)+'</span></span>' +
             '<span class="pf-field"><b>Aircraft Reg:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
             '<span class="pf-field"><b>Work Report:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>Maintenance performed:</b><span class="pf-underline">'+escapeHTML(data.maintType)+'</span></span></div>' +
+          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Maintenance performed:</b><span class="pf-underline">'+escapeHTML(data.maintType)+'</span></span></div>' +
           '<div class="pf-worktext">'+escapeHTML(data.desc)+'</div>' +
-          '<div class="pf-statement" style="border:1.5px solid #000;padding:6px 8px;font-size:13px;font-weight:700;margin:10px 0;">Caution: Maintenance Tests are A High Risk Activity</div>' +
-          '<div class="pf-row"><b>Pilot Action to Take:</b></div>' +
+          '<div class="pf-statement" style="border:1.5px solid #000;padding:8px 10px;font-size:17px;font-weight:700;margin:16px 0;">Caution: Maintenance Tests are A High Risk Activity</div>' +
+          '<div class="pf-row" style="margin-top:8px;"><b>Pilot Action to Take:</b></div>' +
           '<div class="pf-desc-field">'+escapeHTML(data.action1)+'</div>' +
           '<div class="pf-desc-field">'+escapeHTML(data.action2)+'</div>' +
           (data.action3 ? '<div class="pf-desc-field" style="white-space:pre-wrap;">'+escapeHTML(data.action3)+'</div>' : '') +
-          '<div class="pf-row" style="margin-top:8px;"><b>What Abnormalities Can the Pilot Anticipate to Happen?</b></div>' +
+          '<div class="pf-row" style="margin-top:16px;"><b>What Abnormalities Can the Pilot Anticipate to Happen?</b></div>' +
           '<div class="pf-worktext">'+escapeHTML(data.abnormal)+'</div>' +
-          '<div class="pf-signline" style="margin-top:18px;">' +
+          '<div class="pf-row" style="margin-top:22px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+(data.pilotName?escapeHTML(data.pilotName):'&nbsp;')+'</span></span>' +
+            '<span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ameName?escapeHTML(data.ameName):'&nbsp;')+'</span></span></div>' +
+          '<div class="pf-signline" style="margin-top:16px;">' +
             '<span class="sl"><b>Pilot Signature:</b></span>' +
             '<span class="sl"><b>AME Signature:</b></span>' +
           '</div>' +
+        '</div>' +
+        docFooterHTML('anticipation', data.revision, data.revisionDate) +
         '</div>';
       openPrint(html);
     };
