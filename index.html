@@ -654,6 +654,8 @@
         '<div class="field-grid">' +
           '<div class="field"><label>Date</label><input type="date" id="tolDate" value="'+todayISO()+'"></div>' +
           '<div class="field"><label>REG #</label><select id="tolReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
+        '</div>' +
+        '<div class="field-grid">' +
           '<div class="field"><label>Part name</label><input id="tolPartName"></div>' +
           '<div class="field"><label>Part #</label><input id="tolPartNo" value="N/A"></div>' +
           '<div class="field"><label>Serial #</label><input id="tolSerial" value="N/A"></div>' +
@@ -730,8 +732,14 @@
       s.company.prmName = data.prmName;
       await saveSettings();
 
-      const html = PRINT_STYLES +
-        '<div class="pf-fillpage">' +
+      const tolStyles = '<style>' +
+          '.tol-print .pf-head{margin-bottom:26px;}' +
+          '.tol-print .pf-box{line-height:2.1;}' +
+          '.tol-print .pf-row{margin-bottom:6px;}' +
+        '</style>';
+
+      const html = PRINT_STYLES + tolStyles +
+        '<div class="pf-fillpage tol-print">' +
         '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
         '<div class="pf-head pf-headleft">' +
           '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
@@ -740,26 +748,26 @@
         '<div class="pf-box">' +
           '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
             '<span class="pf-field"><b>REG #:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:12px;"><span class="pf-field"><b>Part name:</b><span class="pf-underline" style="min-width:200px;">'+escapeHTML(data.partName)+'</span></span>' +
+          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Part name:</b><span class="pf-underline" style="min-width:200px;">'+escapeHTML(data.partName)+'</span></span>' +
             '<span class="pf-field"><b>Part #:</b><span class="pf-underline">'+escapeHTML(data.partNo)+'</span></span>' +
             '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:12px;">Special inspection to be carried out while on tolerance: '+chk(data.special,'Yes')+' &nbsp; '+chk(data.special,'No')+'</div>' +
+          '<div class="pf-row" style="margin-top:14px;">Special inspection to be carried out while on tolerance: '+chk(data.special,'Yes')+' &nbsp; '+chk(data.special,'No')+'</div>' +
           '<div class="pf-row">Any inspection required before granting the tolerance: '+chk(data.preInsp,'Yes')+' &nbsp; '+chk(data.preInsp,'No')+'</div>' +
           '<div class="pf-row">Ensure all applicable airworthiness directives are performed: <span class="pf-check'+(data.adDone?' on':'')+'"></span></div>' +
-          '<div style="margin-top:8px;font-size:12px;"><b>Reason for tolerance:</b></div>' +
+          '<div style="margin-top:10px;font-size:12px;"><b>Reason for tolerance:</b></div>' +
           '<div class="pf-reasonbox">'+escapeHTML(data.reason)+'</div>' +
-          '<div class="pf-row"><span class="pf-field"><b>A/F time:</b><span class="pf-underline">'+escapeHTML(data.afTime)+'</span></span>' +
+          '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>A/F time:</b><span class="pf-underline">'+escapeHTML(data.afTime)+'</span></span>' +
             '<span class="pf-field"><b>TSN/TSO:</b><span class="pf-underline">'+escapeHTML(data.tsn)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:10px;">Life remaining with tolerance — ' +
+          '<div class="pf-row" style="margin-top:14px;">Life remaining with tolerance — ' +
             '<span class="pf-field"><b>Not to exceed TTAF:</b><span class="pf-underline">'+escapeHTML(data.ttaf)+'</span></span>' +
             '<span class="pf-field"><b>Calendar:</b><span class="pf-underline">'+escapeHTML(data.calendar)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ame?escapeHTML(data.ame):'&nbsp;')+'</span></span></div>' +
-          '<div class="pf-row"><span class="pf-field"><b>SIG:</b><span class="pf-underline" style="min-width:160px;">&nbsp;</span></span>' +
+          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ame?escapeHTML(data.ame):'&nbsp;')+'</span></span></div>' +
+          '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>SIG:</b><span class="pf-underline" style="min-width:160px;">&nbsp;</span></span>' +
             '<span class="pf-field"><b>ACA #:</b><span class="pf-underline">'+(data.aca?escapeHTML(data.aca):'&nbsp;')+'</span></span>' +
             '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.sigDate)+'</span></span></div>' +
-          '<div class="pf-row"><span class="pf-field"><b>PHF approval number:</b><span class="pf-underline">'+escapeHTML(data.phf)+'</span></span></div>' +
-          '<div class="pf-statement">The tolerance described above has been approved as per the CARs Standard 625.86 Maintenance Schedule.</div>' +
-          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>PRM Name:</b><span class="pf-underline" style="min-width:200px;">'+(data.prmName?escapeHTML(data.prmName):'&nbsp;')+'</span></span>' +
+          '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>PHF approval number:</b><span class="pf-underline">'+escapeHTML(data.phf)+'</span></span></div>' +
+          '<div class="pf-statement" style="margin-top:14px;">The tolerance described above has been approved as per the CARs Standard 625.86 Maintenance Schedule.</div>' +
+          '<div class="pf-row" style="margin-top:20px;"><span class="pf-field"><b>PRM Name:</b><span class="pf-underline" style="min-width:200px;">'+(data.prmName?escapeHTML(data.prmName):'&nbsp;')+'</span></span>' +
             '<span class="pf-field"><b>PRM SIG:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
         '</div>' +
         docFooterHTML('tolerance', data.revision, data.revisionDate) +
