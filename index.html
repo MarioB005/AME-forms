@@ -1785,7 +1785,7 @@
 
       const marginFigure = document.getElementById('pcMarginFigure');
       const sign = out.torqueMargin >= 0 ? '+' : '\u2212';
-      marginFigure.textContent = sign + Math.abs(out.torqueMargin).toFixed(1) + '%';
+      marginFigure.textContent = sign + Math.abs(out.torqueMargin).toFixed(2) + '%';
       marginFigure.style.color = out.torqueMargin < 0 ? 'var(--bad)' : (out.torqueMargin < PC_GWARN ? 'var(--warn)' : 'var(--good)');
 
       document.getElementById('pcMinTorqueOut').textContent = out.minimumTorque.toFixed(1) + '%';
