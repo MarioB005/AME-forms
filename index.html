@@ -136,6 +136,7 @@
       <span class="db-title">Phoenix Heli-Flight — Maintenance Forms</span>
     </div>
     <div class="db-right">
+      <button class="db-icon-btn" id="savedFormsBtn" title="Saved Forms">🗂</button>
       <button class="db-icon-btn" id="settingsBtn" title="Settings">⚙</button>
       <button class="db-icon-btn" id="lockBtn" title="Lock">🔒</button>
     </div>
@@ -155,6 +156,7 @@
   </div>
 
   <div id="viewSettings" style="display:none;"></div>
+  <div id="viewSavedForms" style="display:none;"></div>
   <div id="viewTolerance" style="display:none;"></div>
   <div id="viewTrackBalance" style="display:none;"></div>
   <div id="viewMajorMod" style="display:none;"></div>
@@ -302,6 +304,153 @@
     await storageSet('forms:settings', JSON.stringify(state.settings), true);
   }
 
+  // ---------- saved form records (searchable history + "new form from this") ----------
+  function newRecordId(){
+    return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+  }
+  async function loadRecords(){
+    try{
+      const raw = await storageGet('forms:records', true);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  async function saveRecord(rec){
+    // fetch-then-append — if two stations hit "Prepare PDF" at the exact same instant this can
+    // race and one save could be lost, same limitation the rest of this shared backend already has.
+    const records = await loadRecords();
+    records.push(rec);
+    await storageSet('forms:records', JSON.stringify(records), true);
+    return rec;
+  }
+  function buildRecord(formType, formLabel, reg, dateISO, description, data){
+    return {
+      id: newRecordId(),
+      formType: formType,
+      formLabel: formLabel,
+      reg: reg || '',
+      date: dateISO || '',
+      description: description || '',
+      data: data,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  // ---------- Saved Forms view (search / recall / "new form from this") ----------
+  let savedFormsFilter = { reg:'', date:'', keyword:'' };
+  let savedFormsCache = null;
+
+  function buildHtmlForRecord(rec){
+    switch(rec.formType){
+      case 'tolerance': return buildToleranceHtml(rec.data);
+      case 'trackbalance': return buildTrackBalanceHtml(rec.data);
+      case 'majormod': return buildModHtml('majormod', 'Major', rec.data);
+      case 'minormod': return buildModHtml('minormod', 'Minor', rec.data);
+      case 'anticipation': return buildAnticipationHtml(rec.data);
+      default: return null;
+    }
+  }
+
+  function openFormWithPrefill(rec){
+    switch(rec.formType){
+      case 'tolerance': renderTolerance(rec.data); break;
+      case 'trackbalance': renderTrackBalance(rec.data); break;
+      case 'majormod': renderModForm('MajorMod', 'Major', rec.data); break;
+      case 'minormod': renderModForm('MinorMod', 'Minor', rec.data); break;
+      case 'anticipation': renderAnticipation(rec.data); break;
+    }
+  }
+
+  async function renderSavedForms(){
+    showView('SavedForms');
+    const el = document.getElementById('viewSavedForms');
+    el.innerHTML = backButton() + '<div class="panel"><h2 class="form-title">Saved Forms</h2><p class="form-sub">Loading…</p></div>';
+    savedFormsCache = await loadRecords();
+    renderSavedFormsBody();
+  }
+
+  function renderSavedFormsBody(){
+    const el = document.getElementById('viewSavedForms');
+    if(!el) return; // user navigated away before the records finished loading
+    const s = state.settings;
+    const records = savedFormsCache || [];
+    const f = savedFormsFilter;
+    const filtered = records.filter(r=>{
+      if(f.reg && (r.reg||'').toLowerCase() !== f.reg.toLowerCase()) return false;
+      if(f.date && r.date !== f.date) return false;
+      if(f.keyword){
+        const kw = f.keyword.toLowerCase();
+        if(!(r.description||'').toLowerCase().includes(kw)) return false;
+      }
+      return true;
+    }).sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Saved Forms</h2>' +
+        '<p class="form-sub">Every form saved here automatically when "Prepare PDF" is pressed. Search by aircraft registration, date, or keywords in the description, then view the original PDF or start a new form pre-filled from it.</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Aircraft Reg</label><select id="sfFilterReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg, 'All aircraft')+'</select></div>' +
+          '<div class="field"><label>Date</label><input type="date" id="sfFilterDate"></div>' +
+          '<div class="field span2"><label>Keyword (in description)</label><input id="sfFilterKeyword" placeholder="e.g. hydraulic servo"></div>' +
+        '</div>' +
+        '<div class="btn-row"><button class="btn primary" id="sfSearchBtn">Search</button><button class="btn" id="sfClearBtn">Clear filters</button></div>' +
+        '<div id="sfResults"></div>' +
+      '</div>';
+
+    document.getElementById('sfFilterReg').value = f.reg||'';
+    document.getElementById('sfFilterDate').value = f.date||'';
+    document.getElementById('sfFilterKeyword').value = f.keyword||'';
+
+    document.getElementById('sfSearchBtn').onclick = ()=>{
+      f.reg = document.getElementById('sfFilterReg').value;
+      f.date = document.getElementById('sfFilterDate').value;
+      f.keyword = document.getElementById('sfFilterKeyword').value;
+      renderSavedFormsBody();
+    };
+    document.getElementById('sfClearBtn').onclick = ()=>{
+      savedFormsFilter = { reg:'', date:'', keyword:'' };
+      renderSavedFormsBody();
+    };
+
+    const resultsEl = document.getElementById('sfResults');
+    if(!records.length){
+      resultsEl.innerHTML = '<p class="note" style="margin-top:16px;">No saved forms yet — a record is created automatically every time "Prepare PDF" is pressed on any form.</p>';
+      return;
+    }
+    if(!filtered.length){
+      resultsEl.innerHTML = '<p class="note" style="margin-top:16px;">No saved forms match your search.</p>';
+      return;
+    }
+    resultsEl.innerHTML = '<table class="list-table" style="margin-top:16px;"><thead><tr>' +
+        '<th>Form</th><th>Reg</th><th>Date</th><th>Description</th><th></th>' +
+      '</tr></thead><tbody>' +
+      filtered.map(r=>
+        '<tr>' +
+          '<td>'+escapeHTML(r.formLabel||'')+'</td>' +
+          '<td>'+escapeHTML(r.reg||'')+'</td>' +
+          '<td>'+escapeHTML(r.date ? (fmtDateNice(r.date)||r.date) : '')+'</td>' +
+          '<td>'+escapeHTML((r.description||'').slice(0,80))+((r.description||'').length>80?'…':'')+'</td>' +
+          '<td style="white-space:nowrap;"><button class="btn small" data-action="view" data-id="'+r.id+'">View / Print PDF</button> ' +
+            '<button class="btn small" data-action="new" data-id="'+r.id+'">New form from this</button></td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table>';
+
+    resultsEl.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const rec = records.find(r=>r.id===btn.dataset.id);
+        if(!rec) return;
+        if(btn.dataset.action==='view'){
+          const html = buildHtmlForRecord(rec);
+          if(html) openPrint(html);
+        } else {
+          openFormWithPrefill(rec);
+        }
+      };
+    });
+  }
+
   // ---------- gate (password) ----------
   async function initGate(){
     const gate = document.getElementById('gate');
@@ -381,7 +530,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -411,11 +560,30 @@
     });
   });
   document.getElementById('settingsBtn').onclick = renderSettings;
+  document.getElementById('savedFormsBtn').onclick = renderSavedForms;
 
   function backButton(){
     return '<button class="back-btn" onclick="window.__formsNav.home()">‹ Back to forms</button>';
   }
   window.__formsNav = { home: showHome };
+
+  // ---------- prefill helpers ("New form from this") ----------
+  // Date/time fields are deliberately NOT prefilled by these helpers — every render*
+  // function already defaults its date inputs to "today", and callers should leave
+  // those defaults in place rather than carrying over a saved record's old date.
+  function fillField(id, value){
+    const elx = document.getElementById(id);
+    if(elx && value!==undefined && value!==null) elx.value = value;
+  }
+  function fillChecked(id, checked){
+    const elx = document.getElementById(id);
+    if(elx) elx.checked = !!checked;
+  }
+  function fillRadio(name, value){
+    if(value===undefined || value===null || value==='') return;
+    const elx = document.querySelector('input[name="'+name+'"][value="'+value+'"]');
+    if(elx) elx.checked = true;
+  }
 
   function opts(list, valueFn, labelFn, placeholder){
     let html = '<option value="">' + escapeHTML(placeholder||'Select…') + '</option>';
@@ -488,6 +656,14 @@
   }
 
   // ---------- Settings ----------
+  const DOC_CONTROL_FORMS = [
+    {key:'trackbalance', label:'MR Track & Balance Check List', pages:1},
+    {key:'tolerance', label:'Tolerance Approval Form', pages:1},
+    {key:'majormod', label:'Major Modification Report', pages:2},
+    {key:'minormod', label:'Minor Modification Report', pages:2},
+    {key:'anticipation', label:'Anticipation of Aircraft Behaviour after Maintenance Form', pages:1},
+  ];
+
   let settingsTab = 'aircraft';
   function renderSettings(){
     showView('Settings');
@@ -507,6 +683,7 @@
       {key:'reasons', label:'Tolerance reasons'},
       {key:'templates', label:'Templates'},
       {key:'company', label:'Company info'},
+      {key:'doccontrol', label:'Document control'},
     ];
     const tabsEl = document.getElementById('settingsTabs');
     tabsEl.innerHTML = tabs.map(t=>'<button class="settings-tab'+(t.key===settingsTab?' active':'')+'" data-tab="'+t.key+'">'+t.label+'</button>').join('');
@@ -639,6 +816,35 @@
         await saveSettings();
         flashSaved('saveCoBtn');
       };
+    } else if(settingsTab==='doccontrol'){
+      body.innerHTML =
+        '<p class="form-sub" style="margin-top:0;">Appendix #, revision info, and the printed page label for each form — these feed the Maintenance Policy Manual header/footer on every PDF and rarely change, so they live here instead of on the fill-out screen.</p>' +
+        DOC_CONTROL_FORMS.map(f=>{
+          const dc = s.docControl[f.key];
+          return '<div class="panel" style="margin-bottom:14px;">' +
+            '<h3 style="margin:0 0 10px;font-size:14.5px;">'+escapeHTML(f.label)+'</h3>' +
+            '<div class="field-grid">' +
+              '<div class="field"><label>Appendix #</label><input id="dc_'+f.key+'_appendix" value="'+escapeHTML(s.appendix[f.key]||'')+'"></div>' +
+              '<div class="field"><label>Revision #</label><input id="dc_'+f.key+'_revision" value="'+escapeHTML(dc.revision||'')+'"></div>' +
+              '<div class="field"><label>Revision date</label><input type="date" id="dc_'+f.key+'_revisionDate" value="'+escapeHTML(dc.revisionDate||'')+'"></div>' +
+              '<div class="field"><label>'+(f.pages>1?'Page 1 label':'Page label')+'</label><input id="dc_'+f.key+'_page" value="'+escapeHTML(dc.page||'Page 1 of '+f.pages)+'"></div>' +
+              (f.pages>1 ? '<div class="field"><label>Page 2 label</label><input id="dc_'+f.key+'_page2" value="'+escapeHTML(dc.page2||'Page 2 of '+f.pages)+'"></div>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('') +
+        '<div class="btn-row"><button class="btn primary" id="saveDocControlBtn">Save</button></div>';
+      document.getElementById('saveDocControlBtn').onclick = async ()=>{
+        DOC_CONTROL_FORMS.forEach(f=>{
+          s.appendix[f.key] = document.getElementById('dc_'+f.key+'_appendix').value;
+          const dc = { revision: document.getElementById('dc_'+f.key+'_revision').value,
+                       revisionDate: document.getElementById('dc_'+f.key+'_revisionDate').value,
+                       page: document.getElementById('dc_'+f.key+'_page').value };
+          if(f.pages>1) dc.page2 = document.getElementById('dc_'+f.key+'_page2').value;
+          s.docControl[f.key] = dc;
+        });
+        await saveSettings();
+        flashSaved('saveDocControlBtn');
+      };
     }
   }
   function flashSaved(btnId){
@@ -650,7 +856,50 @@
   }
 
   // ---------- Tolerance form ----------
-  function renderTolerance(){
+  function buildToleranceHtml(data){
+    const chk = (yesNo, want)=> '<span class="pf-check'+(yesNo===want?' on':'')+'"></span>'+want;
+    const tolStyles = '<style>' +
+        '.tol-print .pf-head{margin-bottom:26px;}' +
+        '.tol-print .pf-box{line-height:2.1;}' +
+        '.tol-print .pf-row{margin-bottom:6px;}' +
+      '</style>';
+
+    return PRINT_STYLES + tolStyles +
+      '<div class="pf-fillpage tol-print">' +
+      '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
+      '<div class="pf-head pf-headleft">' +
+        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+        '<div class="pf-title-block"><h1>Tolerance Approval Form</h1><div class="pf-sub">Appendix &quot;M&quot; — D.I.R. Appendix to MCM</div></div>' +
+      '</div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
+          '<span class="pf-field"><b>REG #:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Part name:</b><span class="pf-underline" style="min-width:200px;">'+escapeHTML(data.partName)+'</span></span>' +
+          '<span class="pf-field"><b>Part #:</b><span class="pf-underline">'+escapeHTML(data.partNo)+'</span></span>' +
+          '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:14px;">Special inspection to be carried out while on tolerance: '+chk(data.special,'Yes')+' &nbsp; '+chk(data.special,'No')+'</div>' +
+        '<div class="pf-row">Any inspection required before granting the tolerance: '+chk(data.preInsp,'Yes')+' &nbsp; '+chk(data.preInsp,'No')+'</div>' +
+        '<div class="pf-row">Ensure all applicable airworthiness directives are performed: <span class="pf-check'+(data.adDone?' on':'')+'"></span></div>' +
+        '<div style="margin-top:10px;font-size:12px;"><b>Reason for tolerance:</b></div>' +
+        '<div class="pf-reasonbox">'+escapeHTML(data.reason)+'</div>' +
+        '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>A/F time:</b><span class="pf-underline">'+escapeHTML(data.afTime)+'</span></span>' +
+          '<span class="pf-field"><b>TSN/TSO:</b><span class="pf-underline">'+escapeHTML(data.tsn)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:14px;">Life remaining with tolerance — ' +
+          '<span class="pf-field"><b>Not to exceed TTAF:</b><span class="pf-underline">'+escapeHTML(data.ttaf)+'</span></span>' +
+          '<span class="pf-field"><b>Calendar:</b><span class="pf-underline">'+escapeHTML(data.calendar)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ame?escapeHTML(data.ame):'&nbsp;')+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>SIG:</b><span class="pf-underline" style="min-width:160px;">&nbsp;</span></span>' +
+          '<span class="pf-field"><b>ACA #:</b><span class="pf-underline">'+(data.aca?escapeHTML(data.aca):'&nbsp;')+'</span></span>' +
+          '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.sigDate)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>PHF approval number:</b><span class="pf-underline">'+escapeHTML(data.phf)+'</span></span></div>' +
+        '<div class="pf-statement" style="margin-top:14px;">The tolerance described above has been approved as per the CARs Standard 625.86 Maintenance Schedule.</div>' +
+        '<div class="pf-row" style="margin-top:20px;"><span class="pf-field"><b>PRM Name:</b><span class="pf-underline" style="min-width:200px;">'+(data.prmName?escapeHTML(data.prmName):'&nbsp;')+'</span></span>' +
+          '<span class="pf-field"><b>PRM SIG:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
+      '</div>' +
+      docFooterHTML('tolerance', data.revision, data.revisionDate, data.page) +
+      '</div>';
+  }
+  function renderTolerance(prefill){
     showView('Tolerance');
     const el = document.getElementById('viewTolerance');
     const s = state.settings;
@@ -690,13 +939,6 @@
           '<div class="field"><label>PHF approval number</label><input id="tolPhf" value="'+escapeHTML(s.company.phfApproval)+'"></div>' +
           '<div class="field"><label>PRM name</label><input id="tolPrmName" value="'+escapeHTML(s.company.prmName||'')+'"></div>' +
         '</div>' +
-        '<h3 style="margin:18px 0 6px;font-size:14px;">Maintenance Policy Manual document control</h3>' +
-        '<div class="field-grid">' +
-          '<div class="field"><label>Appendix #</label><input id="tolAppendix" value="'+escapeHTML(s.appendix.tolerance||'')+'"></div>' +
-          '<div class="field"><label>Revision #</label><input id="tolRevision" value="'+escapeHTML(s.docControl.tolerance.revision||'')+'"></div>' +
-          '<div class="field"><label>Revision date</label><input type="date" id="tolRevisionDate" value="'+escapeHTML(s.docControl.tolerance.revisionDate||'')+'"></div>' +
-          '<div class="field"><label>Page label</label><input id="tolPage" value="'+escapeHTML(s.docControl.tolerance.page||'Page 1 of 1')+'"></div>' +
-        '</div>' +
         '<div class="btn-row"><button class="btn primary" id="tolPrintBtn">Prepare PDF</button></div>' +
       '</div>';
 
@@ -708,6 +950,25 @@
     document.getElementById('tolReasonPick').onchange = (e)=>{
       if(e.target.value) document.getElementById('tolReasonText').value = e.target.value;
     };
+
+    if(prefill){
+      // Date/Calendar/Signature date are intentionally left at their "today" defaults.
+      fillField('tolReg', prefill.reg);
+      fillField('tolPartName', prefill.partName);
+      fillField('tolPartNo', prefill.partNo);
+      fillField('tolSerial', prefill.serial);
+      fillRadio('tolSpecial', prefill.special);
+      fillRadio('tolPreInsp', prefill.preInsp);
+      fillChecked('tolAdCheck', prefill.adDone);
+      fillField('tolReasonText', prefill.reason);
+      fillField('tolAfTime', prefill.afTime);
+      fillField('tolTsn', prefill.tsn);
+      fillField('tolTtaf', prefill.ttaf);
+      fillField('tolAme', prefill.ame);
+      fillField('tolAca', prefill.aca);
+      fillField('tolPhf', prefill.phf);
+      fillField('tolPrmName', prefill.prmName);
+    }
 
     document.getElementById('tolPrintBtn').onclick = async ()=>{
       const yn = (name)=> document.querySelector('input[name="'+name+'"]:checked').value;
@@ -731,63 +992,88 @@
         sigDate: fmtDateNice(document.getElementById('tolSigDate').value),
         phf: document.getElementById('tolPhf').value,
         prmName: document.getElementById('tolPrmName').value,
-        appendix: document.getElementById('tolAppendix').value,
-        revision: document.getElementById('tolRevision').value,
-        revisionDate: document.getElementById('tolRevisionDate').value,
-        page: document.getElementById('tolPage').value,
+        appendix: s.appendix.tolerance||'',
+        revision: s.docControl.tolerance.revision||'',
+        revisionDate: s.docControl.tolerance.revisionDate||'',
+        page: s.docControl.tolerance.page||'Page 1 of 1',
       };
-      // remember appendix #, revision info and PRM name as the new default for next time, shared across stations
-      s.appendix.tolerance = data.appendix;
-      s.docControl.tolerance = { revision: data.revision, revisionDate: data.revisionDate, page: data.page };
+      // remember PRM name as the new default for next time, shared across stations
+      // (Appendix #/Revision #/Page label are edited in Settings > Document control, not here)
       s.company.prmName = data.prmName;
       await saveSettings();
+      await saveRecord(buildRecord('tolerance', 'Tolerance Approval Form', data.reg, document.getElementById('tolDate').value, data.reason, data));
 
-      const tolStyles = '<style>' +
-          '.tol-print .pf-head{margin-bottom:26px;}' +
-          '.tol-print .pf-box{line-height:2.1;}' +
-          '.tol-print .pf-row{margin-bottom:6px;}' +
-        '</style>';
-
-      const html = PRINT_STYLES + tolStyles +
-        '<div class="pf-fillpage tol-print">' +
-        '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
-        '<div class="pf-head pf-headleft">' +
-          '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
-          '<div class="pf-title-block"><h1>Tolerance Approval Form</h1><div class="pf-sub">Appendix &quot;M&quot; — D.I.R. Appendix to MCM</div></div>' +
-        '</div>' +
-        '<div class="pf-box">' +
-          '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
-            '<span class="pf-field"><b>REG #:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Part name:</b><span class="pf-underline" style="min-width:200px;">'+escapeHTML(data.partName)+'</span></span>' +
-            '<span class="pf-field"><b>Part #:</b><span class="pf-underline">'+escapeHTML(data.partNo)+'</span></span>' +
-            '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:14px;">Special inspection to be carried out while on tolerance: '+chk(data.special,'Yes')+' &nbsp; '+chk(data.special,'No')+'</div>' +
-          '<div class="pf-row">Any inspection required before granting the tolerance: '+chk(data.preInsp,'Yes')+' &nbsp; '+chk(data.preInsp,'No')+'</div>' +
-          '<div class="pf-row">Ensure all applicable airworthiness directives are performed: <span class="pf-check'+(data.adDone?' on':'')+'"></span></div>' +
-          '<div style="margin-top:10px;font-size:12px;"><b>Reason for tolerance:</b></div>' +
-          '<div class="pf-reasonbox">'+escapeHTML(data.reason)+'</div>' +
-          '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>A/F time:</b><span class="pf-underline">'+escapeHTML(data.afTime)+'</span></span>' +
-            '<span class="pf-field"><b>TSN/TSO:</b><span class="pf-underline">'+escapeHTML(data.tsn)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:14px;">Life remaining with tolerance — ' +
-            '<span class="pf-field"><b>Not to exceed TTAF:</b><span class="pf-underline">'+escapeHTML(data.ttaf)+'</span></span>' +
-            '<span class="pf-field"><b>Calendar:</b><span class="pf-underline">'+escapeHTML(data.calendar)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ame?escapeHTML(data.ame):'&nbsp;')+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>SIG:</b><span class="pf-underline" style="min-width:160px;">&nbsp;</span></span>' +
-            '<span class="pf-field"><b>ACA #:</b><span class="pf-underline">'+(data.aca?escapeHTML(data.aca):'&nbsp;')+'</span></span>' +
-            '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.sigDate)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:10px;"><span class="pf-field"><b>PHF approval number:</b><span class="pf-underline">'+escapeHTML(data.phf)+'</span></span></div>' +
-          '<div class="pf-statement" style="margin-top:14px;">The tolerance described above has been approved as per the CARs Standard 625.86 Maintenance Schedule.</div>' +
-          '<div class="pf-row" style="margin-top:20px;"><span class="pf-field"><b>PRM Name:</b><span class="pf-underline" style="min-width:200px;">'+(data.prmName?escapeHTML(data.prmName):'&nbsp;')+'</span></span>' +
-            '<span class="pf-field"><b>PRM SIG:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
-        '</div>' +
-        docFooterHTML('tolerance', data.revision, data.revisionDate, data.page) +
-        '</div>';
+      const html = buildToleranceHtml(data);
       openPrint(html);
     };
   }
 
   // ---------- MR Track & Balance Check List ----------
-  function renderTrackBalance(){
+  function buildTrackBalanceHtml(data){
+    const runs = 5;
+    let runsHTML = '';
+    for(let i=1;i<=runs;i++){
+      runsHTML +=
+        '<div class="pf-run">' +
+          '<h3>Run #'+i+'</h3>' +
+          '<div class="pf-runchecks">' +
+            '<span class="pf-runcheck"><span class="pf-check"></span>Weight change</span>' +
+            '<span class="pf-runcheck"><span class="pf-check"></span>Pitch Link Adjustment</span>' +
+            '<span class="pf-runcheck"><span class="pf-check"></span>Tab Adjustment</span>' +
+            '<span class="pf-runcheck">Tool Check - AME initials: <span class="pf-underline" style="min-width:45px;">&nbsp;</span></span>' +
+          '</div>' +
+          '<div class="pf-signblock">' +
+            '<div class="pf-signgroup">' +
+              '<div class="pf-signheading">MR</div>' +
+              '<div class="pf-signfields">AME Signature: <span class="pf-underline" style="min-width:130px;">&nbsp;</span> &nbsp; Lic #: <span class="pf-underline" style="min-width:70px;">&nbsp;</span></div>' +
+            '</div>' +
+            '<div class="pf-signgroup">' +
+              '<div class="pf-signheading">DCC</div>' +
+              '<div class="pf-signfields">Pilot Signature: <span class="pf-underline" style="min-width:130px;">&nbsp;</span> &nbsp; Lic #: <span class="pf-underline" style="min-width:70px;">&nbsp;</span></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    const tbStyles = '<style>' +
+        '.tb-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;}' +
+        '.tb-head .pf-logo{grid-column:1;justify-self:start;}' +
+        '.tb-head .pf-title-block{grid-column:2;text-align:center;}' +
+        '.tb-print{display:flex;flex-direction:column;min-height:955px;}' +
+        '.tb-print .pf-box{font-size:14.5px;padding:9px 14px;}' +
+        '.tb-print .pf-head{margin-bottom:8px;}' +
+        '.tb-print .pf-run{padding:7px 12px;margin-top:8px;}' +
+        '.tb-print .pf-run h3{font-size:15.5px;margin:0 0 5px;}' +
+        '.tb-print .pf-runchecks{margin-bottom:7px;}' +
+        '.tb-print .pf-runcheck{font-size:14.5px;}' +
+        '.tb-print .pf-signblock{margin-top:5px;}' +
+        '.tb-print .pf-signheading{font-size:15.5px;margin-bottom:3px;}' +
+        '.tb-print .pf-signfields{font-size:14.5px;}' +
+        '.tb-print .pf-statement{font-size:13px;margin-top:8px;white-space:pre-wrap;}' +
+        '.tb-print .pf-docfooter{margin-top:auto;padding-top:16px;}' +
+        '@page{margin:9mm;}' +
+      '</style>';
+
+    return PRINT_STYLES + tbStyles +
+      '<div class="tb-print">' +
+      '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
+      '<div class="pf-head tb-head">' +
+        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+        '<div class="pf-title-block"><h1>MR Track &amp; Balance Check List</h1></div>' +
+      '</div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
+          '<span class="pf-field"><b>WR #:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span>' +
+          '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+        '<div class="pf-row"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot)+'</span></span>' +
+          '<span class="pf-field"><b>AME:</b><span class="pf-underline">'+escapeHTML(data.ame)+'</span></span></div>' +
+      '</div>' +
+      runsHTML +
+      (data.note ? '<div class="pf-statement">'+escapeHTML(data.note)+'</div>' : '') +
+      docFooterHTML('trackbalance', data.revision, data.revisionDate, data.page) +
+      '</div>';
+  }
+  function renderTrackBalance(prefill){
     showView('TrackBalance');
     const el = document.getElementById('viewTrackBalance');
     const s = state.settings;
@@ -802,14 +1088,19 @@
           '<div class="field"><label>A/C registration</label><select id="tbReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg)+'</select></div>' +
           '<div class="field"><label>Pilot name</label><select id="tbPilot">'+opts(s.pilots, p=>p.name, p=>p.name)+'</select></div>' +
           '<div class="field"><label>AME name</label><select id="tbAme">'+opts(s.ames, a=>a.name, a=>a.name)+'</select></div>' +
-          '<div class="field"><label>Appendix # (Maintenance Policy Manual)</label><input id="tbAppendix" value="'+escapeHTML(s.appendix.trackbalance||'')+'"></div>' +
-          '<div class="field"><label>Revision #</label><input id="tbRevision" value="'+escapeHTML(s.docControl.trackbalance.revision||'')+'"></div>' +
-          '<div class="field"><label>Revision date</label><input type="date" id="tbRevisionDate" value="'+escapeHTML(s.docControl.trackbalance.revisionDate||'')+'"></div>' +
-          '<div class="field"><label>Page label</label><input id="tbPage" value="'+escapeHTML(s.docControl.trackbalance.page||'Page 1 of 1')+'"></div>' +
         '</div>' +
         '<div class="field"><label>Note printed below the runs</label><textarea id="tbNote" rows="3">'+escapeHTML(s.trackBalanceNote||'')+'</textarea></div>' +
         '<div class="btn-row"><button class="btn primary" id="tbPrintBtn">Prepare PDF</button></div>' +
       '</div>';
+
+    if(prefill){
+      // Date is intentionally left at its "today" default.
+      fillField('tbWr', prefill.wr);
+      fillField('tbReg', prefill.reg);
+      fillField('tbPilot', prefill.pilot);
+      fillField('tbAme', prefill.ame);
+      fillField('tbNote', prefill.note);
+    }
 
     document.getElementById('tbPrintBtn').onclick = async ()=>{
       const data = {
@@ -818,86 +1109,85 @@
         reg: document.getElementById('tbReg').value,
         pilot: document.getElementById('tbPilot').value,
         ame: document.getElementById('tbAme').value,
-        appendix: document.getElementById('tbAppendix').value,
+        appendix: s.appendix.trackbalance||'',
         note: document.getElementById('tbNote').value,
-        revision: document.getElementById('tbRevision').value,
-        revisionDate: document.getElementById('tbRevisionDate').value,
-        page: document.getElementById('tbPage').value,
+        revision: s.docControl.trackbalance.revision||'',
+        revisionDate: s.docControl.trackbalance.revisionDate||'',
+        page: s.docControl.trackbalance.page||'Page 1 of 1',
       };
-      // remember the appendix #, note and revision info as the new default for next time, shared across stations
-      s.appendix.trackbalance = data.appendix;
+      // remember the note as the new default for next time, shared across stations
+      // (Appendix #/Revision #/Page label are edited in Settings > Document control, not here)
       s.trackBalanceNote = data.note;
-      s.docControl.trackbalance = { revision: data.revision, revisionDate: data.revisionDate, page: data.page };
       await saveSettings();
+      await saveRecord(buildRecord('trackbalance', 'MR Track & Balance Check List', data.reg, document.getElementById('tbDate').value, data.note, data));
 
-      const runs = 5;
-
-      let runsHTML = '';
-      for(let i=1;i<=runs;i++){
-        runsHTML +=
-          '<div class="pf-run">' +
-            '<h3>Run #'+i+'</h3>' +
-            '<div class="pf-runchecks">' +
-              '<span class="pf-runcheck"><span class="pf-check"></span>Weight change</span>' +
-              '<span class="pf-runcheck"><span class="pf-check"></span>Pitch Link Adjustment</span>' +
-              '<span class="pf-runcheck"><span class="pf-check"></span>Tab Adjustment</span>' +
-              '<span class="pf-runcheck">Tool Check - AME initials: <span class="pf-underline" style="min-width:45px;">&nbsp;</span></span>' +
-            '</div>' +
-            '<div class="pf-signblock">' +
-              '<div class="pf-signgroup">' +
-                '<div class="pf-signheading">MR</div>' +
-                '<div class="pf-signfields">AME Signature: <span class="pf-underline" style="min-width:130px;">&nbsp;</span> &nbsp; Lic #: <span class="pf-underline" style="min-width:70px;">&nbsp;</span></div>' +
-              '</div>' +
-              '<div class="pf-signgroup">' +
-                '<div class="pf-signheading">DCC</div>' +
-                '<div class="pf-signfields">Pilot Signature: <span class="pf-underline" style="min-width:130px;">&nbsp;</span> &nbsp; Lic #: <span class="pf-underline" style="min-width:70px;">&nbsp;</span></div>' +
-              '</div>' +
-            '</div>' +
-          '</div>';
-      }
-
-      const tbStyles = '<style>' +
-          '.tb-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;}' +
-          '.tb-head .pf-logo{grid-column:1;justify-self:start;}' +
-          '.tb-head .pf-title-block{grid-column:2;text-align:center;}' +
-          '.tb-print{display:flex;flex-direction:column;min-height:955px;}' +
-          '.tb-print .pf-box{font-size:14.5px;padding:9px 14px;}' +
-          '.tb-print .pf-head{margin-bottom:8px;}' +
-          '.tb-print .pf-run{padding:7px 12px;margin-top:8px;}' +
-          '.tb-print .pf-run h3{font-size:15.5px;margin:0 0 5px;}' +
-          '.tb-print .pf-runchecks{margin-bottom:7px;}' +
-          '.tb-print .pf-runcheck{font-size:14.5px;}' +
-          '.tb-print .pf-signblock{margin-top:5px;}' +
-          '.tb-print .pf-signheading{font-size:15.5px;margin-bottom:3px;}' +
-          '.tb-print .pf-signfields{font-size:14.5px;}' +
-          '.tb-print .pf-statement{font-size:13px;margin-top:8px;white-space:pre-wrap;}' +
-          '.tb-print .pf-docfooter{margin-top:auto;padding-top:16px;}' +
-          '@page{margin:9mm;}' +
-        '</style>';
-
-      const html = PRINT_STYLES + tbStyles +
-        '<div class="tb-print">' +
-        '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
-        '<div class="pf-head tb-head">' +
-          '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
-          '<div class="pf-title-block"><h1>MR Track &amp; Balance Check List</h1></div>' +
-        '</div>' +
-        '<div class="pf-box">' +
-          '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
-            '<span class="pf-field"><b>WR #:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span>' +
-            '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
-          '<div class="pf-row"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot)+'</span></span>' +
-            '<span class="pf-field"><b>AME:</b><span class="pf-underline">'+escapeHTML(data.ame)+'</span></span></div>' +
-        '</div>' +
-        runsHTML +
-        (data.note ? '<div class="pf-statement">'+escapeHTML(data.note)+'</div>' : '') +
-        docFooterHTML('trackbalance', data.revision, data.revisionDate, data.page) +
-        '</div>';
+      const html = buildTrackBalanceHtml(data);
       openPrint(html);
     };
   }
 
   // ---------- Major / Minor Modification report (shared Standard 571 Appendix L layout) ----------
+  function buildModHtml(settingsKey, label, data){
+    const chk = (val, want)=> '<span class="pf-check'+(val===want?' on':'')+'"></span>'+want;
+    const screening = data.screening||[];
+    const screenNote = data.screenNote||'';
+    const type = data.type||'Modification';
+    return PRINT_STYLES +
+      '<div class="pf-fillpage">' +
+      '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
+      '<div class="pf-head pf-headleft">' +
+        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+        '<div class="pf-title-block"><h1>'+label+' Repair or '+label+' Modification Report</h1>' +
+        '<div class="pf-sub">Rapport de réparation '+(label==='Major'?'majeure':'mineure')+' ou de modification '+(label==='Major'?'majeure':'mineure')+'</div></div>' +
+      '</div>' +
+      '<div class="pf-instr">For instructions, see Standard 571 Appendix L • Pour les instructions, consulter l\'appendice L de la norme 571</div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><b>1. Aircraft</b></div>' +
+        '<div class="pf-row"><span class="pf-field"><b>Make:</b><span class="pf-underline">'+escapeHTML(data.make)+'</span></span>' +
+          '<span class="pf-field"><b>Model:</b><span class="pf-underline">'+escapeHTML(data.model)+'</span></span>' +
+          '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span>' +
+          '<span class="pf-field"><b>Registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:8px;"><b>2. Owner:</b><span class="pf-underline" style="min-width:260px;">'+escapeHTML(data.owner)+'</span></div>' +
+        '<div class="pf-row" style="margin-top:8px;"><b>3. Type of work:</b> '+chk(type,'Modification')+' &nbsp; '+chk(type,'Repair')+'</div>' +
+        '<div class="pf-desc-field" style="margin-top:8px;"><span class="lbl">4. Name &amp; address of person/organization who accomplished the work:</span></div>' +
+        '<div class="pf-reasonbox">'+escapeHTML(data.orgBlock)+'</div>' +
+        '<div class="pf-row"><b>5. Description of work accomplished</b></div>' +
+        '<div class="pf-desc-field"><span class="lbl">Modification / Work Order No.:</span> '+escapeHTML(data.workOrder)+'</div>' +
+        '<div class="pf-desc-field"><span class="lbl">Component / Part No.:</span> '+escapeHTML(data.partNo)+'</div>' +
+        '<div class="pf-desc-field"><span class="lbl">Component Serial No.:</span> '+escapeHTML(data.compSerial)+'</div>' +
+        '<div class="pf-desc-field"><span class="lbl">Location / System affected:</span> '+escapeHTML(data.location)+'</div>' +
+        '<div class="pf-worktext">'+escapeHTML(data.descText)+'</div>' +
+        '<div class="pf-row"><span class="pf-check'+(data.funcCheck?' on':'')+'"></span> System/Functional check has been completed</div>' +
+        '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span>' +
+          '<span class="pf-field"><b>Date of completion:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
+      '</div>' +
+      docFooterHTML(settingsKey, data.revision, data.revisionDate, data.page) +
+      '</div>' +
+      '<div class="pf-page2 pf-fillpage">' +
+        '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
+        '<div class="pf-head pf-headleft">' +
+          '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+          '<div class="pf-title-block"><h1>Modification Screening Result</h1></div>' +
+        '</div>' +
+        '<div class="pf-box">' +
+          '<div class="pf-row"><span class="pf-field"><b>Registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
+            '<span class="pf-field"><b>Modification / Work Order No.:</b><span class="pf-underline">'+escapeHTML(data.workOrder)+'</span></span></div>' +
+        '</div>' +
+        '<div class="pf-screen-heading">Does this modification have an appreciable effect on any of the following?</div>' +
+        '<div class="pf-box pf-screenbox">' +
+          screening.map(item=>
+            '<div class="pf-screen-row"><span>'+escapeHTML(item.q)+'?</span>' +
+              '<span class="pf-screen-yn">'+chk(item.val,'Yes')+' &nbsp; &nbsp; '+chk(item.val,'No')+'</span></div>'
+          ).join('') +
+        '</div>' +
+        (screenNote ? '<div class="pf-desc-field" style="margin-top:14px;"><span class="lbl">Note:</span></div><div class="pf-worktext">'+escapeHTML(screenNote)+'</div>' : '') +
+        '<div class="pf-row" style="margin-top:18px;align-items:center;">' +
+          '<span class="pf-field"><b>AME Signature:</b><span class="pf-underline" style="min-width:200px;">&nbsp;</span></span>' +
+          '<span class="pf-field"><b>ACA Stamp:</b><span class="pf-stampbox"></span></span>' +
+          '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
+        docFooterHTML(settingsKey, data.revision, data.revisionDate, data.page2) +
+      '</div>';
+  }
   const MOD_SCREENING_ITEMS = [
     'Structural strength / Stiffness',
     'Powerplant operation',
@@ -911,7 +1201,7 @@
     'Environmental characteristics',
     'Other qualities affecting airworthiness'
   ];
-  function renderModForm(viewKey, label){
+  function renderModForm(viewKey, label, prefill){
     showView(viewKey);
     const el = document.getElementById('view'+viewKey);
     const s = state.settings;
@@ -956,14 +1246,6 @@
             '<label class="yn-opt"><input type="radio" name="'+idp+'Screen'+i+'" value="No" checked> No</label></div>'
         ).join('') +
         '<div class="field"><label>Note addressing any of the above effects</label><textarea id="'+idp+'ScreenNote" rows="3"></textarea></div>' +
-        '<h3 style="margin:18px 0 6px;font-size:14px;">Maintenance Policy Manual document control</h3>' +
-        '<div class="field-grid">' +
-          '<div class="field"><label>Appendix #</label><input id="'+idp+'Appendix" value="'+escapeHTML(s.appendix[settingsKey]||'')+'"></div>' +
-          '<div class="field"><label>Revision #</label><input id="'+idp+'Revision" value="'+escapeHTML(s.docControl[settingsKey].revision||'')+'"></div>' +
-          '<div class="field"><label>Revision date</label><input type="date" id="'+idp+'RevisionDate" value="'+escapeHTML(s.docControl[settingsKey].revisionDate||'')+'"></div>' +
-          '<div class="field"><label>Page 1 label</label><input id="'+idp+'Page" value="'+escapeHTML(s.docControl[settingsKey].page||'Page 1 of 2')+'"></div>' +
-          '<div class="field"><label>Page 2 label</label><input id="'+idp+'Page2" value="'+escapeHTML(s.docControl[settingsKey].page2||'Page 2 of 2')+'"></div>' +
-        '</div>' +
         '<div class="btn-row"><button class="btn primary" id="'+idp+'PrintBtn">Prepare PDF</button></div>' +
       '</div>';
 
@@ -976,9 +1258,26 @@
       }
     };
 
+    if(prefill){
+      // Date of completion is intentionally left at its "today" default.
+      fillField(idp+'Reg', prefill.reg);
+      fillField(idp+'Make', prefill.make);
+      fillField(idp+'Model', prefill.model);
+      fillField(idp+'Serial', prefill.serial);
+      fillField(idp+'Owner', prefill.owner);
+      fillRadio(idp+'Type', prefill.type);
+      fillField(idp+'OrgBlock', prefill.orgBlock);
+      fillField(idp+'WorkOrder', prefill.workOrder);
+      fillField(idp+'PartNo', prefill.partNo);
+      fillField(idp+'CompSerial', prefill.compSerial);
+      fillField(idp+'Location', prefill.location);
+      fillField(idp+'DescText', prefill.descText);
+      fillChecked(idp+'FuncCheck', prefill.funcCheck);
+      (prefill.screening||[]).forEach((item, i)=>{ fillRadio(idp+'Screen'+i, item.val); });
+      fillField(idp+'ScreenNote', prefill.screenNote);
+    }
+
     document.getElementById(idp+'PrintBtn').onclick = async ()=>{
-      const type = document.querySelector('input[name="'+idp+'Type"]:checked').value;
-      const chk = (val, want)=> '<span class="pf-check'+(val===want?' on':'')+'"></span>'+want;
       const data = {
         reg: document.getElementById(idp+'Reg').value,
         make: document.getElementById(idp+'Make').value,
@@ -993,77 +1292,23 @@
         descText: document.getElementById(idp+'DescText').value,
         funcCheck: document.getElementById(idp+'FuncCheck').checked,
         compDate: fmtDateNice(document.getElementById(idp+'CompDate').value),
-        appendix: document.getElementById(idp+'Appendix').value,
-        revision: document.getElementById(idp+'Revision').value,
-        revisionDate: document.getElementById(idp+'RevisionDate').value,
-        page: document.getElementById(idp+'Page').value,
-        page2: document.getElementById(idp+'Page2').value,
+        appendix: s.appendix[settingsKey]||'',
+        revision: s.docControl[settingsKey].revision||'',
+        revisionDate: s.docControl[settingsKey].revisionDate||'',
+        page: s.docControl[settingsKey].page||'Page 1 of 2',
+        page2: s.docControl[settingsKey].page2||'Page 2 of 2',
+        type: document.querySelector('input[name="'+idp+'Type"]:checked').value,
+        screening: MOD_SCREENING_ITEMS.map((q,i)=>({
+          q: q,
+          val: document.querySelector('input[name="'+idp+'Screen'+i+'"]:checked').value
+        })),
+        screenNote: document.getElementById(idp+'ScreenNote').value,
       };
-      const screening = MOD_SCREENING_ITEMS.map((q,i)=>({
-        q: q,
-        val: document.querySelector('input[name="'+idp+'Screen'+i+'"]:checked').value
-      }));
-      const screenNote = document.getElementById(idp+'ScreenNote').value;
-      // remember the appendix # and revision info as the new default for next time, shared across stations
-      s.appendix[settingsKey] = data.appendix;
-      s.docControl[settingsKey] = { revision: data.revision, revisionDate: data.revisionDate, page: data.page, page2: data.page2 };
+      // (Appendix #/Revision #/Page labels are edited in Settings > Document control, not here)
       await saveSettings();
+      await saveRecord(buildRecord(settingsKey, label+' Repair or '+label+' Modification Report', data.reg, document.getElementById(idp+'CompDate').value, data.descText, data));
 
-      const html = PRINT_STYLES +
-        '<div class="pf-fillpage">' +
-        '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
-        '<div class="pf-head">' +
-          '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
-          '<div class="pf-title-block"><h1>'+label+' Repair or '+label+' Modification Report</h1>' +
-          '<div class="pf-sub">Rapport de réparation '+(label==='Major'?'majeure':'mineure')+' ou de modification '+(label==='Major'?'majeure':'mineure')+'</div></div>' +
-        '</div>' +
-        '<div class="pf-instr">For instructions, see Standard 571 Appendix L • Pour les instructions, consulter l\'appendice L de la norme 571</div>' +
-        '<div class="pf-box">' +
-          '<div class="pf-row"><b>1. Aircraft</b></div>' +
-          '<div class="pf-row"><span class="pf-field"><b>Make:</b><span class="pf-underline">'+escapeHTML(data.make)+'</span></span>' +
-            '<span class="pf-field"><b>Model:</b><span class="pf-underline">'+escapeHTML(data.model)+'</span></span>' +
-            '<span class="pf-field"><b>Serial #:</b><span class="pf-underline">'+escapeHTML(data.serial)+'</span></span>' +
-            '<span class="pf-field"><b>Registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:8px;"><b>2. Owner:</b><span class="pf-underline" style="min-width:260px;">'+escapeHTML(data.owner)+'</span></div>' +
-          '<div class="pf-row" style="margin-top:8px;"><b>3. Type of work:</b> '+chk(type,'Modification')+' &nbsp; '+chk(type,'Repair')+'</div>' +
-          '<div class="pf-desc-field" style="margin-top:8px;"><span class="lbl">4. Name &amp; address of person/organization who accomplished the work:</span></div>' +
-          '<div class="pf-reasonbox">'+escapeHTML(data.orgBlock)+'</div>' +
-          '<div class="pf-row"><b>5. Description of work accomplished</b></div>' +
-          '<div class="pf-desc-field"><span class="lbl">Modification / Work Order No.:</span> '+escapeHTML(data.workOrder)+'</div>' +
-          '<div class="pf-desc-field"><span class="lbl">Component / Part No.:</span> '+escapeHTML(data.partNo)+'</div>' +
-          '<div class="pf-desc-field"><span class="lbl">Component Serial No.:</span> '+escapeHTML(data.compSerial)+'</div>' +
-          '<div class="pf-desc-field"><span class="lbl">Location / System affected:</span> '+escapeHTML(data.location)+'</div>' +
-          '<div class="pf-worktext">'+escapeHTML(data.descText)+'</div>' +
-          '<div class="pf-row"><span class="pf-check'+(data.funcCheck?' on':'')+'"></span> System/Functional check has been completed</div>' +
-          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span>' +
-            '<span class="pf-field"><b>Date of completion:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
-        '</div>' +
-        docFooterHTML(settingsKey, data.revision, data.revisionDate, data.page) +
-        '</div>' +
-        '<div class="pf-page2 pf-fillpage">' +
-          '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
-          '<div class="pf-head">' +
-            '<img class="pf-logo" src="'+PHOENIX_LOGO_DATA_URI+'" alt="Phoenix Heli-Flight">' +
-            '<div class="pf-title-block"><h1>Modification Screening Result</h1></div>' +
-          '</div>' +
-          '<div class="pf-box">' +
-            '<div class="pf-row"><span class="pf-field"><b>Registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
-              '<span class="pf-field"><b>Modification / Work Order No.:</b><span class="pf-underline">'+escapeHTML(data.workOrder)+'</span></span></div>' +
-          '</div>' +
-          '<div class="pf-screen-heading">Does this modification have an appreciable effect on any of the following?</div>' +
-          '<div class="pf-box pf-screenbox">' +
-            screening.map(item=>
-              '<div class="pf-screen-row"><span>'+escapeHTML(item.q)+'?</span>' +
-                '<span class="pf-screen-yn">'+chk(item.val,'Yes')+' &nbsp; &nbsp; '+chk(item.val,'No')+'</span></div>'
-            ).join('') +
-          '</div>' +
-          (screenNote ? '<div class="pf-desc-field" style="margin-top:14px;"><span class="lbl">Note:</span></div><div class="pf-worktext">'+escapeHTML(screenNote)+'</div>' : '') +
-          '<div class="pf-row" style="margin-top:18px;align-items:center;">' +
-            '<span class="pf-field"><b>AME Signature:</b><span class="pf-underline" style="min-width:200px;">&nbsp;</span></span>' +
-            '<span class="pf-field"><b>ACA Stamp:</b><span class="pf-stampbox"></span></span>' +
-            '<span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.compDate)+'</span></span></div>' +
-          docFooterHTML(settingsKey, data.revision, data.revisionDate, data.page2) +
-        '</div>';
+      const html = buildModHtml(settingsKey, label, data);
       openPrint(html);
     };
   }
@@ -1093,7 +1338,51 @@
   ];
   const ANT_MAINT_TYPES = ['Replacement', 'Repair', 'Adjustement', 'Modification', 'Inspection'];
 
-  function renderAnticipation(){
+  function buildAnticipationHtml(data){
+    const antStyles = '<style>' +
+        '.ant-print .ant-logo{display:block;align-self:flex-start;height:52px;width:auto;margin:0 0 6px;}' +
+        '.ant-print .pf-headleft{display:block;text-align:left;}' +
+        '.ant-print .pf-headleft .pf-title-block{display:block;text-align:center;}' +
+        '.ant-print .pf-title-block h1{font-size:26px;}' +
+        '.ant-print .pf-box{font-size:16.5px;line-height:2;padding:18px 20px;}' +
+        '.ant-print .pf-worktext{font-size:16px;min-height:90px;margin:14px 0;}' +
+        '.ant-print .pf-desc-field{font-size:16px;margin:10px 0;}' +
+        '.ant-print .pf-signline{font-size:16px;}' +
+        '.ant-print .pf-signline .sl{padding-bottom:22px;}' +
+        '.ant-print .pf-underline{min-width:150px;}' +
+      '</style>';
+
+    return PRINT_STYLES + antStyles +
+      '<div class="pf-fillpage ant-print">' +
+      '<img class="ant-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+      '<div class="pf-sub" style="text-align:center;margin-bottom:2px;">D.I.R Appendix to MPM</div>' +
+      '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
+      '<div class="pf-head pf-headleft">' +
+        '<div class="pf-title-block"><h1>Anticipation of Aircraft Behaviour<br>after Maintenance Form</h1></div>' +
+      '</div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>Date/Time:</b><span class="pf-underline">'+escapeHTML(data.dateTime)+'</span></span>' +
+          '<span class="pf-field"><b>Aircraft Reg:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
+          '<span class="pf-field"><b>Work Report:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Maintenance performed:</b><span class="pf-underline">'+escapeHTML(data.maintType)+'</span></span></div>' +
+        '<div class="pf-worktext">'+escapeHTML(data.desc)+'</div>' +
+        '<div class="pf-statement" style="border:1.5px solid #000;padding:8px 10px;font-size:17px;font-weight:700;margin:16px 0;">Caution: Maintenance Tests are A High Risk Activity</div>' +
+        '<div class="pf-row" style="margin-top:8px;"><b>Pilot Action to Take:</b></div>' +
+        '<div class="pf-desc-field">'+escapeHTML(data.action1)+'</div>' +
+        '<div class="pf-desc-field">'+escapeHTML(data.action2)+'</div>' +
+        (data.action3 ? '<div class="pf-desc-field" style="white-space:pre-wrap;">'+escapeHTML(data.action3)+'</div>' : '') +
+        '<div class="pf-row" style="margin-top:16px;"><b>What Abnormalities Can the Pilot Anticipate to Happen?</b></div>' +
+        '<div class="pf-worktext">'+escapeHTML(data.abnormal)+'</div>' +
+        '<div class="pf-row" style="margin-top:22px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ameName?escapeHTML(data.ameName):'&nbsp;')+'</span></span>' +
+          '<span class="pf-field"><b>AME Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
+        '<div class="pf-row" style="margin-top:18px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+(data.pilotName?escapeHTML(data.pilotName):'&nbsp;')+'</span></span>' +
+          '<span class="pf-field"><b>Pilot Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
+      '</div>' +
+      docFooterHTML('anticipation', data.revision, data.revisionDate, data.page) +
+      '</div>';
+  }
+
+  function renderAnticipation(prefill){
     showView('Anticipation');
     const el = document.getElementById('viewAnticipation');
     const s = state.settings;
@@ -1123,15 +1412,22 @@
           '<div class="field span3"><label>Additional instructions to the pilot</label><textarea id="antAction3" rows="3"></textarea></div>' +
         '</div>' +
         '<div class="field"><label>What abnormalities can the pilot anticipate to happen?</label><textarea id="antAbnormal" rows="4"></textarea></div>' +
-        '<h3 style="margin:18px 0 6px;font-size:14px;">Maintenance Policy Manual document control</h3>' +
-        '<div class="field-grid">' +
-          '<div class="field"><label>Appendix #</label><input id="antAppendix" value="'+escapeHTML(s.appendix.anticipation||'')+'"></div>' +
-          '<div class="field"><label>Revision #</label><input id="antRevision" value="'+escapeHTML(s.docControl.anticipation.revision||'')+'"></div>' +
-          '<div class="field"><label>Revision date</label><input type="date" id="antRevisionDate" value="'+escapeHTML(s.docControl.anticipation.revisionDate||'')+'"></div>' +
-          '<div class="field"><label>Page label</label><input id="antPage" value="'+escapeHTML(s.docControl.anticipation.page||'Page 1 of 1')+'"></div>' +
-        '</div>' +
         '<div class="btn-row"><button class="btn primary" id="antPrintBtn">Prepare PDF</button></div>' +
       '</div>';
+
+    if(prefill){
+      // Date/Time is intentionally left at its "now" default.
+      fillField('antReg', prefill.reg);
+      fillField('antWr', prefill.wr);
+      fillField('antMaintType', prefill.maintType);
+      fillField('antPilot', prefill.pilotName);
+      fillField('antAme', prefill.ameName);
+      fillField('antDesc', prefill.desc);
+      fillField('antAction1', prefill.action1);
+      fillField('antAction2', prefill.action2);
+      fillField('antAction3', prefill.action3);
+      fillField('antAbnormal', prefill.abnormal);
+    }
 
     document.getElementById('antPrintBtn').onclick = async ()=>{
       const data = {
@@ -1146,57 +1442,16 @@
         action2: document.getElementById('antAction2').value,
         action3: document.getElementById('antAction3').value,
         abnormal: document.getElementById('antAbnormal').value,
-        appendix: document.getElementById('antAppendix').value,
-        revision: document.getElementById('antRevision').value,
-        revisionDate: document.getElementById('antRevisionDate').value,
-        page: document.getElementById('antPage').value,
+        appendix: s.appendix.anticipation||'',
+        revision: s.docControl.anticipation.revision||'',
+        revisionDate: s.docControl.anticipation.revisionDate||'',
+        page: s.docControl.anticipation.page||'Page 1 of 1',
       };
-      // remember appendix # and revision info as the new default for next time, shared across stations
-      s.appendix.anticipation = data.appendix;
-      s.docControl.anticipation = { revision: data.revision, revisionDate: data.revisionDate, page: data.page };
+      // (Appendix #/Revision #/Page label are edited in Settings > Document control, not here)
       await saveSettings();
+      await saveRecord(buildRecord('anticipation', 'Anticipation of Aircraft Behaviour after Maintenance Form', data.reg, (document.getElementById('antDateTime').value||'').slice(0,10), data.desc, data));
 
-      const antStyles = '<style>' +
-          '.ant-print .ant-logo{display:block;align-self:flex-start;height:52px;width:auto;margin:0 0 6px;}' +
-          '.ant-print .pf-headleft{display:block;text-align:left;}' +
-          '.ant-print .pf-headleft .pf-title-block{display:block;text-align:center;}' +
-          '.ant-print .pf-title-block h1{font-size:26px;}' +
-          '.ant-print .pf-box{font-size:16.5px;line-height:2;padding:18px 20px;}' +
-          '.ant-print .pf-worktext{font-size:16px;min-height:90px;margin:14px 0;}' +
-          '.ant-print .pf-desc-field{font-size:16px;margin:10px 0;}' +
-          '.ant-print .pf-signline{font-size:16px;}' +
-          '.ant-print .pf-signline .sl{padding-bottom:22px;}' +
-          '.ant-print .pf-underline{min-width:150px;}' +
-        '</style>';
-
-      const html = PRINT_STYLES + antStyles +
-        '<div class="pf-fillpage ant-print">' +
-        '<img class="ant-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
-        '<div class="pf-sub" style="text-align:center;margin-bottom:2px;">D.I.R Appendix to MPM</div>' +
-        '<div class="pf-topline">Appendix #: '+escapeHTML(data.appendix||'')+'</div>' +
-        '<div class="pf-head pf-headleft">' +
-          '<div class="pf-title-block"><h1>Anticipation of Aircraft Behaviour<br>after Maintenance Form</h1></div>' +
-        '</div>' +
-        '<div class="pf-box">' +
-          '<div class="pf-row"><span class="pf-field"><b>Date/Time:</b><span class="pf-underline">'+escapeHTML(data.dateTime)+'</span></span>' +
-            '<span class="pf-field"><b>Aircraft Reg:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
-            '<span class="pf-field"><b>Work Report:</b><span class="pf-underline">'+escapeHTML(data.wr)+'</span></span></div>' +
-          '<div class="pf-row" style="margin-top:14px;"><span class="pf-field"><b>Maintenance performed:</b><span class="pf-underline">'+escapeHTML(data.maintType)+'</span></span></div>' +
-          '<div class="pf-worktext">'+escapeHTML(data.desc)+'</div>' +
-          '<div class="pf-statement" style="border:1.5px solid #000;padding:8px 10px;font-size:17px;font-weight:700;margin:16px 0;">Caution: Maintenance Tests are A High Risk Activity</div>' +
-          '<div class="pf-row" style="margin-top:8px;"><b>Pilot Action to Take:</b></div>' +
-          '<div class="pf-desc-field">'+escapeHTML(data.action1)+'</div>' +
-          '<div class="pf-desc-field">'+escapeHTML(data.action2)+'</div>' +
-          (data.action3 ? '<div class="pf-desc-field" style="white-space:pre-wrap;">'+escapeHTML(data.action3)+'</div>' : '') +
-          '<div class="pf-row" style="margin-top:16px;"><b>What Abnormalities Can the Pilot Anticipate to Happen?</b></div>' +
-          '<div class="pf-worktext">'+escapeHTML(data.abnormal)+'</div>' +
-          '<div class="pf-row" style="margin-top:22px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+(data.ameName?escapeHTML(data.ameName):'&nbsp;')+'</span></span>' +
-            '<span class="pf-field"><b>AME Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
-          '<div class="pf-row" style="margin-top:18px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+(data.pilotName?escapeHTML(data.pilotName):'&nbsp;')+'</span></span>' +
-            '<span class="pf-field"><b>Pilot Signature:</b><span class="pf-underline" style="min-width:220px;">&nbsp;</span></span></div>' +
-        '</div>' +
-        docFooterHTML('anticipation', data.revision, data.revisionDate, data.page) +
-        '</div>';
+      const html = buildAnticipationHtml(data);
       openPrint(html);
     };
   }
