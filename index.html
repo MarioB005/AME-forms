@@ -153,6 +153,12 @@
   .pc-tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 16px;margin-top:10px;}
   .pc-tech-grid div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0;color:var(--grey-strong);}
   .pc-tech-grid span{color:var(--ink);font-weight:700;}
+
+  /* ---------- Bleed Valve Test ---------- */
+  .bv-check{padding:12px 0;border-bottom:1px solid var(--line);}
+  .bv-check:last-child{border-bottom:none;}
+  .bv-check-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap;}
+  .bv-check-title{font-weight:800;font-size:14px;}
 </style>
 </head>
 <body>
@@ -194,6 +200,7 @@
         <button class="home-btn" data-view="tolerance"><span class="hb-icon">⏳</span>Tolerance</button>
         <button class="home-btn" data-view="anticipation"><span class="hb-icon">✈️</span>Anticipation of Aircraft Behaviour after Maintenance</button>
         <button class="home-btn" data-view="powercheck"><span class="hb-icon">🧮</span>AS350 B2 Powercheck</button>
+        <button class="home-btn" data-view="bleedvalve"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>
       </div>
     </div>
   </div>
@@ -206,6 +213,7 @@
   <div id="viewMinorMod" style="display:none;"></div>
   <div id="viewAnticipation" style="display:none;"></div>
   <div id="viewPowercheck" style="display:none;"></div>
+  <div id="viewBleedValve" style="display:none;"></div>
 </div>
 
 <div id="printArea"></div>
@@ -574,7 +582,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','BleedValve'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -602,6 +610,7 @@
       else if(v==='minormod') renderModForm('MinorMod', 'Minor');
       else if(v==='anticipation') renderAnticipation();
       else if(v==='powercheck') renderPowercheck();
+      else if(v==='bleedvalve') renderBleedValve();
     });
   });
   document.getElementById('settingsBtn').onclick = renderSettings;
@@ -1813,6 +1822,134 @@
     }
 
     syncSand();
+    update();
+  }
+
+
+  // ---------- Arriel 1D1 Bleed Valve Test ----------
+  // Digitized from Safran Helicopter Engines Arriel 1D1 Maintenance Manual,
+  // Task 75-31-00-750-803-A01 "Bleed Valve Tests (Electrical)", Figures 1301 (opening)
+  // and 1302 (closing) - "Rating that causes bleed valve opening/closing", N1(NG)% vs
+  // outside temperature, for Zp = 0/5,000/10,000/15,000/20,000 ft. Each of the 5 lines per
+  // chart is a straight line (digitized via calibrated pixel-to-data-axis regression from
+  // the source PDF at 400dpi), so no curve-fitting is needed - just 2 endpoint points per
+  // line. Cross-checked against both worked examples printed in the manual: opening
+  // T0=-25 degC/Zp=5,000ft -> 86% (this model: 86.36%), closing T0=20 degC/Zp=15,000ft ->
+  // 96% (this model: 96.09%).
+  const BLEEDVALVE_DATA = {"opening":[{"zp":0,"t0a":-12.903,"n1a":87.415,"t0b":19.442,"n1b":92.338},{"zp":5000,"t0a":-7.431,"n1a":89.056,"t0b":25.279,"n1b":94.077},{"zp":10000,"t0a":-2.81,"n1a":90.609,"t0b":33.182,"n1b":96.09},{"zp":15000,"t0a":0.716,"n1a":92.067,"t0b":24.549,"n1b":95.752},{"zp":20000,"t0a":-13.146,"n1a":90.871,"t0b":15.429,"n1b":95.533}],"closing":[{"zp":0,"t0a":-6.113,"n1a":89.522,"t0b":24.057,"n1b":94.103},{"zp":5000,"t0a":1.307,"n1a":91.494,"t0b":30.991,"n1b":95.961},{"zp":10000,"t0a":8.242,"n1a":93.369,"t0b":33.667,"n1b":97.186},{"zp":15000,"t0a":-0.274,"n1a":92.958,"t0b":24.665,"n1b":96.812},{"zp":20000,"t0a":-13.169,"n1a":91.924,"t0b":15.298,"n1b":96.57}],"tolerance":{"plus":2,"minus":1},"limits":{"oat":[-50,50],"zp":[0,20000],"n1":[80,102]}};
+
+  function bvLineN1(band, t0){
+    const t = (t0 - band.t0a) / (band.t0b - band.t0a);
+    return band.n1a + t * (band.n1b - band.n1a);
+  }
+  function bvBracketIndex(x, xs){
+    const n = xs.length;
+    if (x <= xs[0]) return 0;
+    if (x >= xs[n-1]) return n-2;
+    let lo=0, hi=n-1;
+    while (lo < hi-1){
+      const mid = (lo+hi)>>1;
+      if (xs[mid] <= x) lo=mid; else hi=mid;
+    }
+    return lo;
+  }
+  function bvGraphN1(bands, t0, zp){
+    const zps = bands.map(b=>b.zp);
+    const zpClamped = Math.max(zps[0], Math.min(zps[zps.length-1], zp));
+    const idx = bvBracketIndex(zpClamped, zps);
+    const nLeft = bvLineN1(bands[idx], t0);
+    const nRight = bvLineN1(bands[idx+1], t0);
+    const zLeft = zps[idx], zRight = zps[idx+1];
+    const t = zRight===zLeft ? 0 : (zpClamped-zLeft)/(zRight-zLeft);
+    return nLeft + t*(nRight-nLeft);
+  }
+  function bvCompute(bands, t0, zp, actual){
+    const graph = bvGraphN1(bands, t0, zp);
+    const lo = graph - BLEEDVALVE_DATA.tolerance.minus;
+    const hi = graph + BLEEDVALVE_DATA.tolerance.plus;
+    const passed = actual >= lo && actual <= hi;
+    const margin = actual < lo ? (actual-lo) : (actual > hi ? (hi-actual) : Math.min(actual-lo, hi-actual));
+    return { graph, lo, hi, passed, margin };
+  }
+
+  function bvFormatFieldVal(f, val){
+    if (f.step < 1) return val.toFixed(1);
+    return Math.round(val).toLocaleString();
+  }
+
+  function renderBleedValve(){
+    showView('BleedValve');
+    const el = document.getElementById('viewBleedValve');
+    const fields = [
+      { id:'bvOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-50, max:50, step:0.5, value:15 },
+      { id:'bvZp', label:'Zp', unit:'pressure altitude, ft', min:0, max:20000, step:100, value:5000 },
+      { id:'bvActOpen', label:'Actual N1 (NG)', unit:'at valve opening, %', min:80, max:102, step:0.1, value:90.0 },
+      { id:'bvActClose', label:'Actual N1 (NG)', unit:'at valve closing, %', min:80, max:102, step:0.1, value:95.0 },
+    ];
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Arriel 1D1 Bleed Valve Test</h2>' +
+        '<p class="form-sub">Bleed valve opening/closing N1 (NG) threshold check &mdash; Task 75-31-00-750-803-A01, Safran Arriel 1D1 Maintenance Manual (Figures 1301/1302). Tolerance +2% / -1%. For negative pressure altitudes, the 0 ft line is used. For training and reference use only &mdash; always confirm against the current approved maintenance manual.</p>' +
+        '<div class="pc-grid">' +
+          '<div>' +
+            fields.map(f=>(
+              '<div class="pc-field">' +
+                '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+bvFormatFieldVal(f, f.value)+'</span></div>' +
+                '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
+              '</div>'
+            )).join('') +
+          '</div>' +
+          '<div>' +
+            '<div class="bv-check">' +
+              '<div class="bv-check-head"><span class="bv-check-title">Valve Opening</span><span class="pc-status-chip" id="bvOpenChip"><span class="dot"></span><span id="bvOpenStatus">&nbsp;</span></span></div>' +
+              '<div class="pc-readout-row"><span>Graph value (theoretical)</span><span class="v" id="bvOpenGraph">&mdash;</span></div>' +
+              '<div class="pc-readout-row"><span>Acceptable range</span><span class="v" id="bvOpenRange">&mdash;</span></div>' +
+              '<div class="pc-readout-row"><span>Actual reading</span><span class="v" id="bvOpenActual">&mdash;</span></div>' +
+            '</div>' +
+            '<div class="bv-check">' +
+              '<div class="bv-check-head"><span class="bv-check-title">Valve Closing</span><span class="pc-status-chip" id="bvCloseChip"><span class="dot"></span><span id="bvCloseStatus">&nbsp;</span></span></div>' +
+              '<div class="pc-readout-row"><span>Graph value (theoretical)</span><span class="v" id="bvCloseGraph">&mdash;</span></div>' +
+              '<div class="pc-readout-row"><span>Acceptable range</span><span class="v" id="bvCloseRange">&mdash;</span></div>' +
+              '<div class="pc-readout-row"><span>Actual reading</span><span class="v" id="bvCloseActual">&mdash;</span></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    const fEls = {};
+    fields.forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
+
+    fields.forEach(f=>{
+      fEls[f.id].addEventListener('input', ()=>{
+        document.getElementById(f.id+'Val').textContent = bvFormatFieldVal(f, parseFloat(fEls[f.id].value));
+        update();
+      });
+    });
+
+    function setCheck(prefix, result){
+      const chip = document.getElementById(prefix+'Chip');
+      chip.classList.remove('pass','fail');
+      chip.classList.add(result.passed ? 'pass' : 'fail');
+      document.getElementById(prefix+'Status').textContent = result.passed ? 'PASSED' : 'FAILED';
+      document.getElementById(prefix+'Graph').textContent = result.graph.toFixed(2) + '%';
+      document.getElementById(prefix+'Range').textContent = result.lo.toFixed(2) + '% \u2013 ' + result.hi.toFixed(2) + '%';
+      document.getElementById(prefix+'Actual').textContent = document.getElementById(prefix==='bvOpen'?'bvActOpenVal':'bvActCloseVal').textContent + '%';
+    }
+
+    function update(){
+      const t0 = parseFloat(fEls.bvOat.value);
+      const zp = parseFloat(fEls.bvZp.value);
+      const actualOpen = parseFloat(fEls.bvActOpen.value);
+      const actualClose = parseFloat(fEls.bvActClose.value);
+
+      const openResult = bvCompute(BLEEDVALVE_DATA.opening, t0, zp, actualOpen);
+      const closeResult = bvCompute(BLEEDVALVE_DATA.closing, t0, zp, actualClose);
+
+      setCheck('bvOpen', openResult);
+      setCheck('bvClose', closeResult);
+    }
+
     update();
   }
 
