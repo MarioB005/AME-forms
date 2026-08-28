@@ -111,6 +111,48 @@
     #gate, #app{display:none !important;}
     #printArea{display:block !important;}
   }
+
+  /* ---------- Powercheck ---------- */
+  :root{
+    --good:#2f7d4f;
+    --good-bg:#e6f2ea;
+    --warn:#b3791b;
+    --warn-bg:#faf1de;
+    --bad:#b0281e;
+    --bad-bg:#fbe9e7;
+  }
+  .pc-grid{display:grid;grid-template-columns:minmax(240px,1fr) minmax(280px,1.2fr);gap:20px;align-items:start;}
+  @media (max-width:720px){ .pc-grid{grid-template-columns:1fr;} }
+  .pc-field{padding:10px 0;border-bottom:1px solid var(--line);}
+  .pc-field:last-child{border-bottom:none;}
+  .pc-field-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .pc-field-name{font-size:12.5px;font-weight:700;color:var(--ink);}
+  .pc-field-unit{font-size:11px;color:var(--grey-strong);font-weight:500;margin-left:4px;}
+  .pc-field-val{font-size:14px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .pc-field input[type="range"]{width:100%;accent-color:var(--accent);}
+  .pc-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:4px;}
+  .pc-toggle button{flex:1;padding:8px 10px;border:none;background:var(--panel);color:var(--grey-strong);font-size:12.5px;font-weight:700;cursor:pointer;}
+  .pc-toggle button + button{border-left:1px solid var(--line);}
+  .pc-toggle button[aria-pressed="true"]{background:var(--ink);color:#fff;}
+  .pc-gauge-wrap{position:relative;max-width:420px;margin:0 auto;}
+  .pc-gauge-readout{position:absolute;left:0;right:0;bottom:6px;text-align:center;}
+  .pc-gauge-figure{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;}
+  .pc-gauge-caption{font-size:11px;color:var(--grey-strong);text-transform:uppercase;letter-spacing:.3px;margin-top:2px;}
+  .pc-status-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:800;letter-spacing:.3px;margin-bottom:12px;}
+  .pc-status-chip.pass{background:var(--good-bg);color:var(--good);}
+  .pc-status-chip.fail{background:var(--bad-bg);color:var(--bad);}
+  .pc-status-chip .dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .pc-readout-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .pc-readout-row:last-child{border-bottom:none;}
+  .pc-readout-row .v{font-weight:800;font-variant-numeric:tabular-nums;}
+  .pc-note-strip{display:flex;gap:8px;align-items:flex-start;background:var(--warn-bg);color:#7a5410;border:1px solid #e7d3a4;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;margin-top:14px;}
+  .pc-note-strip[hidden]{display:none;}
+  .pc-note-strip .ico{font-size:14px;line-height:1.3;}
+  .pc-tech{margin-top:14px;font-size:12px;}
+  .pc-tech summary{cursor:pointer;color:var(--grey-strong);font-weight:700;}
+  .pc-tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:6px 16px;margin-top:10px;}
+  .pc-tech-grid div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0;color:var(--grey-strong);}
+  .pc-tech-grid span{color:var(--ink);font-weight:700;}
 </style>
 </head>
 <body>
@@ -151,6 +193,7 @@
         <button class="home-btn" data-view="minormod"><span class="hb-icon">🔧</span>Minor Modifications</button>
         <button class="home-btn" data-view="tolerance"><span class="hb-icon">⏳</span>Tolerance</button>
         <button class="home-btn" data-view="anticipation"><span class="hb-icon">✈️</span>Anticipation of Aircraft Behaviour after Maintenance</button>
+        <button class="home-btn" data-view="powercheck"><span class="hb-icon">🧮</span>AS350 B2 Powercheck</button>
       </div>
     </div>
   </div>
@@ -162,6 +205,7 @@
   <div id="viewMajorMod" style="display:none;"></div>
   <div id="viewMinorMod" style="display:none;"></div>
   <div id="viewAnticipation" style="display:none;"></div>
+  <div id="viewPowercheck" style="display:none;"></div>
 </div>
 
 <div id="printArea"></div>
@@ -530,7 +574,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -557,6 +601,7 @@
       else if(v==='majormod') renderModForm('MajorMod', 'Major');
       else if(v==='minormod') renderModForm('MinorMod', 'Minor');
       else if(v==='anticipation') renderAnticipation();
+      else if(v==='powercheck') renderPowercheck();
     });
   });
   document.getElementById('settingsBtn').onclick = renderSettings;
@@ -1454,6 +1499,321 @@
       const html = buildAnticipationHtml(data);
       openPrint(html);
     };
+  }
+
+
+  // ---------- Powercheck (AS350-B2 torque-available performance check) ----------
+  // Chart data digitized from "Eurocopter - AS350-B2 Powercheck v1.2" (c) 2012 Guy Fisher.
+  // Engine reimplements the spreadsheet's chart-reading logic via clamped linear
+  // interpolation/extrapolation (see analysis notes) instead of literally replaying
+  // Excel's MATCH/OFFSET/FORECAST formulas.
+  const POWERCHECK_DATA = {"tqnrBands":[{"torque":95,"kTop":8.953,"nrTop":400.063,"kBot":11.282,"nrBot":380.089},{"torque":90,"kTop":11.379,"nrTop":400.073,"kBot":13.617,"nrBot":380.095},{"torque":85,"kTop":13.943,"nrTop":400.036,"kBot":15.975,"nrBot":380.148},{"torque":80,"kTop":16.369,"nrTop":400.045,"kBot":18.424,"nrBot":380.153},{"torque":75,"kTop":18.932,"nrTop":399.914,"kBot":20.782,"nrBot":380.111},{"torque":70,"kTop":21.427,"nrTop":400.066,"kBot":23.14,"nrBot":380.022},{"torque":65,"kTop":23.807,"nrTop":399.981,"kBot":25.475,"nrBot":380.075},{"torque":60,"kTop":26.302,"nrTop":400.038,"kBot":27.832,"nrBot":380.033},{"torque":55,"kTop":28.797,"nrTop":400.001,"kBot":30.144,"nrBot":379.991},{"torque":50,"kTop":31.246,"nrTop":400.011,"kBot":32.388,"nrBot":379.996},{"torque":49.999,"kTop":31.246,"nrTop":400.011,"kBot":32.388,"nrBot":379.996}],"hpBands":[{"band":100,"points":[[-18.04112203675227,12000],[-0.062,3223.025],[2.882,1785.835],[6.213,-12.059]]},{"band":95,"points":[[-16.971786813462252,12000],[-0.125,4618.977],[1.678,3829.035],[4.21,2535.449],[7.199,866.995],[8.659,-10.852]]},{"band":90,"points":[[-12.72408200719906,12000],[-0.119,6101.34],[2.264,4986.194],[3.485,4392.139],[5.493,3342.831],[7.272,2336.13],[9.234,1170.708],[11.127,-9.633]]},{"band":85,"points":[[-9.788797288747013,12000],[-0.137,7655.634],[2.191,6607.779],[4.472,5429.781],[7.911,3518.052],[10.357,2064.664],[12.661,654.028],[13.619,-8.401]]},{"band":80,"points":[[-6.821083713411809,12000],[0.143,9080.821],[2.128,8248.756],[3.725,7487.84],[6.188,6151.661],[11.554,3025.643],[16.202,-50.373]]},{"band":75,"points":[[-2.5860279478307184,12000],[0.012,10836.462],[3.183,9416.316],[5.282,8397.015],[9.053,6322.766],[14.454,2991.788],[16.996,1179.495],[18.579,-49.209]]},{"band":70,"points":[[1.525,12004.845],[4.079,10756.66],[8.573,8444.728],[12.077,6388.561],[15.005,4475.172],[19.228,1474.754],[21.162,-33.518]]},{"band":65,"points":[[5.455,12011.688],[12.183,8348.812],[16.037,5802.435],[18.5,4060.359],[20.271,2771.863],[21.412,1858.577],[23.654,-46.719]]},{"band":60,"points":[[9.407,11960.949],[13.9,9331.219],[16.386,7763.464],[20.24,4956.138],[22.612,3155.306],[24.458,1511.965],[26.1,-45.518]]},{"band":55,"points":[[13.155,12025.108],[14.044,11551.033],[19.088,8216.609],[22.116,5852.393],[24.442,3935.958],[26.15,2391.51],[27.361,1181.903],[28.5,-1.036]]},{"band":50,"points":[[17.062,12046.343],[22.128,8475.521],[24.22,6735.232],[28.009,3246.528],[30.208,957.802],[30.992,-14.238]]},{"band":45,"points":[[20.969000000000005,12046.343],[25.752000000000002,8475.521],[27.561,6735.232],[31.067,3246.528],[32.983,957.802],[33.484,-14.238]]},{"band":0,"points":[[34,12046.343],[38.783,8475.521],[40.592,6735.232],[44.098,3246.528],[46.013999999999996,957.802],[46.515,-14.238]]}],"sandFilterNone":[{"ng":98,"points":[[-0.033,-22.783],[2.691,-11.633],[4.452,-4.649],[7.197,5.493],[9.918,14.622],[13.733,26.237],[17.296,36.668],[20.104,44.286],[22.387,50.198]]},{"ng":97,"points":[[0.306,-29.744],[2.573,-20.044],[5.228,-9.824],[7.949,0.062],[10.487,8.507],[14.714,21.402],[18.437,32.005],[21.314,39.879],[25.491,49.994]]},{"ng":96,"points":[[2.226,-29.815],[6.026,-14.916],[8.427,-6.053],[11.194,3.328],[13.822,11.268],[17.729,22.293],[21.634,33.073],[25.491,42.669],[28.594,50.046]]},{"ng":95,"points":[[4.078,-29.802],[7.671,-16.176],[10.644,-6.286],[13.387,2.247],[16.54,11.556],[20.241,21.646],[24.099,31.576],[28.504,42.461],[31.698,49.927]]},{"ng":94,"points":[[6.112,-29.702],[9.338,-17.946],[12.357,-8.395],[14.871,-0.714],[18.139,8.512],[21.885,18.518],[26.268,29.734],[29.327,37.106],[33.958,47.322]]},{"ng":93,"points":[[8.192,-29.602],[11.12,-19.546],[14.139,-10.334],[16.79,-2.565],[19.829,5.723],[23.483,15.132],[28.438,27.208],[33.96,40.075],[33.96,40.075]]},{"ng":92,"points":[[10.341,-29.671],[13.84,-18.332],[17.109,-9.029],[20.856,1.223],[24.146,9.605],[26.863,16.453],[30.675,25.024],[33.962,32.657],[33.962,32.657]]},{"ng":91,"points":[[12.33,-29.741],[15.531,-20.53],[18.594,-12.078],[21.496,-4.389],[24.534,3.478],[27.686,11.096],[30.289,17.008],[33.963,25.069],[33.963,25.069]]}],"sandFilterInstalled":[{"ng":98,"points":[[2.505,-30.348],[4.128,-22.364],[6.669,-10.98],[9.431,0.534],[12.994,13.716],[17.656,29.003],[24.874,50.126],[24.874,50.126],[24.874,50.126]]},{"ng":97,"points":[[4.206,-30.323],[5.48,-24.123],[8.057,-13.237],[11.28,-0.513],[14.269,10.23],[17.081,19.707],[20.827,30.839],[27.705,50.273],[27.705,50.273]]},{"ng":96,"points":[[5.959,-30.298],[7.898,-21.655],[8.945,-17.381],[11.698,-6.745],[15.63,7.379],[18.437,16.338],[23.579,31.182],[26.493,39.255],[30.799,50.525]]},{"ng":95,"points":[[7.792,-30.469],[9.39,-23.217],[13.317,-8.73],[15.837,0.249],[19.143,10.863],[28.746,37.807],[33.814,50.379],[33.814,50.379],[33.814,50.379]]},{"ng":94,"points":[[9.545,-30.345],[12.296,-19.609],[15.966,-6.878],[19.455,4.134],[22.911,14.441],[28.394,29.168],[34.071,43.446],[34.071,43.446],[34.071,43.446]]},{"ng":93,"points":[[11.561,-30.414],[13.683,-22.065],[17.382,-9.693],[22.68,6.311],[27.758,20.203],[34.144,36.312],[34.144,36.312],[34.144,36.312],[34.144,36.312]]},{"ng":92,"points":[[13.524,-30.287],[15.987,-21.436],[19.583,-10.179],[22.648,-1.105],[27.076,11.294],[34.311,29.109],[34.311,29.109],[34.311,29.109],[34.311,29.109]]},{"ng":91,"points":[[15.513,-30.357],[17.355,-24.166],[21.294,-12.201],[28.05,6.758],[32.072,16.757],[34.107,21.446],[34.107,21.446],[34.107,21.446],[34.107,21.446]]}],"threshold":{"r8":-0.031,"s8":35.048,"r9":34.022,"s9":-29.923},"limits":{"nr":[380,400],"torque":[50,95],"hp":[0,12000],"oat":[-30,50],"ng":[91,98]}};
+
+  function pcInterpAscending(x, xs, ys) {
+    const n = xs.length;
+    if (n === 1) return { y: ys[0], extrapolated: false };
+    let i, extrapolated = false;
+    if (x <= xs[0]) { i = 0; extrapolated = x < xs[0]; }
+    else if (x >= xs[n - 1]) { i = n - 2; extrapolated = x > xs[n - 1]; }
+    else {
+      let lo = 0, hi = n - 1;
+      while (lo < hi - 1) {
+        const mid = (lo + hi) >> 1;
+        if (xs[mid] <= x) lo = mid; else hi = mid;
+      }
+      i = lo;
+    }
+    const x0 = xs[i], x1 = xs[i + 1], y0 = ys[i], y1 = ys[i + 1];
+    const t = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
+    return { y: y0 + t * (y1 - y0), extrapolated };
+  }
+
+  function pcBracketIndex(x, xs) {
+    const n = xs.length;
+    if (x <= xs[0]) return 0;
+    if (x >= xs[n - 1]) return n - 2;
+    let lo = 0, hi = n - 1;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      if (xs[mid] <= x) lo = mid; else hi = mid;
+    }
+    return lo;
+  }
+
+  function pcKAtHpForBand(targetHp, points) {
+    const rev = points.slice().reverse();
+    const hps = rev.map(p => p[1]);
+    const ks = rev.map(p => p[0]);
+    return pcInterpAscending(targetHp, hps, ks);
+  }
+
+  function pcMakeEngine(data) {
+    const { tqnrBands, hpBands, sandFilterNone, sandFilterInstalled, threshold, limits } = data;
+
+    function kFromTorque(nr, torque) {
+      const kAtNr = tqnrBands.map(b => {
+        const t = (b.nrTop - nr) / (b.nrTop - b.nrBot);
+        return b.kTop + t * (b.kBot - b.kTop);
+      });
+      const torques = tqnrBands.map(b => b.torque);
+      const torqueAsc = torques.slice().reverse();
+      const kDesc = kAtNr.slice().reverse();
+      const r = pcInterpAscending(torque, torqueAsc, kDesc);
+      return { k: r.y, extrapolated: r.extrapolated, kAtNr, torques };
+    }
+
+    function torqueFromK(targetK, kAtNr, torques) {
+      return pcInterpAscending(targetK, kAtNr, torques);
+    }
+
+    function hpChain(hp, targetK, anchorAtActual) {
+      const actualK = hpBands.map(b => pcKAtHpForBand(hp, b.points).y);
+      const groundK = hpBands.map(b => pcKAtHpForBand(0, b.points).y);
+      if (!anchorAtActual) {
+        const n = hpBands.length - 1;
+        const arr = groundK.slice(0, n);
+        const idx = pcBracketIndex(targetK, arr);
+        const gL = groundK[idx], gR = groundK[idx + 1];
+        const aL = actualK[idx], aR = actualK[idx + 1];
+        const t = gR === gL ? 0 : (targetK - gL) / (gR - gL);
+        return aL + t * (aR - aL);
+      } else {
+        const arr = actualK;
+        const idx = pcBracketIndex(targetK, arr);
+        const aL = actualK[idx], aR = actualK[idx + 1];
+        const gL = groundK[idx], gR = groundK[idx + 1];
+        const t = aR === aL ? 0 : (targetK - aL) / (aR - aL);
+        return gL + t * (gR - gL);
+      }
+    }
+
+    function marginKFromOatNg(oat, ng, sandInstalled) {
+      const bands = sandInstalled ? sandFilterInstalled : sandFilterNone;
+      const kAtOat = bands.map(b => {
+        const oats = b.points.map(p => p[1]);
+        const ks = b.points.map(p => p[0]);
+        return pcInterpAscending(oat, oats, ks).y;
+      });
+      const ngVals = bands.map(b => b.ng);
+      const ngAsc = ngVals.slice().reverse();
+      const kDesc = kAtOat.slice().reverse();
+      return pcInterpAscending(ng, ngAsc, kDesc).y;
+    }
+
+    function thresholdLine(x) {
+      const { r8, s8, r9, s9 } = threshold;
+      const t = (x - r8) / (r9 - r8);
+      return s8 + t * (s9 - s8);
+    }
+
+    function compute(inputs) {
+      const { nr, torque, hp, oat, ng, sandFilterInstalled } = inputs;
+      const kFromTq = kFromTorque(nr, torque);
+      const marginK = marginKFromOatNg(oat, ng, sandFilterInstalled);
+      const hpValueOut = hpChain(hp, kFromTq.k, false);
+      const hpMarginOut = hpChain(hp, marginK, true);
+      const minTorqueResult = torqueFromK(hpMarginOut, kFromTq.kAtNr, kFromTq.torques);
+      const minimumTorque = minTorqueResult.y;
+      const torqueMargin = torque - minimumTorque;
+      const sandCheckValue = thresholdLine(marginK);
+      const sandCheckThreshold = thresholdLine(hpValueOut);
+      const passed = sandCheckValue < sandCheckThreshold;
+      return {
+        minimumTorque, torqueMargin, passed,
+        extrapolated: kFromTq.extrapolated || minTorqueResult.extrapolated,
+        debug: { kFromTorque: kFromTq.k, marginK, hpValueOut, hpMarginOut, sandCheckValue, sandCheckThreshold },
+      };
+    }
+
+    return { compute, limits };
+  }
+
+  const pcEngine = pcMakeEngine(POWERCHECK_DATA);
+  let pcSandInstalled = true;
+
+  function pcCssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  const PC_GMIN = -20, PC_GMAX = 30, PC_GWARN = 3;
+  function pcAngleFor(v){
+    const t = Math.max(0, Math.min(1, (v - PC_GMIN) / (PC_GMAX - PC_GMIN)));
+    return Math.PI - t * Math.PI;
+  }
+
+  function pcDrawGauge(canvas, margin){
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const cx = W/2, cy = H - 40, r = 200, rInner = 160;
+    ctx.clearRect(0,0,W,H);
+
+    const badC = pcCssVar('--bad') || '#b0281e';
+    const warnC = pcCssVar('--warn') || '#b3791b';
+    const goodC = pcCssVar('--good') || '#2f7d4f';
+    const lineC = pcCssVar('--line') || '#dfe2da';
+    const grey = pcCssVar('--grey-strong') || '#6b6558';
+    const ink = pcCssVar('--ink') || '#1c2b24';
+
+    ctx.lineWidth = r - rInner;
+    ctx.lineCap = 'butt';
+    const zones = [
+      { from: PC_GMIN, to: 0, color: badC },
+      { from: 0, to: PC_GWARN, color: warnC },
+      { from: PC_GWARN, to: PC_GMAX, color: goodC },
+    ];
+    zones.forEach(z => {
+      ctx.beginPath();
+      ctx.strokeStyle = z.color;
+      ctx.globalAlpha = 0.88;
+      ctx.arc(cx, cy, (r+rInner)/2, -pcAngleFor(z.from), -pcAngleFor(z.to), false);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    ctx.font = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle = grey;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let v = PC_GMIN; v <= PC_GMAX; v += 10) {
+      const a = pcAngleFor(v);
+      const x1 = cx + Math.cos(a) * (r + 3);
+      const y1 = cy - Math.sin(a) * (r + 3);
+      const x2 = cx + Math.cos(a) * (rInner - 3);
+      const y2 = cy - Math.sin(a) * (rInner - 3);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = lineC;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      const lx = cx + Math.cos(a) * (r + 18);
+      const ly = cy - Math.sin(a) * (r + 18);
+      ctx.fillText((v>0?'+':'') + v, lx, ly);
+    }
+
+    const clamped = Math.max(PC_GMIN, Math.min(PC_GMAX, margin));
+    const a = pcAngleFor(clamped);
+    const nx = cx + Math.cos(a) * (rInner - 6);
+    const ny = cy - Math.sin(a) * (rInner - 6);
+    const needleC = margin < 0 ? badC : (margin < PC_GWARN ? warnC : goodC);
+    ctx.strokeStyle = needleC;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(nx, ny); ctx.stroke();
+    ctx.beginPath(); ctx.fillStyle = needleC; ctx.arc(cx, cy, 8, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.fillStyle = ink; ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
+  }
+
+  function pcFormatFieldVal(f, val){
+    if (f.step < 1) return val.toFixed(1);
+    return Math.round(val).toLocaleString();
+  }
+
+  function renderPowercheck(){
+    showView('Powercheck');
+    const el = document.getElementById('viewPowercheck');
+    const fields = [
+      { id:'pcNr', label:'NR', unit:'rotor speed, RPM', min:380, max:400, step:0.1, value:394 },
+      { id:'pcTq', label:'Torque', unit:'observed, %', min:50, max:95, step:0.1, value:84 },
+      { id:'pcHp', label:'Hp', unit:'pressure altitude, ft', min:0, max:12000, step:50, value:3200 },
+      { id:'pcOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-30, max:50, step:0.5, value:16 },
+      { id:'pcNg', label:'Ng', unit:'gas generator, %', min:91, max:98, step:0.1, value:96.9 },
+    ];
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">AS350 B2 Powercheck</h2>' +
+        '<p class="form-sub">Torque-available performance check &mdash; chart data digitized from &ldquo;Eurocopter &ndash; AS350-B2 Powercheck v1.2&rdquo; &copy; 2012 Guy Fisher. For training and reference use only &mdash; not a substitute for the approved Rotorcraft Flight Manual.</p>' +
+        '<div class="pc-grid">' +
+          '<div>' +
+            fields.map(f=>(
+              '<div class="pc-field">' +
+                '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+pcFormatFieldVal(f, f.value)+'</span></div>' +
+                '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
+              '</div>'
+            )).join('') +
+            '<div class="pc-field">' +
+              '<div class="pc-field-head"><span class="pc-field-name">Sand filter</span></div>' +
+              '<div class="pc-toggle">' +
+                '<button type="button" id="pcSandNone" aria-pressed="false">None</button>' +
+                '<button type="button" id="pcSandInstalled" aria-pressed="true">Installed</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="pc-status-chip" id="pcStatusChip"><span class="dot"></span><span id="pcStatusText">&nbsp;</span></div>' +
+            '<div class="pc-gauge-wrap">' +
+              '<canvas id="pcGauge" width="480" height="290" style="width:100%;height:auto;display:block;"></canvas>' +
+              '<div class="pc-gauge-readout"><div class="pc-gauge-figure" id="pcMarginFigure">&nbsp;</div><div class="pc-gauge-caption">Torque margin</div></div>' +
+            '</div>' +
+            '<div class="pc-readout-row"><span>Minimum torque required</span><span class="v" id="pcMinTorqueOut">&mdash;</span></div>' +
+            '<div class="pc-readout-row"><span>Torque observed</span><span class="v" id="pcTqObservedOut">&mdash;</span></div>' +
+            '<div class="pc-note-strip" id="pcExtrapNote" hidden><span class="ico">\u26a0\ufe0f</span><span>This reading falls outside the digitized chart data and has been linearly extrapolated. Cross-check against the printed Flight Manual performance charts before relying on it.</span></div>' +
+            '<details class="pc-tech"><summary>Intermediate chart values</summary><div class="pc-tech-grid" id="pcTechGrid"></div></details>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    const fEls = {};
+    fields.forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
+    const sandNoneBtn = document.getElementById('pcSandNone');
+    const sandInstalledBtn = document.getElementById('pcSandInstalled');
+
+    function syncSand(){
+      sandNoneBtn.setAttribute('aria-pressed', String(!pcSandInstalled));
+      sandInstalledBtn.setAttribute('aria-pressed', String(pcSandInstalled));
+    }
+    sandNoneBtn.onclick = ()=>{ pcSandInstalled = false; syncSand(); update(); };
+    sandInstalledBtn.onclick = ()=>{ pcSandInstalled = true; syncSand(); update(); };
+
+    fields.forEach(f=>{
+      fEls[f.id].addEventListener('input', ()=>{
+        document.getElementById(f.id+'Val').textContent = pcFormatFieldVal(f, parseFloat(fEls[f.id].value));
+        update();
+      });
+    });
+
+    function readInputs(){
+      return {
+        nr: parseFloat(fEls.pcNr.value),
+        torque: parseFloat(fEls.pcTq.value),
+        hp: parseFloat(fEls.pcHp.value),
+        oat: parseFloat(fEls.pcOat.value),
+        ng: parseFloat(fEls.pcNg.value),
+        sandFilterInstalled: pcSandInstalled,
+      };
+    }
+
+    function update(){
+      const inputs = readInputs();
+      const out = pcEngine.compute(inputs);
+
+      const marginFigure = document.getElementById('pcMarginFigure');
+      const sign = out.torqueMargin >= 0 ? '+' : '\u2212';
+      marginFigure.textContent = sign + Math.abs(out.torqueMargin).toFixed(1) + '%';
+      marginFigure.style.color = out.torqueMargin < 0 ? 'var(--bad)' : (out.torqueMargin < PC_GWARN ? 'var(--warn)' : 'var(--good)');
+
+      document.getElementById('pcMinTorqueOut').textContent = out.minimumTorque.toFixed(1) + '%';
+      document.getElementById('pcTqObservedOut').textContent = inputs.torque.toFixed(1) + '%';
+
+      const chip = document.getElementById('pcStatusChip');
+      chip.classList.remove('pass','fail');
+      chip.classList.add(out.passed ? 'pass' : 'fail');
+      document.getElementById('pcStatusText').textContent = out.passed ? 'PASSED' : 'FAILED';
+
+      document.getElementById('pcExtrapNote').hidden = !out.extrapolated;
+
+      const tg = document.getElementById('pcTechGrid');
+      const d = out.debug;
+      tg.innerHTML = [
+        ['K (NR, Torque)', d.kFromTorque],
+        ['K margin (OAT, Ng)', d.marginK],
+        ['Hp value K', d.hpValueOut],
+        ['Hp margin K', d.hpMarginOut],
+        ['Sand check value', d.sandCheckValue],
+        ['Sand check threshold', d.sandCheckThreshold],
+      ].map(([k,v])=>'<div>'+k+'<span>'+v.toFixed(4)+'</span></div>').join('');
+
+      pcDrawGauge(document.getElementById('pcGauge'), out.torqueMargin);
+    }
+
+    syncSand();
+    update();
   }
 
   window.__formsApp = { state, storageGet, storageSet, sha256, escapeHTML, todayISO, fmtDateNice, loadSettings, saveSettings, PHOENIX_LOGO_DATA_URI, SUPABASE_CONFIGURED };
