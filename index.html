@@ -176,6 +176,42 @@
   .bv-check:last-child{border-bottom:none;}
   .bv-check-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap;}
   .bv-check-title{font-weight:800;font-size:14px;}
+
+  /* ---------- Pilot Elementary Task Training ---------- */
+  .pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .pt-table th,.pt-table td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:middle;}
+  .pt-table th{font-size:11px;text-transform:uppercase;color:var(--grey-strong);white-space:nowrap;}
+  .pt-table td.chk{text-align:center;}
+  .pt-table input[type="date"],.pt-table input[type="text"]{border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:12.5px;width:100%;}
+  .pt-due{font-weight:800;}
+  .pt-due.ok{color:var(--good);}
+  .pt-due.warn{color:var(--warn);}
+  .pt-due.bad{color:var(--bad);}
+  .pt-table .rm-btn{border:none;background:none;color:#b0281e;cursor:pointer;font-size:16px;line-height:1;}
+  .pt-row-line{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);}
+  .pt-row-line:last-child{border-bottom:none;}
+  .pt-row-line select{flex:1;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;background:var(--panel);color:var(--ink);}
+  .pt-row-line label.pt-add-chk{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--grey-strong);white-space:nowrap;flex-shrink:0;}
+  .pt-row-line .pt-rm-btn{flex-shrink:0;width:26px;height:26px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--grey-strong);cursor:pointer;font-size:14px;line-height:1;}
+  .pt-ac-grid{display:flex;gap:16px;flex-wrap:wrap;padding:10px 0;}
+  .pt-ac-grid label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;}
+  .pt-section-title{font-weight:800;font-size:13.5px;margin:18px 0 6px;padding-bottom:4px;border-bottom:2px solid var(--ink);}
+  /* two 4in x 2in labels, front + back */
+  .ptl-label{width:4in;height:2in;box-sizing:border-box;border:1px solid #000;padding:0.08in 0.12in;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;position:relative;overflow:hidden;}
+  .ptl-label + .ptl-label{margin-top:0.15in;}
+  .ptl-head{display:flex;align-items:center;gap:8px;margin-bottom:2px;}
+  .ptl-head img{height:0.32in;width:auto;}
+  .ptl-head h1{font-size:13px;margin:0;flex:1;}
+  .ptl-head .ptl-id{font-size:13px;font-weight:800;}
+  .ptl-sub{font-size:6.5px;line-height:1.25;margin-bottom:3px;}
+  .ptl-tasks{font-size:7px;line-height:1.32;}
+  .ptl-tasks div{border-bottom:1px solid #ccc;padding:0.6px 0;}
+  .ptl-back-top{font-size:7px;font-weight:800;margin-bottom:2px;}
+  .ptl-ads{display:flex;gap:6px;font-size:6.5px;margin-bottom:3px;}
+  .ptl-ads > div{flex:1;}
+  .ptl-ads div div{border-bottom:1px solid #ccc;padding:0.5px 0;}
+  .ptl-meta{font-size:7px;line-height:1.5;}
+  .ptl-meta b{display:inline-block;min-width:0.85in;}
 </style>
 </head>
 <body>
@@ -191,6 +227,21 @@
       <input type="password" id="gatePass2" placeholder="Confirm password" style="display:none;" autocomplete="new-password">
       <button id="gateBtn" type="submit">Unlock</button>
     </form>
+  </div>
+</div>
+
+<div id="ptrainGate" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:150;align-items:center;justify-content:center;">
+  <div class="gate-box">
+    <h2 id="ptrainGateTitle">Enter password</h2>
+    <p id="ptrainGateSub">Pilot Elementary Task Training is separately protected.</p>
+    <div class="gate-error" id="ptrainGateError"></div>
+    <form id="ptrainGateForm" autocomplete="on">
+      <input type="text" name="username" value="Pilot Elementary Task Training" autocomplete="username" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <input type="password" id="ptrainGatePass" name="password" placeholder="Password" autocomplete="current-password">
+      <input type="password" id="ptrainGatePass2" placeholder="Confirm password" style="display:none;" autocomplete="new-password">
+      <button id="ptrainGateBtn" type="submit">Unlock</button>
+    </form>
+    <button type="button" id="ptrainGateCancel" style="width:100%;padding:9px 10px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--grey-strong);font-size:13px;cursor:pointer;margin-top:8px;">Cancel</button>
   </div>
 </div>
 
@@ -219,6 +270,7 @@
         <button class="home-btn" data-view="powercheck"><span class="hb-icon">🧮</span>AS350 B2 Powercheck</button>
         <button class="home-btn" data-view="ec135pc"><span class="hb-icon">🚁</span>EC135 T2+ Power Check</button>
         <button class="home-btn" data-view="bleedvalve"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>
+        <button class="home-btn" data-view="pilottraining"><span class="hb-icon">🎓</span>Pilot Elementary Task Training</button>
       </div>
     </div>
   </div>
@@ -234,6 +286,10 @@
   <div id="viewEc135pc" style="display:none;"></div>
   <div id="viewEc135Trend" style="display:none;"></div>
   <div id="viewBleedValve" style="display:none;"></div>
+  <div id="viewPilotTraining" style="display:none;"></div>
+  <div id="viewPilotTrainRecords" style="display:none;"></div>
+  <div id="viewPilotTrainCard" style="display:none;"></div>
+  <div id="viewPilotTrainManage" style="display:none;"></div>
 </div>
 
 <div id="printArea"></div>
@@ -604,7 +660,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -634,6 +690,7 @@
       else if(v==='powercheck') renderPowercheck();
       else if(v==='ec135pc') renderEc135Powercheck();
       else if(v==='bleedvalve') renderBleedValve();
+      else if(v==='pilottraining') openPilotTraining();
     });
   });
   document.getElementById('settingsBtn').onclick = renderSettings;
@@ -2603,6 +2660,597 @@
 
 
 
+
+
+
+  // ==================== Pilot Elementary Task Training (separately password-protected) ====================
+  const PTRAIN_AIRCRAFT = ['EC120','H130','AS350','AS355','EC135'];
+
+  function ptrainDefaultTasks(){ return JSON.parse('[{"num":1,"category":"Servicing","appendix":"Hb","text":"Adding Oil in the Engine, Main Gearbox and Hydraulic reservoir.","mcmLink":""},{"num":2,"category":"Servicing","appendix":"Hb","text":"AS350 Bleed valve test procedure.","mcmLink":""},{"num":3,"category":"Servicing","appendix":"Hb","text":"Differing Defects Training Procedure for pilots.","mcmLink":""},{"num":4,"category":"EMT","appendix":"Hc","text":"Removal installation of external Cargo basket.","mcmLink":""},{"num":5,"category":"EMT","appendix":"Hc","text":"Removal and replacement of cabin doors.","mcmLink":""},{"num":6,"category":"EMT","appendix":"Hc","text":"Removal and replacement of passenger seats.","mcmLink":""},{"num":7,"category":"EMT","appendix":"Hc","text":"EC135 Stretcher kit Removal / Installation.","mcmLink":""},{"num":8,"category":"EMT","appendix":"Hc","text":"AS350 /AS355 Stretcher kit Removal / Installation","mcmLink":""},{"num":9,"category":"EMT","appendix":"Hc","text":"H130T2 & Stretcher kit Removal / Installation","mcmLink":""},{"num":13,"category":"Opp. Check","appendix":"","text":"ELT check.","mcmLink":""},{"num":14,"category":"Opp. Check","appendix":"","text":"Free wheel assy. - Check of the free wheel rotation.","mcmLink":""},{"num":15,"category":"Opp. Check","appendix":"Hd","text":"Airworthiness Directives & AMOC (APPENDIX “Hd” for applicable Ads).","mcmLink":""},{"num":16,"category":"Opp. Check","appendix":"","text":"Aircraft daily inspection (DI) using the procedure found in the flight manual Sec. #4.","mcmLink":""},{"num":17,"category":"Opp. Check","appendix":"He","text":"Dual Control Check / Independent Check Training Procedure as per APPENDIX “He”.","mcmLink":""},{"num":18,"category":"Opp. Check","appendix":"Hf","text":"Inspection and continuity checking of self-sealing chip detectors. (See Appendix “Hf”).","mcmLink":""},{"num":19,"category":"Opp. Check","appendix":"","text":"H130T2 Cargo sling installation check and clean.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Replacement of FDC filter.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Weight & Balance procedure.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AS355 NP Engine to MGB Flexible coupling – 25 hour visual check.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Clean, Check & Removal installation of Cargo Hook / Swing.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine, Main Gearbox, Tail Rotor Gearbox and Hydraulic reservoir. (legacy AS355 wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine, Main Gearbox reservoir. (legacy wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine reservoir. (legacy wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"H130 - Cargo sling installation check and clean with soft bristle brush. (legacy H130 wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"H130 & AS350 /AS355 Stretcher kit Removal / Installation. (legacy combined wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AS350 Cargo swing Removal / Installation.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Battery Removal / Installation","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Removal / Installation of Dual Controls on the Cabri G2.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AMOC # AARDG2019/A38 in reference to pre-flight visual inspection of blade attachment area.","mcmLink":""}]'); }
+  function ptrainDefaultAds(){ return JSON.parse('[{"text":"AD 2000-340-080(A) R2","mcmLink":""},{"text":"AD 2004-055","mcmLink":""},{"text":"AD 2007-0138-E","mcmLink":""},{"text":"AD 2007-0138 R2","mcmLink":""},{"text":"AD 2010-0006","mcmLink":""},{"text":"AD 2010-0026-E","mcmLink":""},{"text":"AD 2012-0085 R6","mcmLink":""},{"text":"AD 2012-0085R5","mcmLink":""},{"text":"AD 2012-0257-E","mcmLink":""},{"text":"AD 2015-0033-E","mcmLink":""},{"text":"AD 2018-0104","mcmLink":""},{"text":"AD 2018-0104R1","mcmLink":""},{"text":"AD 2019-0139","mcmLink":""},{"text":"AD 2019-0272-E","mcmLink":""},{"text":"AD 2019-0272-E R1","mcmLink":""},{"text":"AD 2021-0046","mcmLink":""},{"text":"AD 2021-0048","mcmLink":""},{"text":"AD 2021-0069","mcmLink":""},{"text":"AD 2021-0282","mcmLink":""},{"text":"AD 2023-0036","mcmLink":""},{"text":"AD 2023-0064","mcmLink":""},{"text":"AD 2023-0083","mcmLink":""},{"text":"AD 2024-0139","mcmLink":""},{"text":"AD 2024-0209","mcmLink":""},{"text":"AD 2025-0287","mcmLink":""},{"text":"AD 84-045-022 (B) R4","mcmLink":""},{"text":"AD 84-064-037(B) R3","mcmLink":""}]'); }
+  function ptrainDefaultPilots(){ return JSON.parse('[{"name":"Paul Spring","licence":"CH216904 (Paul S)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":false,"trainingDate":"2026-02-21","exEmployee":false},{"name":"Marc McGee","licence":"AH427749 (Marc)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-06-12","exEmployee":false},{"name":"Roger Jamieson","licence":"AH787923 (Roger)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-03-14","exEmployee":false},{"name":"John Valiant","licence":"AH503887 (John)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-02-01","exEmployee":false},{"name":"Cameron Spring","licence":"CH471718 (Cam)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":true,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Steve Tomlinson","licence":"CH476037 (Steve T)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":false,"trainingDate":"2026-04-12","exEmployee":false},{"name":"Jessie Bergey","licence":"CH447789 (Jessie)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Craig de Jong","licence":"CH477797 (Craig)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-25","exEmployee":false},{"name":"Steve Harmer","licence":"AH425724 (Steve H)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-20","exEmployee":false},{"name":"Matthew Wasserman","licence":"AH308537 (Matt)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-06-18","exEmployee":false},{"name":"Andrew Grinham","licence":"515603 (Andrew)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Kilian Andrian","licence":"519957 (Kilian)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":true,"trainingDate":"2026-03-14","exEmployee":false},{"name":"Steve Harmer (135)","licence":"AH425724 (Steve H)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-02-20","exEmployee":false},{"name":"Tyler McElroy","licence":"CH449803 (tyler)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Cameron Bengough","licence":"CH852256 (Cam B)","ec120":true,"h130":false,"as350":false,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Paul Kendall","licence":"CH302952 (Paul K)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":true,"trainingDate":"2026-02-01","exEmployee":false},{"name":"Robert Magee","licence":"AH358607 (Rob M)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":true,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Jeff Kvist","licence":"CH501886 (Jeff K)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"JF Tremblay","licence":"CH774430 (JF T)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Brendan McCormick","licence":"AH789550 (Bren M)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false}]'); }
+
+  // ---------- gate (separate password from the main site) ----------
+  function ptrainIsUnlocked(){
+    try{ return sessionStorage.getItem('ptrainUnlocked')==='1'; }catch(e){ return false; }
+  }
+  function ptrainFinishUnlock(){
+    try{ sessionStorage.setItem('ptrainUnlocked','1'); }catch(e){}
+    document.getElementById('ptrainGate').style.display = 'none';
+    renderPilotTraining();
+  }
+  function ptrainLock(){
+    try{ sessionStorage.removeItem('ptrainUnlocked'); }catch(e){}
+    showHome();
+  }
+  async function openPilotTraining(){
+    if(ptrainIsUnlocked()){ renderPilotTraining(); return; }
+    const gate = document.getElementById('ptrainGate');
+    const title = document.getElementById('ptrainGateTitle');
+    const sub = document.getElementById('ptrainGateSub');
+    const err = document.getElementById('ptrainGateError');
+    const p1 = document.getElementById('ptrainGatePass');
+    const p2 = document.getElementById('ptrainGatePass2');
+    const btn = document.getElementById('ptrainGateBtn');
+    err.textContent = ''; p1.value=''; p2.value='';
+    gate.style.display = 'flex';
+
+    const existingHash = await storageGet('ptrain:app_password');
+    const settingUp = !existingHash;
+    if(settingUp){
+      title.textContent = 'Set a password';
+      sub.textContent = 'This module is kept separate from the rest of the site — create a password just for it. Anyone who knows it (in addition to the site password) can open Pilot Elementary Task Training.';
+      p2.style.display = 'block';
+      btn.textContent = 'Set password';
+    } else {
+      title.textContent = 'Enter password';
+      sub.textContent = 'Pilot Elementary Task Training is separately protected.';
+      p2.style.display = 'none';
+      btn.textContent = 'Unlock';
+    }
+
+    document.getElementById('ptrainGateForm').onsubmit = async (e)=>{
+      e.preventDefault();
+      err.textContent = '';
+      if(settingUp){
+        if(!p1.value || p1.value.length<4){ err.textContent='Use at least 4 characters.'; return; }
+        if(p1.value !== p2.value){ err.textContent='Passwords do not match.'; return; }
+        const hash = await sha256(p1.value);
+        await storageSet('ptrain:app_password', hash);
+        ptrainFinishUnlock();
+      } else {
+        const hash = await sha256(p1.value);
+        if(hash === existingHash){ ptrainFinishUnlock(); }
+        else { err.textContent = 'Incorrect password.'; p1.value=''; }
+      }
+    };
+    document.getElementById('ptrainGateCancel').onclick = ()=>{ gate.style.display = 'none'; showHome(); };
+  }
+
+  // ---------- data layer (Supabase-backed via storageGet/storageSet, same as the rest of the site) ----------
+  let ptrainSettingsCache = null;
+  async function loadPtrainSettings(){
+    if(ptrainSettingsCache) return ptrainSettingsCache;
+    try{
+      const raw = await storageGet('ptrain:settings');
+      if(raw){ ptrainSettingsCache = JSON.parse(raw); return ptrainSettingsCache; }
+    }catch(e){}
+    ptrainSettingsCache = { tasks: ptrainDefaultTasks(), ads: ptrainDefaultAds() };
+    await storageSet('ptrain:settings', JSON.stringify(ptrainSettingsCache));
+    return ptrainSettingsCache;
+  }
+  async function savePtrainSettings(s){ ptrainSettingsCache = s; await storageSet('ptrain:settings', JSON.stringify(s)); }
+
+  let ptrainPilotsCache = null;
+  async function loadPtrainPilots(){
+    if(ptrainPilotsCache) return ptrainPilotsCache;
+    try{
+      const raw = await storageGet('ptrain:pilots');
+      if(raw){ ptrainPilotsCache = JSON.parse(raw); return ptrainPilotsCache; }
+    }catch(e){}
+    ptrainPilotsCache = ptrainDefaultPilots();
+    await storageSet('ptrain:pilots', JSON.stringify(ptrainPilotsCache));
+    return ptrainPilotsCache;
+  }
+  async function savePtrainPilots(list){ ptrainPilotsCache = list; await storageSet('ptrain:pilots', JSON.stringify(list)); }
+
+  let ptrainRecordsCache = null;
+  async function loadPtrainRecords(){
+    if(ptrainRecordsCache) return ptrainRecordsCache;
+    try{
+      const raw = await storageGet('ptrain:records');
+      if(raw){ ptrainRecordsCache = JSON.parse(raw); return ptrainRecordsCache; }
+    }catch(e){}
+    // first-ever load: seed from the legacy export shipped alongside this page
+    try{
+      const res = await fetch('./ptrain-legacy-records.json');
+      const data = await res.json();
+      ptrainRecordsCache = data;
+      await storageSet('ptrain:records', JSON.stringify(data));
+      return ptrainRecordsCache;
+    }catch(e){
+      ptrainRecordsCache = [];
+      return ptrainRecordsCache;
+    }
+  }
+  async function savePtrainRecords(list){ ptrainRecordsCache = list; await storageSet('ptrain:records', JSON.stringify(list)); }
+
+  function ptrainNextId(records){
+    let max = 0;
+    records.forEach(r=>{ if(typeof r.id==='number' && r.id>max) max = r.id; });
+    return max+1;
+  }
+  function ptrainDueInfo(trainingDateISO){
+    if(!trainingDateISO) return { days:null, cls:'' };
+    const due = new Date(trainingDateISO+'T00:00:00');
+    due.setFullYear(due.getFullYear()+2);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const days = Math.round((due - today) / 86400000);
+    let cls = 'ok';
+    if(days < 0) cls = 'bad'; else if(days < 30) cls = 'warn';
+    return { days, cls };
+  }
+  function backToPtBtn(){ return '<button class="back-btn" id="ptBackBtn">‹ Back to Pilot Training</button>'; }
+  function ptrainSelectOptions(list, selected, labelFn){
+    let html = '<option value="">— select —</option>';
+    let matched = false;
+    list.forEach(item=>{
+      if(item.text===selected) matched = true;
+      const sel = item.text===selected ? ' selected' : '';
+      html += '<option value="'+escapeHTML(item.text)+'"'+sel+'>'+escapeHTML(labelFn(item))+'</option>';
+    });
+    if(selected && !matched){
+      html += '<option value="'+escapeHTML(selected)+'" selected>(as recorded) '+escapeHTML(selected)+'</option>';
+    }
+    return html;
+  }
+  function ptrainTaskRowHtml(row, idx, taskList){
+    return (
+      '<div class="pt-row-line" data-idx="'+idx+'">' +
+        '<select data-role="task" data-idx="'+idx+'">' + ptrainSelectOptions(taskList, row.text, it=>(it.num!=null?it.num+' ':'')+(it.category?it.category+': ':'')+it.text) + '</select>' +
+        '<label class="pt-add-chk"><input type="checkbox" data-role="taskAdd" data-idx="'+idx+'" '+(row.additional?'checked':'')+'> Additional</label>' +
+        '<button type="button" class="pt-rm-btn" data-role="taskRm" data-idx="'+idx+'">✕</button>' +
+      '</div>'
+    );
+  }
+  function ptrainAdRowHtml(row, idx, adList){
+    return (
+      '<div class="pt-row-line" data-idx="'+idx+'">' +
+        '<select data-role="ad" data-idx="'+idx+'">' + ptrainSelectOptions(adList, row.text, it=>it.text) + '</select>' +
+        '<label class="pt-add-chk"><input type="checkbox" data-role="adAdd" data-idx="'+idx+'" '+(row.additional?'checked':'')+'> Additional</label>' +
+        '<button type="button" class="pt-rm-btn" data-role="adRm" data-idx="'+idx+'">✕</button>' +
+      '</div>'
+    );
+  }
+
+  // ---------- "Current Pilot" qualification grid ----------
+  async function renderPilotTraining(){
+    showView('PilotTraining');
+    const el = document.getElementById('viewPilotTraining');
+    el.innerHTML = backButton() + '<div class="panel"><h2 class="form-title">Pilot Elementary Task Training</h2><p class="form-sub">Loading…</p></div>';
+    const pilots = await loadPtrainPilots();
+    ptrainRenderGridBody(pilots);
+  }
+  function ptrainRenderGridBody(pilots){
+    const el = document.getElementById('viewPilotTraining');
+    if(!el) return;
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Pilot Elementary Task Training</h2>' +
+        '<p class="form-sub">Elementary work, servicing and AD training status per pilot. "Due in Days" is computed as two years from the Training Date shown, per the validity note on the training card.</p>' +
+        '<div class="btn-row">' +
+          '<button type="button" class="btn primary" id="ptNewCardBtn">+ New Training Card</button>' +
+          '<button type="button" class="btn" id="ptRecordsBtn">📋 All Training Records</button>' +
+          '<button type="button" class="btn" id="ptManageBtn">⚙️ Manage Task / AD Lists</button>' +
+          '<button type="button" class="btn" id="ptLockBtn" style="margin-left:auto;">🔒 Lock</button>' +
+        '</div>' +
+        '<div style="overflow-x:auto;">' +
+        '<table class="pt-table"><thead><tr>' +
+          '<th>Name</th><th>Licence</th><th>EC120</th><th>H130</th><th>AS350</th><th>AS355</th><th>EC135</th><th>Training Date</th><th>Due in Days</th><th>Ex Employee</th><th></th>' +
+        '</tr></thead><tbody id="ptGridBody"></tbody></table>' +
+        '</div>' +
+        '<div class="btn-row" style="margin-top:12px;"><button type="button" class="btn small" id="ptAddPilotBtn">+ Add pilot row</button></div>' +
+      '</div>';
+
+    const body = document.getElementById('ptGridBody');
+    body.innerHTML = pilots.map((p,i)=>{
+      const due = ptrainDueInfo(p.trainingDate);
+      return (
+        '<tr data-i="'+i+'">' +
+          '<td><input type="text" data-f="name" value="'+escapeHTML(p.name)+'" style="font-weight:700;min-width:130px;"></td>' +
+          '<td><input type="text" data-f="licence" value="'+escapeHTML(p.licence||'')+'" style="min-width:140px;"></td>' +
+          '<td class="chk"><input type="checkbox" data-f="ec120" '+(p.ec120?'checked':'')+'></td>' +
+          '<td class="chk"><input type="checkbox" data-f="h130" '+(p.h130?'checked':'')+'></td>' +
+          '<td class="chk"><input type="checkbox" data-f="as350" '+(p.as350?'checked':'')+'></td>' +
+          '<td class="chk"><input type="checkbox" data-f="as355" '+(p.as355?'checked':'')+'></td>' +
+          '<td class="chk"><input type="checkbox" data-f="ec135" '+(p.ec135?'checked':'')+'></td>' +
+          '<td><input type="date" data-f="trainingDate" value="'+(p.trainingDate||'')+'" style="min-width:135px;"></td>' +
+          '<td class="pt-due '+due.cls+'">'+(due.days===null?'—':due.days)+'</td>' +
+          '<td class="chk"><input type="checkbox" data-f="exEmployee" '+(p.exEmployee?'checked':'')+'></td>' +
+          '<td style="white-space:nowrap;"><button class="btn small" data-action="card" data-i="'+i+'">New Card</button> <button class="btn small" data-action="history" data-i="'+i+'">History</button> <button class="rm-btn" data-action="rm" data-i="'+i+'">✕</button></td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    body.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('change', async ()=>{
+        const tr = inp.closest('tr');
+        const i = parseInt(tr.dataset.i,10);
+        const f = inp.dataset.f;
+        pilots[i][f] = inp.type==='checkbox' ? inp.checked : inp.value;
+        await savePtrainPilots(pilots);
+        if(f==='trainingDate'){
+          const due = ptrainDueInfo(pilots[i].trainingDate);
+          const cell = tr.querySelector('.pt-due');
+          cell.textContent = due.days===null?'—':due.days;
+          cell.className = 'pt-due ' + due.cls;
+        }
+      });
+    });
+    body.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const i = parseInt(btn.dataset.i,10);
+        if(btn.dataset.action==='card'){
+          renderPilotTrainCard(null, pilots[i]);
+        } else if(btn.dataset.action==='history'){
+          ptrainRecordsFilter = { keyword: pilots[i].name, date:'' };
+          renderPilotTrainRecords();
+        } else if(btn.dataset.action==='rm'){
+          if(!confirm('Remove '+pilots[i].name+' from this list? (Their saved training cards are kept.)')) return;
+          pilots.splice(i,1);
+          await savePtrainPilots(pilots);
+          ptrainRenderGridBody(pilots);
+        }
+      };
+    });
+
+    document.getElementById('ptNewCardBtn').onclick = ()=> renderPilotTrainCard(null, null);
+    document.getElementById('ptRecordsBtn').onclick = ()=> renderPilotTrainRecords();
+    document.getElementById('ptManageBtn').onclick = ()=> renderPilotTrainManage();
+    document.getElementById('ptLockBtn').onclick = ptrainLock;
+    document.getElementById('ptAddPilotBtn').onclick = async ()=>{
+      pilots.push({name:'',licence:'',ec120:false,h130:false,as350:false,as355:false,ec135:false,trainingDate:'',exEmployee:false});
+      await savePtrainPilots(pilots);
+      ptrainRenderGridBody(pilots);
+    };
+  }
+
+  // ---------- searchable list of all saved training cards ----------
+  let ptrainRecordsFilter = { keyword:'', date:'' };
+  async function renderPilotTrainRecords(){
+    showView('PilotTrainRecords');
+    const el = document.getElementById('viewPilotTrainRecords');
+    el.innerHTML = backToPtBtn() + '<div class="panel"><h2 class="form-title">All Training Records</h2><p class="form-sub">Loading…</p></div>';
+    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+    const records = await loadPtrainRecords();
+    ptrainRecordsBodyRender(records);
+  }
+  function ptrainRecordsBodyRender(records){
+    const el = document.getElementById('viewPilotTrainRecords');
+    if(!el) return;
+    const f = ptrainRecordsFilter;
+    const filtered = records.filter(r=>{
+      if(f.keyword && !(r.traineeName||'').toLowerCase().includes(f.keyword.toLowerCase())) return false;
+      if(f.date && r.originalTrainingDate!==f.date && r.additionalTrainingDate!==f.date) return false;
+      return true;
+    }).sort((a,b)=> (b.id||0)-(a.id||0));
+
+    el.innerHTML =
+      backToPtBtn() +
+      '<div class="panel">' +
+        '<h2 class="form-title">All Training Records</h2>' +
+        '<p class="form-sub">'+records.length+' records on file (including '+records.filter(r=>r.imported).length+' imported from the legacy log). A record is saved automatically every time a training card is saved.</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Trainee name contains</label><input id="ptrFilterKeyword" placeholder="e.g. Spring"></div>' +
+          '<div class="field"><label>Date (original or additional)</label><input type="date" id="ptrFilterDate"></div>' +
+        '</div>' +
+        '<div class="btn-row"><button class="btn primary" id="ptrSearchBtn">Search</button><button class="btn" id="ptrClearBtn">Clear</button><button class="btn" id="ptrNewBtn" style="margin-left:auto;">+ New Training Card</button></div>' +
+        '<div id="ptrResults"></div>' +
+      '</div>';
+
+    document.getElementById('ptrFilterKeyword').value = f.keyword||'';
+    document.getElementById('ptrFilterDate').value = f.date||'';
+    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+    document.getElementById('ptrNewBtn').onclick = ()=> renderPilotTrainCard(null,null);
+    document.getElementById('ptrSearchBtn').onclick = ()=>{
+      f.keyword = document.getElementById('ptrFilterKeyword').value;
+      f.date = document.getElementById('ptrFilterDate').value;
+      ptrainRecordsBodyRender(records);
+    };
+    document.getElementById('ptrClearBtn').onclick = ()=>{
+      ptrainRecordsFilter = { keyword:'', date:'' };
+      ptrainRecordsBodyRender(records);
+    };
+
+    const resultsEl = document.getElementById('ptrResults');
+    if(!filtered.length){
+      resultsEl.innerHTML = '<p class="note" style="margin-top:16px;">No matching records.</p>';
+      return;
+    }
+    resultsEl.innerHTML = '<table class="list-table" style="margin-top:16px;"><thead><tr>' +
+        '<th>ID</th><th>Trainee</th><th>Original Date</th><th>Additional Date</th><th>Trainer</th><th></th>' +
+      '</tr></thead><tbody>' +
+      filtered.map(r=>
+        '<tr>' +
+          '<td>'+escapeHTML(r.id)+'</td>' +
+          '<td>'+escapeHTML(r.traineeName||'—')+'</td>' +
+          '<td>'+escapeHTML(r.originalTrainingDate?fmtDateNice(r.originalTrainingDate):'—')+'</td>' +
+          '<td>'+escapeHTML(r.additionalTrainingDate?fmtDateNice(r.additionalTrainingDate):'—')+'</td>' +
+          '<td>'+escapeHTML(r.trainerName||'—')+'</td>' +
+          '<td style="white-space:nowrap;"><button class="btn small" data-action="view" data-id="'+r.id+'">View / Edit</button> <button class="btn small" data-action="print" data-id="'+r.id+'">Print</button></td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table>';
+
+    resultsEl.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const rec = records.find(r=>String(r.id)===btn.dataset.id);
+        if(!rec) return;
+        if(btn.dataset.action==='view') renderPilotTrainCard(rec, null);
+        else openPrint(buildPtrainLabelHtml(rec));
+      };
+    });
+  }
+
+  // ---------- Pilot Training Card entry form ----------
+  function renderPilotTrainCard(existingRecord, prefillPilot){
+    showView('PilotTrainCard');
+    const el = document.getElementById('viewPilotTrainCard');
+    el.innerHTML = backToPtBtn() + '<div class="panel"><p class="form-sub">Loading…</p></div>';
+    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+
+    Promise.all([loadPtrainSettings(), loadPtrainPilots(), loadPtrainRecords()]).then(([settings, ptPilots, records])=>{
+      const rec = existingRecord || {
+        id: ptrainNextId(records),
+        traineeName: prefillPilot ? prefillPilot.name : '',
+        traineeLicence: prefillPilot ? (prefillPilot.licence||'') : '',
+        trainerName: '', trainerLicence: '',
+        originalTrainingDate: '', additionalTrainingDate: '',
+        acTypes: prefillPilot ? PTRAIN_AIRCRAFT.filter(t=> prefillPilot[t.toLowerCase()]) : [],
+        tasks: [], ads: [],
+      };
+      let taskRows = (rec.tasks||[]).map(t=>({text:t.text, additional:!!t.additional}));
+      let adRows = (rec.ads||[]).map(a=>({text:a.text, additional:!!a.additional}));
+      while(taskRows.length < 8) taskRows.push({text:'', additional:false});
+      while(adRows.length < 4) adRows.push({text:'', additional:false});
+
+      const sharedPilots = (state.settings.pilots||[]);
+      const trainPilotNames = ptPilots.map(p=>p.name);
+      const allTraineeNames = Array.from(new Set([...sharedPilots.map(p=>p.name), ...trainPilotNames])).filter(Boolean).sort();
+      const ameNames = (state.settings.ames||[]).map(a=>a.name);
+
+      function traineeLicenceFor(name){
+        const fromShared = sharedPilots.find(p=>p.name===name);
+        if(fromShared && fromShared.license) return fromShared.license;
+        const fromTrain = ptPilots.find(p=>p.name===name);
+        if(fromTrain && fromTrain.licence) return fromTrain.licence;
+        return '';
+      }
+      function ameLicenceFor(name){
+        const a = (state.settings.ames||[]).find(a=>a.name===name);
+        return a ? (a.aca||'') : '';
+      }
+
+      function renderTaskRows(){ return taskRows.map((r,i)=>ptrainTaskRowHtml(r,i,settings.tasks)).join(''); }
+      function renderAdRows(){ return adRows.map((r,i)=>ptrainAdRowHtml(r,i,settings.ads)).join(''); }
+
+      el.innerHTML =
+        backToPtBtn() +
+        '<div class="panel">' +
+          '<h2 class="form-title">Pilot Training Card <span style="font-weight:400;color:var(--grey-strong);font-size:14px;">— ID '+rec.id+'</span></h2>' +
+          '<p class="form-sub">Valid for two years from date of issue. Select every elementary work / servicing / AD item this trainee has been trained and supervised to carry out.</p>' +
+
+          '<div class="pt-section-title">Elementary Work (EMT), Servicing &amp; Additional Training</div>' +
+          '<div id="ptTaskRows">' + renderTaskRows() + '</div>' +
+          '<div class="btn-row"><button type="button" class="btn small" id="ptAddTaskBtn">+ Add task line</button></div>' +
+
+          '<div class="pt-section-title">A/C Type trained on</div>' +
+          '<div class="pt-ac-grid" id="ptAcGrid">' +
+            PTRAIN_AIRCRAFT.map(t=>'<label><input type="checkbox" data-ac="'+t+'" '+(rec.acTypes.includes(t)?'checked':'')+'> '+t+'</label>').join('') +
+          '</div>' +
+
+          '<div class="pt-section-title">Airworthiness Directives</div>' +
+          '<div id="ptAdRows">' + renderAdRows() + '</div>' +
+          '<div class="btn-row"><button type="button" class="btn small" id="ptAddAdBtn">+ Add AD line</button></div>' +
+
+          '<div class="pt-section-title">Trainee &amp; PRM</div>' +
+          '<div class="field-grid">' +
+            '<div class="field"><label for="ptTraineeName">Trainee Name</label><select id="ptTraineeName"><option value="">— select —</option>' + allTraineeNames.map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.traineeName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
+            '<div class="field"><label for="ptTraineeLicence">Trainee Licence</label><input type="text" id="ptTraineeLicence" value="'+escapeHTML(rec.traineeLicence||'')+'"></div>' +
+            '<div class="field"><label for="ptTrainerName">PRM Name</label><select id="ptTrainerName"><option value="">— select —</option>' + ameNames.map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.trainerName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
+            '<div class="field"><label for="ptTrainerLicence">PRM Licence</label><input type="text" id="ptTrainerLicence" value="'+escapeHTML(rec.trainerLicence||'')+'"></div>' +
+            '<div class="field"><label for="ptOriginalDate">Original Training Date</label><input type="date" id="ptOriginalDate" value="'+(rec.originalTrainingDate||'')+'"></div>' +
+            '<div class="field"><label for="ptAdditionalDate">Additional Training Date</label><input type="date" id="ptAdditionalDate" value="'+(rec.additionalTrainingDate||'')+'"></div>' +
+          '</div>' +
+
+          '<div class="btn-row" style="justify-content:flex-end;">' +
+            '<button type="button" class="btn" id="ptPrintBtn">🖨️ Print Training Card (2 × 4in labels)</button>' +
+            '<button type="button" class="btn primary" id="ptSaveBtn">💾 Save Record</button>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+
+      document.getElementById('ptTraineeName').addEventListener('change', (e)=>{
+        const lic = traineeLicenceFor(e.target.value);
+        if(lic) document.getElementById('ptTraineeLicence').value = lic;
+      });
+      document.getElementById('ptTrainerName').addEventListener('change', (e)=>{
+        const lic = ameLicenceFor(e.target.value);
+        if(lic) document.getElementById('ptTrainerLicence').value = lic;
+      });
+
+      function wireRows(){
+        document.getElementById('ptTaskRows').querySelectorAll('select[data-role="task"]').forEach(s=>{
+          s.onchange = ()=>{ taskRows[parseInt(s.dataset.idx,10)].text = s.value; };
+        });
+        document.getElementById('ptTaskRows').querySelectorAll('input[data-role="taskAdd"]').forEach(c=>{
+          c.onchange = ()=>{ taskRows[parseInt(c.dataset.idx,10)].additional = c.checked; };
+        });
+        document.getElementById('ptTaskRows').querySelectorAll('button[data-role="taskRm"]').forEach(b=>{
+          b.onclick = ()=>{ taskRows.splice(parseInt(b.dataset.idx,10),1); refreshTaskRows(); };
+        });
+        document.getElementById('ptAdRows').querySelectorAll('select[data-role="ad"]').forEach(s=>{
+          s.onchange = ()=>{ adRows[parseInt(s.dataset.idx,10)].text = s.value; };
+        });
+        document.getElementById('ptAdRows').querySelectorAll('input[data-role="adAdd"]').forEach(c=>{
+          c.onchange = ()=>{ adRows[parseInt(c.dataset.idx,10)].additional = c.checked; };
+        });
+        document.getElementById('ptAdRows').querySelectorAll('button[data-role="adRm"]').forEach(b=>{
+          b.onclick = ()=>{ adRows.splice(parseInt(b.dataset.idx,10),1); refreshAdRows(); };
+        });
+      }
+      function refreshTaskRows(){ document.getElementById('ptTaskRows').innerHTML = renderTaskRows(); wireRows(); }
+      function refreshAdRows(){ document.getElementById('ptAdRows').innerHTML = renderAdRows(); wireRows(); }
+      wireRows();
+
+      document.getElementById('ptAddTaskBtn').onclick = ()=>{ taskRows.push({text:'',additional:false}); refreshTaskRows(); };
+      document.getElementById('ptAddAdBtn').onclick = ()=>{ adRows.push({text:'',additional:false}); refreshAdRows(); };
+
+      function collectRecord(){
+        const acTypes = PTRAIN_AIRCRAFT.filter(t=> document.querySelector('[data-ac="'+t+'"]').checked);
+        return {
+          id: rec.id,
+          traineeName: document.getElementById('ptTraineeName').value,
+          traineeLicence: document.getElementById('ptTraineeLicence').value,
+          trainerName: document.getElementById('ptTrainerName').value,
+          trainerLicence: document.getElementById('ptTrainerLicence').value,
+          originalTrainingDate: document.getElementById('ptOriginalDate').value || null,
+          additionalTrainingDate: document.getElementById('ptAdditionalDate').value || null,
+          acTypes: acTypes,
+          tasks: taskRows.filter(r=>r.text),
+          ads: adRows.filter(r=>r.text),
+          imported: false,
+          createdAt: rec.createdAt || new Date().toISOString(),
+        };
+      }
+
+      document.getElementById('ptSaveBtn').onclick = async ()=>{
+        const newRec = collectRecord();
+        const idx = records.findIndex(r=>r.id===newRec.id);
+        if(idx>=0) records[idx] = newRec; else records.push(newRec);
+        await savePtrainRecords(records);
+
+        if(newRec.traineeName){
+          let p = ptPilots.find(p=>p.name===newRec.traineeName);
+          if(!p){ p = {name:newRec.traineeName, licence:newRec.traineeLicence||'', ec120:false,h130:false,as350:false,as355:false,ec135:false,trainingDate:'',exEmployee:false}; ptPilots.push(p); }
+          if(newRec.traineeLicence) p.licence = newRec.traineeLicence;
+          newRec.acTypes.forEach(t=>{ p[t.toLowerCase()] = true; });
+          const latest = [newRec.originalTrainingDate, newRec.additionalTrainingDate].filter(Boolean).sort().pop();
+          if(latest && (!p.trainingDate || latest > p.trainingDate)) p.trainingDate = latest;
+          await savePtrainPilots(ptPilots);
+        }
+        flashSaved('ptSaveBtn');
+      };
+
+      document.getElementById('ptPrintBtn').onclick = ()=>{
+        openPrint(buildPtrainLabelHtml(collectRecord()));
+      };
+    });
+  }
+
+  // ---------- print: two 4in x 2in labels (front = tasks, back = A/C types, ADs, names, dates) ----------
+  function buildPtrainLabelHtml(rec){
+    const taskLines = (rec.tasks||[]).map(t=>'<div>'+escapeHTML((t.additional?'* ':'')+t.text)+'</div>').join('');
+    const adCols = [[],[]];
+    (rec.ads||[]).forEach((a,i)=> adCols[i%2].push(a));
+    const adColHtml = (col)=> col.map(a=>'<div>'+escapeHTML((a.additional?'* ':'')+a.text)+'</div>').join('');
+
+    return (
+      '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' +
+      '<div class="ptl-label">' +
+        '<div class="ptl-head">' +
+          '<img src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="">' +
+          '<h1>Pilot Training Card</h1>' +
+          '<span class="ptl-id">ID '+escapeHTML(rec.id)+'</span>' +
+        '</div>' +
+        '<div class="ptl-sub">Valid for two years from date of issue. The signature below certifies that the individual has been trained and supervised to carry out the following tasks &amp; ADs. * indicates additional training received.</div>' +
+        '<div class="ptl-tasks">' + (taskLines || '<div>&nbsp;</div>') + '</div>' +
+      '</div>' +
+      '<div class="ptl-label">' +
+        '<div class="ptl-back-top">A/C Type Trained on: '+ PTRAIN_AIRCRAFT.map(t=> rec.acTypes.includes(t) ? '<u>'+t+'</u>' : ('<span style="color:#999;">'+t+'</span>')).join('&nbsp;&nbsp;&nbsp;') +'</div>' +
+        '<div class="ptl-ads"><div>'+adColHtml(adCols[0])+'</div><div>'+adColHtml(adCols[1])+'</div></div>' +
+        '<div class="ptl-meta">' +
+          '<div><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+'</div>' +
+          '<div><b>PRM Name/Licence:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' / '+escapeHTML(rec.trainerLicence):'')+'</div>' +
+          '<div><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'')+'</div>' +
+          '<div><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'')+'</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  // ---------- admin: manage the task / AD master lists (add an MCM link once your manual is hosted online) ----------
+  async function renderPilotTrainManage(){
+    showView('PilotTrainManage');
+    const el = document.getElementById('viewPilotTrainManage');
+    el.innerHTML = backToPtBtn() + '<div class="panel"><p class="form-sub">Loading…</p></div>';
+    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+    const settings = await loadPtrainSettings();
+    ptrainManageBody(settings);
+  }
+  function ptrainManageBody(settings){
+    const el = document.getElementById('viewPilotTrainManage');
+    if(!el) return;
+    el.innerHTML =
+      backToPtBtn() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Manage Task &amp; AD Lists</h2>' +
+        '<p class="form-sub">These are the options offered on every Pilot Training Card. Add an MCM link once your Maintenance Control Manual is hosted online — it will be ready to show next to the item on the entry form.</p>' +
+        '<div class="pt-section-title">Elementary Work / Servicing / Opp. Check tasks</div>' +
+        '<div style="overflow-x:auto;"><table class="list-table"><thead><tr><th>#</th><th>Category</th><th>Text</th><th>Appendix</th><th>MCM Link</th><th></th></tr></thead><tbody id="ptmTaskRows"></tbody></table></div>' +
+        '<div class="btn-row"><button class="btn small" id="ptmAddTask">+ Add task</button></div>' +
+        '<div class="pt-section-title">Airworthiness Directives</div>' +
+        '<div style="overflow-x:auto;"><table class="list-table"><thead><tr><th>AD</th><th>MCM / AD Link</th><th></th></tr></thead><tbody id="ptmAdRows"></tbody></table></div>' +
+        '<div class="btn-row"><button class="btn small" id="ptmAddAd">+ Add AD</button></div>' +
+        '<div class="btn-row" style="margin-top:16px;"><button class="btn primary" id="ptmSaveBtn">💾 Save Lists</button></div>' +
+      '</div>';
+
+    const taskBody = document.getElementById('ptmTaskRows');
+    taskBody.innerHTML = settings.tasks.map((t,i)=>
+      '<tr>' +
+        '<td><input data-i="'+i+'" data-f="num" value="'+(t.num!=null?t.num:'')+'" style="width:50px;"></td>' +
+        '<td><input data-i="'+i+'" data-f="category" value="'+escapeHTML(t.category||'')+'" style="width:100px;"></td>' +
+        '<td><input data-i="'+i+'" data-f="text" value="'+escapeHTML(t.text)+'" style="min-width:260px;width:100%;"></td>' +
+        '<td><input data-i="'+i+'" data-f="appendix" value="'+escapeHTML(t.appendix||'')+'" style="width:70px;"></td>' +
+        '<td><input data-i="'+i+'" data-f="mcmLink" value="'+escapeHTML(t.mcmLink||'')+'" placeholder="https://…" style="min-width:160px;width:100%;"></td>' +
+        '<td><button class="rm-btn" data-role="rmTask" data-i="'+i+'">✕</button></td>' +
+      '</tr>'
+    ).join('');
+    const adBody = document.getElementById('ptmAdRows');
+    adBody.innerHTML = settings.ads.map((a,i)=>
+      '<tr>' +
+        '<td><input data-i="'+i+'" data-f="text" value="'+escapeHTML(a.text)+'" style="min-width:160px;"></td>' +
+        '<td><input data-i="'+i+'" data-f="mcmLink" value="'+escapeHTML(a.mcmLink||'')+'" placeholder="https://…" style="min-width:200px;width:100%;"></td>' +
+        '<td><button class="rm-btn" data-role="rmAd" data-i="'+i+'">✕</button></td>' +
+      '</tr>'
+    ).join('');
+
+    taskBody.querySelectorAll('input').forEach(inp=>{
+      inp.oninput = ()=>{
+        const i = parseInt(inp.dataset.i,10), f = inp.dataset.f;
+        settings.tasks[i][f] = (f==='num') ? (inp.value===''?null:parseInt(inp.value,10)) : inp.value;
+      };
+    });
+    taskBody.querySelectorAll('button[data-role="rmTask"]').forEach(b=>{
+      b.onclick = ()=>{ settings.tasks.splice(parseInt(b.dataset.i,10),1); ptrainManageBody(settings); };
+    });
+    adBody.querySelectorAll('input').forEach(inp=>{
+      inp.oninput = ()=>{
+        const i = parseInt(inp.dataset.i,10), f = inp.dataset.f;
+        settings.ads[i][f] = inp.value;
+      };
+    });
+    adBody.querySelectorAll('button[data-role="rmAd"]').forEach(b=>{
+      b.onclick = ()=>{ settings.ads.splice(parseInt(b.dataset.i,10),1); ptrainManageBody(settings); };
+    });
+
+    document.getElementById('ptmAddTask').onclick = ()=>{ settings.tasks.push({num:null,category:'Additional',text:'',appendix:'',mcmLink:''}); ptrainManageBody(settings); };
+    document.getElementById('ptmAddAd').onclick = ()=>{ settings.ads.push({text:'',mcmLink:''}); ptrainManageBody(settings); };
+    document.getElementById('ptmSaveBtn').onclick = async ()=>{ await savePtrainSettings(settings); flashSaved('ptmSaveBtn'); };
+    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+  }
 
   window.__formsApp = { state, storageGet, storageSet, sha256, escapeHTML, todayISO, fmtDateNice, loadSettings, saveSettings, PHOENIX_LOGO_DATA_URI, SUPABASE_CONFIGURED };
 
