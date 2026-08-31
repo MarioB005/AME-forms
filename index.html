@@ -232,6 +232,7 @@
   <div id="viewAnticipation" style="display:none;"></div>
   <div id="viewPowercheck" style="display:none;"></div>
   <div id="viewEc135pc" style="display:none;"></div>
+  <div id="viewEc135Trend" style="display:none;"></div>
   <div id="viewBleedValve" style="display:none;"></div>
 </div>
 
@@ -417,6 +418,7 @@
       case 'majormod': return buildModHtml('majormod', 'Major', rec.data);
       case 'minormod': return buildModHtml('minormod', 'Minor', rec.data);
       case 'anticipation': return buildAnticipationHtml(rec.data);
+      case 'ec135pc': return buildEc135PrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       default: return null;
     }
   }
@@ -428,6 +430,7 @@
       case 'majormod': renderModForm('MajorMod', 'Major', rec.data); break;
       case 'minormod': renderModForm('MinorMod', 'Minor', rec.data); break;
       case 'anticipation': renderAnticipation(rec.data); break;
+      case 'ec135pc': renderEc135Powercheck(rec.data); break;
     }
   }
 
@@ -601,7 +604,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','BleedValve'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -2161,7 +2164,7 @@
   function ec135AmbientFields(defaults){
     return [
       { id:'ecPa',  label:'Zp',  unit:'pressure altitude, ft (both engines)', min:-1500, max:10000, step:10,  value:defaults.pa },
-      { id:'ecOat', label:'OAT', unit:'outside air temp, °C (both engines)', min:-35, max:50, step:0.5, value:defaults.oat },
+      { id:'ecOat', label:'OAT', unit:'outside air temp, °C (both engines)', min:-35, max:50, step:1, value:defaults.oat },
     ];
   }
 
@@ -2211,7 +2214,7 @@
     );
 
     return (
-      EC135_PRINT_STYLES +
+      PRINT_STYLES + EC135_PRINT_STYLES +
       '<div class="ec-pf-head">' +
         '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
         '<div class="pf-title-block"><h1>EC135 T2+ Power Check</h1><div class="pf-sub">Ground power check &amp; N1/TOT check — Turbomeca Arriel 2B2 — AFM Section 5.1.3 (Rev. 17)</div></div>' +
@@ -2219,7 +2222,8 @@
       '<div class="pf-box">' +
         '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
           '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
-          '<span class="pf-field"><b>Performed by:</b><span class="pf-underline">'+escapeHTML(data.by)+'</span></span></div>' +
+          '<span class="pf-field"><b>Performed by:</b><span class="pf-underline">'+escapeHTML(data.by)+'</span></span>' +
+          '<span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot||'')+'</span></span></div>' +
         '<div class="pf-row" style="margin-top:8px;"><span class="pf-field"><b>Zp:</b><span class="pf-underline" style="min-width:70px;">'+data.pa.toLocaleString()+' ft</span></span>' +
           '<span class="pf-field"><b>OAT:</b><span class="pf-underline" style="min-width:70px;">'+data.oat.toFixed(1)+' °C</span></span></div>' +
       '</div>' +
@@ -2230,16 +2234,20 @@
     );
   }
 
-  function renderEc135Powercheck(){
+  function renderEc135Powercheck(prefill){
     showView('Ec135pc');
     const el = document.getElementById('viewEc135pc');
+    const s = state.settings;
+    const pfEngine = (p, fallback)=> (prefill && prefill.engines) ? (prefill.engines.find(e=>e.p===p) || fallback) : fallback;
 
-    const ambientDefaults = { pa:2000, oat:14 };
+    const ambientDefaults = prefill ? { pa: prefill.pa, oat: prefill.oat } : { pa:2000, oat:14 };
     const engineDefs = [
-      { p:'e1', label:'Engine 1', defaults:{ torque:75, n1:94.5, tot:760 } },
-      { p:'e2', label:'Engine 2', defaults:{ torque:75, n1:93.8, tot:745 } },
+      { p:'e1', label:'Engine 1', defaults: (()=>{ const e = pfEngine('e1', {torque:75, n1:94.5, tot:760}); return { torque:e.torque, n1:e.n1, tot:e.tot }; })() },
+      { p:'e2', label:'Engine 2', defaults: (()=>{ const e = pfEngine('e2', {torque:75, n1:93.8, tot:745}); return { torque:e.torque, n1:e.n1, tot:e.tot }; })() },
     ];
-    ec135State = ec135State || { e1:{target:75}, e2:{target:75} };
+    ec135State = prefill
+      ? { e1:{target: pfEngine('e1',{target:75}).target}, e2:{target: pfEngine('e2',{target:75}).target} }
+      : (ec135State || { e1:{target:75}, e2:{target:75} });
 
     function engineBlock(def){
       const target = ec135State[def.p].target;
@@ -2280,7 +2288,8 @@
         '<div class="field-grid" style="margin-bottom:16px;">' +
           '<div class="field"><label for="ecReg">A/C registration</label><input type="text" id="ecReg" placeholder="C-XXXX"></div>' +
           '<div class="field"><label for="ecDate">Date</label><input type="date" id="ecDate"></div>' +
-          '<div class="field"><label for="ecBy">Performed by</label><input type="text" id="ecBy" placeholder="Name"></div>' +
+          '<div class="field"><label for="ecBy">Performed by (AME)</label><select id="ecBy">'+opts(s.ames, a=>a.name, a=>a.name, 'Select AME')+'</select></div>' +
+          '<div class="field"><label for="ecPilot">Pilot</label><select id="ecPilot">'+opts(s.pilots, p=>p.name, p=>p.name, 'Select pilot')+'</select></div>' +
         '</div>' +
         '<div class="ec-overall">' +
           '<span class="lbl">Overall result</span>' +
@@ -2291,11 +2300,16 @@
         '</div>' +
         engineDefs.map(engineBlock).join('') +
         '<div class="btn-row" style="justify-content:flex-end;">' +
+          '<button type="button" class="btn" id="ecTrendBtn">📈 Trend monitoring</button>' +
           '<button type="button" class="btn primary" id="ecPrintBtn">🖨️ Print report (PDF)</button>' +
         '</div>' +
       '</div>';
 
-    if (!document.getElementById('ecDate').value) document.getElementById('ecDate').value = todayISO();
+    document.getElementById('ecReg').value = prefill ? (prefill.reg||'') : 'C-GERP';
+    document.getElementById('ecDate').value = prefill ? (prefill.date||todayISO()) : todayISO();
+    if (prefill && prefill.by) document.getElementById('ecBy').value = prefill.by;
+    if (prefill && prefill.pilot) document.getElementById('ecPilot').value = prefill.pilot;
+    document.getElementById('ecTrendBtn').onclick = ()=> renderEc135Trend();
 
     const ambEls = {};
     ec135AmbientFields(ambientDefaults).forEach(f=>{ ambEls[f.id] = document.getElementById(f.id); });
@@ -2410,19 +2424,172 @@
     }
 
     document.getElementById('ecPrintBtn').onclick = ()=>{
-      const data = {
-        date: fmtDateNice(document.getElementById('ecDate').value),
-        reg: document.getElementById('ecReg').value,
-        by: document.getElementById('ecBy').value,
+      const dateISO = document.getElementById('ecDate').value;
+      const reg = document.getElementById('ecReg').value;
+      const by = document.getElementById('ecBy').value;
+      const pilot = document.getElementById('ecPilot').value;
+      const recordData = {
+        date: dateISO,
+        reg: reg,
+        by: by,
+        pilot: pilot,
         pa: parseFloat(ambEls.ecPa.value),
         oat: parseFloat(ambEls.ecOat.value),
         engines: lastResults,
         allPass: lastResults.every(r=>r.out.passed),
       };
-      openPrint(buildEc135PrintHtml(data));
+      openPrint(buildEc135PrintHtml(Object.assign({}, recordData, { date: fmtDateNice(dateISO) })));
+      // keep a record of every printed report (searchable in Saved Forms, and plotted in Trend monitoring) —
+      // best-effort: saveRecord/storageSet never reject, so this never blocks or breaks the print itself.
+      const desc = 'AME: '+(by||'—')+' — Pilot: '+(pilot||'—')+' — '+(recordData.allPass?'PASSED':'FAILED');
+      saveRecord(buildRecord('ec135pc', 'EC135 T2+ Power Check', reg, dateISO, desc, recordData)).catch(()=>{});
     };
 
     update();
+  }
+
+  // ---------- EC135 trend monitoring (N1/TOT margin history) ----------
+  let ec135TrendFilter = { reg:'' };
+  let ec135TrendCache = null;
+
+  function ec135TrendBackHTML(){
+    return '<button class="back-btn" id="ecTrendBackBtn">‹ Back to Power Check</button>';
+  }
+
+  async function renderEc135Trend(){
+    showView('Ec135Trend');
+    const el = document.getElementById('viewEc135Trend');
+    el.innerHTML = ec135TrendBackHTML() + '<div class="panel"><h2 class="form-title">EC135 Power Check — Trend Monitoring</h2><p class="form-sub">Loading…</p></div>';
+    document.getElementById('ecTrendBackBtn').onclick = ()=> renderEc135Powercheck();
+    const all = await loadRecords();
+    ec135TrendCache = all
+      .filter(r=>r.formType==='ec135pc')
+      .sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.createdAt||'').localeCompare(b.createdAt||''));
+    renderEc135TrendBody();
+  }
+
+  function renderEc135TrendBody(){
+    const el = document.getElementById('viewEc135Trend');
+    if(!el) return; // user navigated away before records finished loading
+    const records = ec135TrendCache || [];
+    const regs = Array.from(new Set(records.map(r=>r.reg).filter(Boolean))).sort();
+    const filtered = ec135TrendFilter.reg ? records.filter(r=>r.reg===ec135TrendFilter.reg) : records;
+
+    el.innerHTML =
+      ec135TrendBackHTML() +
+      '<div class="panel">' +
+        '<h2 class="form-title">EC135 Power Check — Trend Monitoring</h2>' +
+        '<p class="form-sub">N1 and TOT margins recorded automatically every time a report is printed, plotted by the date/time the check was performed. Use this to watch for gradual power-margin decay between checks.</p>' +
+        '<div class="field-grid" style="margin-bottom:6px;">' +
+          '<div class="field"><label for="ecTrendRegFilter">Aircraft Reg</label><select id="ecTrendRegFilter"><option value="">All aircraft</option>' +
+            regs.map(r=>'<option value="'+escapeHTML(r)+'"'+(r===ec135TrendFilter.reg?' selected':'')+'>'+escapeHTML(r)+'</option>').join('') +
+          '</select></div>' +
+        '</div>' +
+        (filtered.length ?
+          (
+            '<div style="margin-top:10px;">' +
+              '<div class="pc-gauge-caption" style="margin-bottom:6px;">N1 margin, % (dashed line = 0% margin)</div>' +
+              '<canvas id="ecTrendN1" width="720" height="220" style="width:100%;height:auto;display:block;"></canvas>' +
+            '</div>' +
+            '<div style="margin-top:20px;">' +
+              '<div class="pc-gauge-caption" style="margin-bottom:6px;">TOT margin, °C (dashed line = 0°C margin)</div>' +
+              '<canvas id="ecTrendTot" width="720" height="220" style="width:100%;height:auto;display:block;"></canvas>' +
+            '</div>' +
+            '<table class="list-table" style="margin-top:20px;"><thead><tr><th>Date</th><th>Reg</th><th>AME</th><th>Pilot</th><th>Engine</th><th>N1 margin</th><th>TOT margin</th><th>Result</th></tr></thead><tbody>' +
+              filtered.slice().reverse().flatMap(r=>
+                (r.data.engines||[]).map(e=>
+                  '<tr><td>'+escapeHTML(fmtDateNice(r.date)||r.date||'')+'</td>' +
+                    '<td>'+escapeHTML(r.reg||'')+'</td>' +
+                    '<td>'+escapeHTML(r.data.by||'')+'</td>' +
+                    '<td>'+escapeHTML(r.data.pilot||'')+'</td>' +
+                    '<td>'+escapeHTML(e.label||'')+'</td>' +
+                    '<td>'+(e.out.n1Margin>=0?'+':'−')+Math.abs(e.out.n1Margin).toFixed(2)+'%</td>' +
+                    '<td>'+(e.out.totMargin>=0?'+':'−')+Math.abs(e.out.totMargin).toFixed(0)+'°C</td>' +
+                    '<td>'+(e.out.passed?'PASS':'FAIL')+'</td></tr>'
+                )
+              ).join('') +
+            '</tbody></table>'
+          ) :
+          '<p class="note" style="margin-top:16px;">No power checks recorded yet'+(ec135TrendFilter.reg?' for '+escapeHTML(ec135TrendFilter.reg):'')+'. A record is saved automatically every time "Print report (PDF)" is pressed.</p>'
+        ) +
+      '</div>';
+
+    document.getElementById('ecTrendBackBtn').onclick = ()=> renderEc135Powercheck();
+    document.getElementById('ecTrendRegFilter').onchange = (e)=>{ ec135TrendFilter.reg = e.target.value; renderEc135TrendBody(); };
+
+    if(filtered.length){
+      ec135DrawTrendChart(document.getElementById('ecTrendN1'), filtered, e=>e.out.n1Margin);
+      ec135DrawTrendChart(document.getElementById('ecTrendTot'), filtered, e=>e.out.totMargin);
+    }
+  }
+
+  function ec135DrawTrendChart(canvas, records, valueFn){
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    const padL = 48, padR = 14, padT = 20, padB = 30;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+
+    const seriesColors = { e1: pcCssVar('--accent'), e2: pcCssVar('--warn') };
+    const allVals = [];
+    records.forEach(r=> (r.data.engines||[]).forEach(e=> allVals.push(valueFn(e))));
+    if(!allVals.length) return;
+    let vMin = Math.min(0, Math.min.apply(null, allVals));
+    let vMax = Math.max.apply(null, allVals);
+    const pad = (vMax - vMin) * 0.15 || 1;
+    vMin -= pad; vMax += pad;
+
+    function xFor(i){ return padL + (records.length<=1 ? plotW/2 : plotW * i/(records.length-1)); }
+    function yFor(v){ return padT + plotH * (1 - (v - vMin)/(vMax - vMin)); }
+
+    ctx.strokeStyle = pcCssVar('--line');
+    ctx.lineWidth = 1;
+    ctx.fillStyle = pcCssVar('--grey-strong');
+    ctx.font = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    const ticks = 4;
+    for(let t=0;t<=ticks;t++){
+      const v = vMin + (vMax-vMin)*t/ticks;
+      const y = yFor(v);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.fillText(v.toFixed(1), padL-6, y);
+    }
+    if(vMin < 0 && vMax > 0){
+      ctx.strokeStyle = pcCssVar('--bad');
+      ctx.setLineDash([4,3]);
+      const y0 = yFor(0);
+      ctx.beginPath(); ctx.moveTo(padL,y0); ctx.lineTo(W-padR,y0); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ['e1','e2'].forEach(p=>{
+      const pts = records.map((r,i)=>{
+        const e = (r.data.engines||[]).find(en=>en.p===p);
+        return e ? {x:xFor(i), y:yFor(valueFn(e))} : null;
+      }).filter(Boolean);
+      if(!pts.length) return;
+      ctx.strokeStyle = seriesColors[p];
+      ctx.fillStyle = seriesColors[p];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      pts.forEach((pt,i)=> i===0 ? ctx.moveTo(pt.x,pt.y) : ctx.lineTo(pt.x,pt.y));
+      ctx.stroke();
+      pts.forEach(pt=>{ ctx.beginPath(); ctx.arc(pt.x,pt.y,3,0,Math.PI*2); ctx.fill(); });
+    });
+
+    ctx.fillStyle = pcCssVar('--grey-strong');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const labelIdxs = records.length>1 ? [0, Math.floor((records.length-1)/2), records.length-1] : [0];
+    labelIdxs.forEach(i=>{
+      const label = (fmtDateNice(records[i].date) || records[i].date || '').split(',')[0];
+      ctx.fillText(label, xFor(i), H-padB+8);
+    });
+
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillStyle = seriesColors.e1; ctx.fillRect(padL, 2, 10, 10);
+    ctx.fillStyle = pcCssVar('--ink'); ctx.fillText('Engine 1', padL+14, 7);
+    ctx.fillStyle = seriesColors.e2; ctx.fillRect(padL+90, 2, 10, 10);
+    ctx.fillStyle = pcCssVar('--ink'); ctx.fillText('Engine 2', padL+104, 7);
   }
 
 
