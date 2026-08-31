@@ -162,6 +162,8 @@
   .ec-gauge-wrap{max-width:280px;margin:0 auto;}
   .ec-overall{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:10px;background:var(--paper);border:1px solid var(--line);margin-bottom:16px;}
   .ec-overall .lbl{font-weight:800;font-size:14px;}
+  .ec-ambient{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;padding:12px 16px 2px;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;background:var(--paper);}
+  @media (max-width:560px){ .ec-ambient{grid-template-columns:1fr;} }
 
   /* ---------- Bleed Valve Test ---------- */
   .bv-check{padding:12px 0;border-bottom:1px solid var(--line);}
@@ -2002,6 +2004,20 @@
 
   function ec135Quad(c, x){ return c[0]*x*x + c[1]*x + c[2]; }
 
+  // The two AFM charts (Fig. 5-1 @ 75% torque, Fig. 5-2 @ 60% torque) are each fitted as a
+  // plane in OAT/Zp. Torque actually observed during the check rarely lands exactly on
+  // 75.0 or 60.0, so the N1-limit plane is linearly interpolated (and, within +/-3%,
+  // mildly extrapolated) between those two calibrated torque settings.
+  function ec135PlaneAt(torque){
+    const c60 = EC135_POWERCHECK_DATA.ch60, c75 = EC135_POWERCHECK_DATA.ch75;
+    const t = (torque - 60) / (75 - 60);
+    return {
+      n0: c60.n0 + t*(c75.n0 - c60.n0),
+      a:  c60.a  + t*(c75.a  - c60.a),
+      b:  c60.b  + t*(c75.b  - c60.b)
+    };
+  }
+
   function ec135TopX(n1, oat){
     const d = EC135_POWERCHECK_DATA;
     const oatC = Math.max(d.topOats[0], Math.min(d.topOats[d.topOats.length-1], oat));
@@ -2017,19 +2033,22 @@
   }
 
   function ec135Compute(inputs){
-    const { torque, pa, oat, n1, tot } = inputs;
-    const chart = torque === 60 ? EC135_POWERCHECK_DATA.ch60 : EC135_POWERCHECK_DATA.ch75;
-    const n1Limit = chart.n0 + chart.a*oat + chart.b*(pa/1000);
+    const { target, torque, pa, oat, n1, tot } = inputs;
+    const plane = ec135PlaneAt(torque);
+    const n1Limit = plane.n0 + plane.a*oat + plane.b*(pa/1000);
     const n1Margin = n1Limit - n1;
     const x = ec135TopX(n1, oat);
     const totLimit = ec135BottomTOT(x, pa);
     const totMargin = totLimit - tot;
 
     const notes = [];
-    if (torque === 75 && pa >= 15000){
+    if (torque < 60 || torque > 75){
+      notes.push('Torque is outside the digitized 60–75% range: the N1-limit relationship is extrapolated beyond the two charted torque settings.');
+    }
+    if (target === 75 && pa >= 15000){
       notes.push('Zp ≥ 15,000 ft: Fig. 5-1’s 16,000 ft line departs from a straight line above N1 ≈97% (collective/topping limit). Cross-check Fig. 5-1 directly.');
     }
-    if (torque === 60 && (pa < 8000 || oat < 10)){
+    if (target === 60 && (pa < 8000 || oat < 10)){
       notes.push('The 60% chart (Fig. 5-2) is intended for high altitude / high OAT conditions (Zp &gt; 10,000 ft, OAT &gt; ISA+20°C). Outside that corner the result is extrapolated — prefer the 75% check when it can be reached within limits.');
     }
     if (n1 > 95.5){
@@ -2039,7 +2058,7 @@
       notes.push('Pressure altitude is outside the charted range (−1,500 to 18,000 ft) — result is extrapolated.');
     }
     if (n1Limit > 99.5 || n1Limit < 87){
-      notes.push('This OAT/altitude combination falls outside Fig. 5-'+(torque===60?'2':'1')+'’s plotted grid — treat the chart limit N1 as an extrapolation and verify against the AFM.');
+      notes.push('This OAT/altitude combination falls outside Fig. 5-'+(target===60?'2':'1')+'’s plotted grid — treat the chart limit N1 as an extrapolation and verify against the AFM.');
     }
 
     const passed = n1Margin >= 0 && totMargin >= 0;
@@ -2117,10 +2136,16 @@
     return Math.round(val).toLocaleString();
   }
 
-  function ec135EngineFields(p, defaults){
+  function ec135AmbientFields(defaults){
     return [
-      { id:p+'Pa',  label:'Zp',  unit:'pressure altitude, ft', min:-1500, max:16000, step:50,  value:defaults.pa },
-      { id:p+'Oat', label:'OAT', unit:'outside air temp, °C', min:-35, max:50, step:0.5, value:defaults.oat },
+      { id:'ecPa',  label:'Zp',  unit:'pressure altitude, ft (both engines)', min:-1500, max:16000, step:50,  value:defaults.pa },
+      { id:'ecOat', label:'OAT', unit:'outside air temp, °C (both engines)', min:-35, max:50, step:0.5, value:defaults.oat },
+    ];
+  }
+
+  function ec135EngineFields(p, target, defaults){
+    return [
+      { id:p+'Tq',  label:'Torque', unit:'observed, % ('+target+'% ±3)', min:target-3, max:target+3, step:0.1, value:defaults.torque },
       { id:p+'N1',  label:'N1',  unit:'indicated, %', min:80, max:100, step:0.1, value:defaults.n1 },
       { id:p+'Tot', label:'TOT', unit:'indicated, °C', min:500, max:900, step:1, value:defaults.tot },
     ];
@@ -2130,20 +2155,22 @@
     showView('Ec135pc');
     const el = document.getElementById('viewEc135pc');
 
+    const ambientDefaults = { pa:2000, oat:14 };
     const engineDefs = [
-      { p:'e1', label:'Engine 1', torque:75, defaults:{ pa:2000, oat:14, n1:94.5, tot:760 } },
-      { p:'e2', label:'Engine 2', torque:75, defaults:{ pa:2000, oat:14, n1:93.8, tot:745 } },
+      { p:'e1', label:'Engine 1', defaults:{ torque:75, n1:94.5, tot:760 } },
+      { p:'e2', label:'Engine 2', defaults:{ torque:75, n1:93.8, tot:745 } },
     ];
-    ec135State = ec135State || { e1:75, e2:75 };
+    ec135State = ec135State || { e1:{target:75}, e2:{target:75} };
 
     function engineBlock(def){
-      const fields = ec135EngineFields(def.p, def.defaults);
+      const target = ec135State[def.p].target;
+      const fields = ec135EngineFields(def.p, target, def.defaults);
       return (
         '<div class="ec-engine">' +
           '<div class="ec-engine-head"><span class="ec-engine-title">'+def.label+'</span>' +
             '<div class="pc-toggle" style="width:200px;margin-top:0;">' +
-              '<button type="button" id="'+def.p+'Tq75" aria-pressed="true">75%</button>' +
-              '<button type="button" id="'+def.p+'Tq60" aria-pressed="false">60%</button>' +
+              '<button type="button" id="'+def.p+'Tq75" aria-pressed="'+(target===75)+'">75%</button>' +
+              '<button type="button" id="'+def.p+'Tq60" aria-pressed="'+(target===60)+'">60%</button>' +
             '</div>' +
           '</div>' +
           '<div class="pc-grid">' +
@@ -2180,32 +2207,67 @@
           '<span class="lbl">Overall result</span>' +
           '<span class="pc-status-chip" id="ecOverallChip" style="margin-bottom:0;"><span class="dot"></span><span id="ecOverallText">&nbsp;</span></span>' +
         '</div>' +
+        '<div class="ec-ambient">' +
+          ec135AmbientFields(ambientDefaults).map(f=>(
+            '<div class="pc-field">' +
+              '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+ec135FormatFieldVal(f, f.value)+'</span></div>' +
+              '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
+            '</div>'
+          )).join('') +
+        '</div>' +
         engineDefs.map(engineBlock).join('') +
       '</div>';
 
+    const ambEls = {};
+    ec135AmbientFields(ambientDefaults).forEach(f=>{ ambEls[f.id] = document.getElementById(f.id); });
+    ambEls.ecPa.addEventListener('input', ()=>{
+      document.getElementById('ecPaVal').textContent = ec135FormatFieldVal({step:50}, parseFloat(ambEls.ecPa.value));
+      update();
+    });
+    ambEls.ecOat.addEventListener('input', ()=>{
+      document.getElementById('ecOatVal').textContent = ec135FormatFieldVal({step:0.5}, parseFloat(ambEls.ecOat.value));
+      update();
+    });
+
     const fEls = {};
-    engineDefs.forEach(def=>{
-      ec135EngineFields(def.p, def.defaults).forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
-    });
-
-    function syncToggle(p){
-      document.getElementById(p+'Tq75').setAttribute('aria-pressed', String(ec135State[p]===75));
-      document.getElementById(p+'Tq60').setAttribute('aria-pressed', String(ec135State[p]===60));
+    function bindEngineFieldEls(def){
+      const target = ec135State[def.p].target;
+      ec135EngineFields(def.p, target, def.defaults).forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
     }
-    engineDefs.forEach(def=>{
-      const p = def.p;
-      document.getElementById(p+'Tq75').onclick = ()=>{ ec135State[p]=75; syncToggle(p); update(); };
-      document.getElementById(p+'Tq60').onclick = ()=>{ ec135State[p]=60; syncToggle(p); update(); };
-      syncToggle(p);
-    });
+    engineDefs.forEach(bindEngineFieldEls);
 
-    engineDefs.forEach(def=>{
-      ec135EngineFields(def.p, def.defaults).forEach(f=>{
+    function bindEngineFieldInputs(def){
+      const target = ec135State[def.p].target;
+      ec135EngineFields(def.p, target, def.defaults).forEach(f=>{
         fEls[f.id].addEventListener('input', ()=>{
           document.getElementById(f.id+'Val').textContent = ec135FormatFieldVal(f, parseFloat(fEls[f.id].value));
           update();
         });
       });
+    }
+    engineDefs.forEach(bindEngineFieldInputs);
+
+    function syncToggle(p){
+      document.getElementById(p+'Tq75').setAttribute('aria-pressed', String(ec135State[p].target===75));
+      document.getElementById(p+'Tq60').setAttribute('aria-pressed', String(ec135State[p].target===60));
+    }
+    function retargetEngine(p, newTarget){
+      ec135State[p].target = newTarget;
+      syncToggle(p);
+      // rescale the torque slider around the new target, keep it centered on target
+      const tq = fEls[p+'Tq'];
+      tq.min = newTarget - 3;
+      tq.max = newTarget + 3;
+      tq.value = newTarget;
+      document.getElementById(p+'Tq').previousElementSibling.querySelector('.pc-field-unit').textContent = 'observed, % ('+newTarget+'% ±3)';
+      document.getElementById(p+'TqVal').textContent = ec135FormatFieldVal({step:0.1}, newTarget);
+      update();
+    }
+    engineDefs.forEach(def=>{
+      const p = def.p;
+      document.getElementById(p+'Tq75').onclick = ()=> retargetEngine(p, 75);
+      document.getElementById(p+'Tq60').onclick = ()=> retargetEngine(p, 60);
+      syncToggle(p);
     });
 
     const EC_GMIN = -3, EC_GMAX = 6, EC_GWARN = 1;
@@ -2213,9 +2275,10 @@
     function updateEngine(def){
       const p = def.p;
       const inputs = {
-        torque: ec135State[p],
-        pa: parseFloat(fEls[p+'Pa'].value),
-        oat: parseFloat(fEls[p+'Oat'].value),
+        target: ec135State[p].target,
+        torque: parseFloat(fEls[p+'Tq'].value),
+        pa: parseFloat(ambEls.ecPa.value),
+        oat: parseFloat(ambEls.ecOat.value),
         n1: parseFloat(fEls[p+'N1'].value),
         tot: parseFloat(fEls[p+'Tot'].value),
       };
@@ -2223,10 +2286,10 @@
 
       const marginFigure = document.getElementById(p+'MarginFigure');
       const sign = out.n1Margin >= 0 ? '+' : '−';
-      marginFigure.textContent = sign + Math.abs(out.n1Margin).toFixed(1) + '%';
+      marginFigure.textContent = sign + Math.abs(out.n1Margin).toFixed(2) + '%';
       marginFigure.style.color = out.n1Margin < 0 ? 'var(--bad)' : (out.n1Margin < EC_GWARN ? 'var(--warn)' : 'var(--good)');
 
-      document.getElementById(p+'N1LimOut').textContent = out.n1Limit.toFixed(1) + '%';
+      document.getElementById(p+'N1LimOut').textContent = out.n1Limit.toFixed(2) + '%';
       document.getElementById(p+'TotLimOut').textContent = out.totLimit.toFixed(0) + '°C';
       const totOut = document.getElementById(p+'TotMarginOut');
       const totSign = out.totMargin >= 0 ? '+' : '−';
@@ -2261,6 +2324,8 @@
 
     update();
   }
+
+
 
 
   window.__formsApp = { state, storageGet, storageSet, sha256, escapeHTML, todayISO, fmtDateNice, loadSettings, saveSettings, PHOENIX_LOGO_DATA_URI, SUPABASE_CONFIGURED };
