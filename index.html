@@ -164,6 +164,12 @@
   .ec-overall .lbl{font-weight:800;font-size:14px;}
   .ec-ambient{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;padding:12px 16px 2px;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;background:var(--paper);}
   @media (max-width:560px){ .ec-ambient{grid-template-columns:1fr;} }
+  .pc-field-row{display:flex;align-items:center;gap:10px;}
+  .pc-field-row input[type="range"]{flex:1;width:auto;}
+  .pc-stepper{display:flex;flex-shrink:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .pc-step-btn{width:28px;height:28px;border:none;background:var(--panel);color:var(--ink);font-size:15px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .pc-step-btn:active{background:var(--accent);color:#fff;}
+  .pc-step-btn + .pc-step-btn{border-left:1px solid var(--line);}
 
   /* ---------- Bleed Valve Test ---------- */
   .bv-check{padding:12px 0;border-bottom:1px solid var(--line);}
@@ -2136,9 +2142,25 @@
     return Math.round(val).toLocaleString();
   }
 
+  // Range slider + fine-adjustment up/down steppers, shared by every EC135 field.
+  function ec135FieldHTML(f){
+    return (
+      '<div class="pc-field">' +
+        '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+ec135FormatFieldVal(f, f.value)+'</span></div>' +
+        '<div class="pc-field-row">' +
+          '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
+          '<div class="pc-stepper">' +
+            '<button type="button" class="pc-step-btn" data-target="'+f.id+'" data-dir="-1" aria-label="Decrease '+f.label+'">&minus;</button>' +
+            '<button type="button" class="pc-step-btn" data-target="'+f.id+'" data-dir="1" aria-label="Increase '+f.label+'">+</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   function ec135AmbientFields(defaults){
     return [
-      { id:'ecPa',  label:'Zp',  unit:'pressure altitude, ft (both engines)', min:-1500, max:16000, step:50,  value:defaults.pa },
+      { id:'ecPa',  label:'Zp',  unit:'pressure altitude, ft (both engines)', min:-1500, max:10000, step:10,  value:defaults.pa },
       { id:'ecOat', label:'OAT', unit:'outside air temp, °C (both engines)', min:-35, max:50, step:0.5, value:defaults.oat },
     ];
   }
@@ -2149,6 +2171,63 @@
       { id:p+'N1',  label:'N1',  unit:'indicated, %', min:80, max:100, step:0.1, value:defaults.n1 },
       { id:p+'Tot', label:'TOT', unit:'indicated, °C', min:500, max:900, step:1, value:defaults.tot },
     ];
+  }
+
+  // ---------- EC135 print report ----------
+  const EC135_PRINT_STYLES = '<style>' +
+    '.ec-pf-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;margin-bottom:12px;}' +
+    '.ec-pf-head .pf-logo{grid-column:1;justify-self:start;}' +
+    '.ec-pf-head .pf-title-block{grid-column:2;text-align:center;}' +
+    '.ec-pf-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;}' +
+    '.ec-pf-table th{text-align:left;background:#eee;border:1px solid #000;padding:5px 8px;font-size:11px;text-transform:uppercase;}' +
+    '.ec-pf-table td{border:1px solid #000;padding:5px 8px;}' +
+    '.ec-pf-table td.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}' +
+    '.ec-pf-result{font-weight:800;}' +
+    '.ec-pf-result.pass{color:#1a6b3f;}' +
+    '.ec-pf-result.fail{color:#a3221a;}' +
+    '.ec-pf-notes{font-size:11px;margin-top:4px;color:#333;}' +
+    '.ec-pf-overall{border:1.5px solid #000;padding:8px 12px;margin-top:14px;font-size:14px;font-weight:800;text-align:center;}' +
+    '.ec-pf-foot{font-size:9.5px;color:#333;margin-top:14px;line-height:1.5;}' +
+  '</style>';
+
+  function ec135PrintRow(name, val, unit){
+    return '<tr><td>'+name+'</td><td class="num">'+val+(unit||'')+'</td></tr>';
+  }
+
+  function buildEc135PrintHtml(data){
+    const engineTable = (e)=>(
+      '<table class="ec-pf-table">' +
+        '<tr><th colspan="2">'+e.label+' — <span class="ec-pf-result '+(e.out.passed?'pass':'fail')+'">'+(e.out.passed?'PASSED':'FAILED')+'</span></th></tr>' +
+        ec135PrintRow('Torque target', e.target+'%') +
+        ec135PrintRow('Torque observed', e.torque.toFixed(1),'%') +
+        ec135PrintRow('Indicated N1', e.n1.toFixed(1),'%') +
+        ec135PrintRow('Chart limit N1 (Fig. 5-'+(e.target===60?'2':'1')+')', e.out.n1Limit.toFixed(2),'%') +
+        ec135PrintRow('N1 margin', (e.out.n1Margin>=0?'+':'−')+Math.abs(e.out.n1Margin).toFixed(2),'%') +
+        ec135PrintRow('Indicated TOT', e.tot.toFixed(0),'°C') +
+        ec135PrintRow('Max TOT (Fig. 5-3)', e.out.totLimit.toFixed(0),'°C') +
+        ec135PrintRow('TOT margin', (e.out.totMargin>=0?'+':'−')+Math.abs(e.out.totMargin).toFixed(0),'°C') +
+      '</table>' +
+      (e.out.notes.length ? '<div class="ec-pf-notes">'+e.out.notes.map(n=>'⚠ '+n).join('<br>')+'</div>' : '')
+    );
+
+    return (
+      EC135_PRINT_STYLES +
+      '<div class="ec-pf-head">' +
+        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+        '<div class="pf-title-block"><h1>EC135 T2+ Power Check</h1><div class="pf-sub">Ground power check &amp; N1/TOT check — Turbomeca Arriel 2B2 — AFM Section 5.1.3 (Rev. 17)</div></div>' +
+      '</div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
+          '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
+          '<span class="pf-field"><b>Performed by:</b><span class="pf-underline">'+escapeHTML(data.by)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:8px;"><span class="pf-field"><b>Zp:</b><span class="pf-underline" style="min-width:70px;">'+data.pa.toLocaleString()+' ft</span></span>' +
+          '<span class="pf-field"><b>OAT:</b><span class="pf-underline" style="min-width:70px;">'+data.oat.toFixed(1)+' °C</span></span></div>' +
+      '</div>' +
+      engineTable(data.engines[0]) +
+      engineTable(data.engines[1]) +
+      '<div class="ec-pf-overall">Overall result: '+(data.allPass?'POWER ASSURED — BOTH ENGINES':'POWER NOT ASSURED')+'</div>' +
+      '<div class="ec-pf-foot">N1 and TOT limit curves digitized from AFM EC135 T2+ Figs. 5-1/5-2/5-3, Rev. 17, cross-checked against the AFM\'s own worked example. For training and reference use only — the approved Flight Manual is the sole authority. If power is not assured, refer to the Maintenance Manual before further flight. Printed '+fmtDateNice(todayISO())+' from Phoenix Heli-Flight Maintenance Forms.</div>'
+    );
   }
 
   function renderEc135Powercheck(){
@@ -2175,12 +2254,7 @@
           '</div>' +
           '<div class="pc-grid">' +
             '<div>' +
-              fields.map(f=>(
-                '<div class="pc-field">' +
-                  '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+ec135FormatFieldVal(f, f.value)+'</span></div>' +
-                  '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
-                '</div>'
-              )).join('') +
+              fields.map(ec135FieldHTML).join('') +
             '</div>' +
             '<div>' +
               '<div class="pc-status-chip" id="'+def.p+'Chip"><span class="dot"></span><span id="'+def.p+'StatusText">&nbsp;</span></div>' +
@@ -2203,31 +2277,28 @@
       '<div class="panel">' +
         '<h2 class="form-title">EC135 T2+ Power Check</h2>' +
         '<p class="form-sub">Ground power check &amp; N1/TOT check &mdash; Turbomeca Arriel 2B2 &mdash; chart data digitized from the EC135 T2+ Flight Manual, Section 5.1.3 &amp; Figs. 5-1/5-2/5-3 (Rev. 17). For training and reference use only &mdash; not a substitute for the approved Flight Manual. If power is not assured, refer to the Maintenance Manual before further flight.</p>' +
+        '<div class="field-grid" style="margin-bottom:16px;">' +
+          '<div class="field"><label for="ecReg">A/C registration</label><input type="text" id="ecReg" placeholder="C-XXXX"></div>' +
+          '<div class="field"><label for="ecDate">Date</label><input type="date" id="ecDate"></div>' +
+          '<div class="field"><label for="ecBy">Performed by</label><input type="text" id="ecBy" placeholder="Name"></div>' +
+        '</div>' +
         '<div class="ec-overall">' +
           '<span class="lbl">Overall result</span>' +
           '<span class="pc-status-chip" id="ecOverallChip" style="margin-bottom:0;"><span class="dot"></span><span id="ecOverallText">&nbsp;</span></span>' +
         '</div>' +
         '<div class="ec-ambient">' +
-          ec135AmbientFields(ambientDefaults).map(f=>(
-            '<div class="pc-field">' +
-              '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+ec135FormatFieldVal(f, f.value)+'</span></div>' +
-              '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
-            '</div>'
-          )).join('') +
+          ec135AmbientFields(ambientDefaults).map(ec135FieldHTML).join('') +
         '</div>' +
         engineDefs.map(engineBlock).join('') +
+        '<div class="btn-row" style="justify-content:flex-end;">' +
+          '<button type="button" class="btn primary" id="ecPrintBtn">🖨️ Print report (PDF)</button>' +
+        '</div>' +
       '</div>';
+
+    if (!document.getElementById('ecDate').value) document.getElementById('ecDate').value = todayISO();
 
     const ambEls = {};
     ec135AmbientFields(ambientDefaults).forEach(f=>{ ambEls[f.id] = document.getElementById(f.id); });
-    ambEls.ecPa.addEventListener('input', ()=>{
-      document.getElementById('ecPaVal').textContent = ec135FormatFieldVal({step:50}, parseFloat(ambEls.ecPa.value));
-      update();
-    });
-    ambEls.ecOat.addEventListener('input', ()=>{
-      document.getElementById('ecOatVal').textContent = ec135FormatFieldVal({step:0.5}, parseFloat(ambEls.ecOat.value));
-      update();
-    });
 
     const fEls = {};
     function bindEngineFieldEls(def){
@@ -2236,16 +2307,31 @@
     }
     engineDefs.forEach(bindEngineFieldEls);
 
-    function bindEngineFieldInputs(def){
-      const target = ec135State[def.p].target;
-      ec135EngineFields(def.p, target, def.defaults).forEach(f=>{
-        fEls[f.id].addEventListener('input', ()=>{
-          document.getElementById(f.id+'Val').textContent = ec135FormatFieldVal(f, parseFloat(fEls[f.id].value));
-          update();
-        });
+    // single delegated handler drives every slider AND its +/- fine-adjust buttons
+    function wireField(inputEl){
+      inputEl.addEventListener('input', ()=>{
+        const f = { step: parseFloat(inputEl.step) };
+        document.getElementById(inputEl.id+'Val').textContent = ec135FormatFieldVal(f, parseFloat(inputEl.value));
+        update();
       });
     }
-    engineDefs.forEach(bindEngineFieldInputs);
+    Object.values(ambEls).forEach(wireField);
+    Object.values(fEls).forEach(wireField);
+
+    el.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.pc-step-btn');
+      if (!btn) return;
+      const inp = document.getElementById(btn.dataset.target);
+      if (!inp) return;
+      const step = parseFloat(inp.step) || 1;
+      const min = parseFloat(inp.min), max = parseFloat(inp.max);
+      const dir = parseFloat(btn.dataset.dir);
+      let val = parseFloat(inp.value) + dir*step;
+      val = Math.round(val/step)*step;
+      val = Math.max(min, Math.min(max, val));
+      inp.value = val;
+      inp.dispatchEvent(new Event('input', { bubbles:true }));
+    });
 
     function syncToggle(p){
       document.getElementById(p+'Tq75').setAttribute('aria-pressed', String(ec135State[p].target===75));
@@ -2259,7 +2345,7 @@
       tq.min = newTarget - 3;
       tq.max = newTarget + 3;
       tq.value = newTarget;
-      document.getElementById(p+'Tq').previousElementSibling.querySelector('.pc-field-unit').textContent = 'observed, % ('+newTarget+'% ±3)';
+      document.getElementById(p+'Tq').closest('.pc-field').querySelector('.pc-field-unit').textContent = 'observed, % ('+newTarget+'% ±3)';
       document.getElementById(p+'TqVal').textContent = ec135FormatFieldVal({step:0.1}, newTarget);
       update();
     }
@@ -2271,6 +2357,7 @@
     });
 
     const EC_GMIN = -3, EC_GMAX = 6, EC_GWARN = 1;
+    let lastResults = null;
 
     function updateEngine(def){
       const p = def.p;
@@ -2310,17 +2397,30 @@
       }
 
       ec135DrawGauge(document.getElementById(p+'Gauge'), out.n1Margin, EC_GMIN, EC_GMAX, EC_GWARN);
-      return out.passed;
+      return { p, label: def.label, target: inputs.target, torque: inputs.torque, n1: inputs.n1, tot: inputs.tot, out };
     }
 
     function update(){
-      const results = engineDefs.map(updateEngine);
+      lastResults = engineDefs.map(updateEngine);
       const overallChip = document.getElementById('ecOverallChip');
       overallChip.classList.remove('pass','fail');
-      const allPass = results.every(r=>r);
+      const allPass = lastResults.every(r=>r.out.passed);
       overallChip.classList.add(allPass ? 'pass' : 'fail');
       document.getElementById('ecOverallText').textContent = allPass ? 'POWER ASSURED — BOTH ENGINES' : 'POWER NOT ASSURED';
     }
+
+    document.getElementById('ecPrintBtn').onclick = ()=>{
+      const data = {
+        date: fmtDateNice(document.getElementById('ecDate').value),
+        reg: document.getElementById('ecReg').value,
+        by: document.getElementById('ecBy').value,
+        pa: parseFloat(ambEls.ecPa.value),
+        oat: parseFloat(ambEls.ecOat.value),
+        engines: lastResults,
+        allPass: lastResults.every(r=>r.out.passed),
+      };
+      openPrint(buildEc135PrintHtml(data));
+    };
 
     update();
   }
