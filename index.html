@@ -154,6 +154,15 @@
   .pc-tech-grid div{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0;color:var(--grey-strong);}
   .pc-tech-grid span{color:var(--ink);font-weight:700;}
 
+  /* ---------- EC135 T2+ Power Check ---------- */
+  .ec-engine{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
+  .ec-engine:last-child{margin-bottom:0;}
+  .ec-engine-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;}
+  .ec-engine-title{font-weight:800;font-size:15px;}
+  .ec-gauge-wrap{max-width:280px;margin:0 auto;}
+  .ec-overall{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:10px;background:var(--paper);border:1px solid var(--line);margin-bottom:16px;}
+  .ec-overall .lbl{font-weight:800;font-size:14px;}
+
   /* ---------- Bleed Valve Test ---------- */
   .bv-check{padding:12px 0;border-bottom:1px solid var(--line);}
   .bv-check:last-child{border-bottom:none;}
@@ -200,6 +209,7 @@
         <button class="home-btn" data-view="tolerance"><span class="hb-icon">⏳</span>Tolerance</button>
         <button class="home-btn" data-view="anticipation"><span class="hb-icon">✈️</span>Anticipation of Aircraft Behaviour after Maintenance</button>
         <button class="home-btn" data-view="powercheck"><span class="hb-icon">🧮</span>AS350 B2 Powercheck</button>
+        <button class="home-btn" data-view="ec135pc"><span class="hb-icon">🚁</span>EC135 T2+ Power Check</button>
         <button class="home-btn" data-view="bleedvalve"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>
       </div>
     </div>
@@ -213,6 +223,7 @@
   <div id="viewMinorMod" style="display:none;"></div>
   <div id="viewAnticipation" style="display:none;"></div>
   <div id="viewPowercheck" style="display:none;"></div>
+  <div id="viewEc135pc" style="display:none;"></div>
   <div id="viewBleedValve" style="display:none;"></div>
 </div>
 
@@ -582,7 +593,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','BleedValve'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','BleedValve'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -610,6 +621,7 @@
       else if(v==='minormod') renderModForm('MinorMod', 'Minor');
       else if(v==='anticipation') renderAnticipation();
       else if(v==='powercheck') renderPowercheck();
+      else if(v==='ec135pc') renderEc135Powercheck();
       else if(v==='bleedvalve') renderBleedValve();
     });
   });
@@ -1952,6 +1964,304 @@
 
     update();
   }
+
+
+  // ---------- EC135 T2+ Power Check (Arriel 2B2) ----------
+  // Chart data digitized from Airbus Helicopters EC135 T2+ Flight Manual, Section 5
+  // Performance Data, Rev. 17: Fig. 5-1 (ground power check, 75% torque), Fig. 5-2
+  // (ground power check, 60% torque - high altitude / high OAT reference) and Fig. 5-3
+  // (N1/TOT check). Fig. 5-1/5-2 are near-planar in OAT and pressure altitude, so each is
+  // stored as a fitted plane (N1max = n0 + a*OAT + b*PA/1000ft). Fig. 5-3 is a two-panel
+  // nomograph (N1,OAT -> linking position -> TOT via pressure altitude); each panel is
+  // digitized per labeled line and read the same way a pilot reads the chart: bracket the
+  // two nearest labeled lines and interpolate linearly between them (AFM 5.1.2 permits
+  // interpolation between charted data). Cross-checked against the AFM's own worked
+  // example (Fig. 5-1: 75% torque, Zp 2000ft, OAT 14degC -> N1 limit 95.5%, this model:
+  // 95.50%; Fig. 5-3: N1 94.5%, OAT 14degC, Zp 2000ft -> max TOT 808degC, this model: 807degC).
+  let ec135State = null;
+  const EC135_POWERCHECK_DATA = {
+    ch75: { n0: 92.842, a: 0.1385, b: 0.3594 },
+    ch60: { n0: 90.916, a: 0.1446, b: 0.3450 },
+    topOats: [-35,-20,0,20,40,50],
+    topCoeffs: {
+      '-35': [4.12500000, -635.30000000, 25303.6938],
+      '-20': [1.73214286, -230.58571429, 8246.85982],
+      '0'  : [1.47321429, -194.45714286, 7151.36027],
+      '20' : [2.30357143, -349.25714286, 14426.5527],
+      '40' : [2.33928571, -363.71428571, 15511.2723],
+      '50' : [3.23214286, -525.10000000, 22845.2420]
+    },
+    botPAs: [-1500, 10000, 18000],
+    botLines: {
+      '-1500': { m: 4.55,  b: -1715.0 },
+      '10000': { m: 4.517, b: -1631.66 },
+      '18000': { m: 4.53,  b: -1745.4 }
+    },
+    limits: { pa:[-1500,18000], oat:[-35,50], n1:[80,100], tot:[500,900] }
+  };
+
+  function ec135Quad(c, x){ return c[0]*x*x + c[1]*x + c[2]; }
+
+  function ec135TopX(n1, oat){
+    const d = EC135_POWERCHECK_DATA;
+    const oatC = Math.max(d.topOats[0], Math.min(d.topOats[d.topOats.length-1], oat));
+    const ys = d.topOats.map(o => ec135Quad(d.topCoeffs[String(o)], n1));
+    return pcInterpAscending(oatC, d.topOats, ys).y;
+  }
+
+  function ec135BottomTOT(x, pa){
+    const d = EC135_POWERCHECK_DATA;
+    const paC = Math.max(d.botPAs[0], Math.min(d.botPAs[d.botPAs.length-1], pa));
+    const ys = d.botPAs.map(p => { const L = d.botLines[String(p)]; return (x - L.b) / L.m; });
+    return pcInterpAscending(paC, d.botPAs, ys).y;
+  }
+
+  function ec135Compute(inputs){
+    const { torque, pa, oat, n1, tot } = inputs;
+    const chart = torque === 60 ? EC135_POWERCHECK_DATA.ch60 : EC135_POWERCHECK_DATA.ch75;
+    const n1Limit = chart.n0 + chart.a*oat + chart.b*(pa/1000);
+    const n1Margin = n1Limit - n1;
+    const x = ec135TopX(n1, oat);
+    const totLimit = ec135BottomTOT(x, pa);
+    const totMargin = totLimit - tot;
+
+    const notes = [];
+    if (torque === 75 && pa >= 15000){
+      notes.push('Zp ≥ 15,000 ft: Fig. 5-1’s 16,000 ft line departs from a straight line above N1 ≈97% (collective/topping limit). Cross-check Fig. 5-1 directly.');
+    }
+    if (torque === 60 && (pa < 8000 || oat < 10)){
+      notes.push('The 60% chart (Fig. 5-2) is intended for high altitude / high OAT conditions (Zp &gt; 10,000 ft, OAT &gt; ISA+20°C). Outside that corner the result is extrapolated — prefer the 75% check when it can be reached within limits.');
+    }
+    if (n1 > 95.5){
+      notes.push('Indicated N1 is above ~95.5%: Fig. 5-3’s OAT lines converge in this region, so the computed max TOT is approximate — confirm against Fig. 5-3.');
+    }
+    if (pa < -1500 || pa > 18000){
+      notes.push('Pressure altitude is outside the charted range (−1,500 to 18,000 ft) — result is extrapolated.');
+    }
+    if (n1Limit > 99.5 || n1Limit < 87){
+      notes.push('This OAT/altitude combination falls outside Fig. 5-'+(torque===60?'2':'1')+'’s plotted grid — treat the chart limit N1 as an extrapolation and verify against the AFM.');
+    }
+
+    const passed = n1Margin >= 0 && totMargin >= 0;
+    return { n1Limit, n1Margin, totLimit, totMargin, passed, notes };
+  }
+
+  function ec135AngleFor(v, gmin, gmax){
+    const t = Math.max(0, Math.min(1, (v - gmin) / (gmax - gmin)));
+    return Math.PI - t * Math.PI;
+  }
+
+  function ec135DrawGauge(canvas, margin, gmin, gmax, gwarn){
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const cx = W/2, cy = H - 26, r = 118, rInner = 92;
+    ctx.clearRect(0,0,W,H);
+
+    const badC = pcCssVar('--bad') || '#b0281e';
+    const warnC = pcCssVar('--warn') || '#b3791b';
+    const goodC = pcCssVar('--good') || '#2f7d4f';
+    const lineC = pcCssVar('--line') || '#dfe2da';
+    const grey = pcCssVar('--grey-strong') || '#6b6558';
+    const ink = pcCssVar('--ink') || '#1c2b24';
+
+    ctx.lineWidth = r - rInner;
+    ctx.lineCap = 'butt';
+    const zones = [
+      { from: gmin, to: 0, color: badC },
+      { from: 0, to: gwarn, color: warnC },
+      { from: gwarn, to: gmax, color: goodC },
+    ];
+    zones.forEach(z => {
+      ctx.beginPath();
+      ctx.strokeStyle = z.color;
+      ctx.globalAlpha = 0.88;
+      ctx.arc(cx, cy, (r+rInner)/2, -ec135AngleFor(z.from,gmin,gmax), -ec135AngleFor(z.to,gmin,gmax), false);
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    ctx.font = '9px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.fillStyle = grey;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const step = (gmax-gmin) > 6 ? 2 : 1;
+    for (let v = gmin; v <= gmax + 0.001; v += step){
+      const a = ec135AngleFor(v,gmin,gmax);
+      const x1 = cx + Math.cos(a) * (r + 2);
+      const y1 = cy - Math.sin(a) * (r + 2);
+      const x2 = cx + Math.cos(a) * (rInner - 2);
+      const y2 = cy - Math.sin(a) * (rInner - 2);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = lineC;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      const lx = cx + Math.cos(a) * (r + 13);
+      const ly = cy - Math.sin(a) * (r + 13);
+      ctx.fillText((v>0?'+':'') + Math.round(v), lx, ly);
+    }
+
+    const clamped = Math.max(gmin, Math.min(gmax, margin));
+    const a = ec135AngleFor(clamped,gmin,gmax);
+    const nx = cx + Math.cos(a) * (rInner - 4);
+    const ny = cy - Math.sin(a) * (rInner - 4);
+    const needleC = margin < 0 ? badC : (margin < gwarn ? warnC : goodC);
+    ctx.strokeStyle = needleC;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(nx, ny); ctx.stroke();
+    ctx.beginPath(); ctx.fillStyle = needleC; ctx.arc(cx, cy, 6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.fillStyle = ink; ctx.arc(cx, cy, 2.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  function ec135FormatFieldVal(f, val){
+    if (f.step < 1) return val.toFixed(1);
+    return Math.round(val).toLocaleString();
+  }
+
+  function ec135EngineFields(p, defaults){
+    return [
+      { id:p+'Pa',  label:'Zp',  unit:'pressure altitude, ft', min:-1500, max:16000, step:50,  value:defaults.pa },
+      { id:p+'Oat', label:'OAT', unit:'outside air temp, °C', min:-35, max:50, step:0.5, value:defaults.oat },
+      { id:p+'N1',  label:'N1',  unit:'indicated, %', min:80, max:100, step:0.1, value:defaults.n1 },
+      { id:p+'Tot', label:'TOT', unit:'indicated, °C', min:500, max:900, step:1, value:defaults.tot },
+    ];
+  }
+
+  function renderEc135Powercheck(){
+    showView('Ec135pc');
+    const el = document.getElementById('viewEc135pc');
+
+    const engineDefs = [
+      { p:'e1', label:'Engine 1', torque:75, defaults:{ pa:2000, oat:14, n1:94.5, tot:760 } },
+      { p:'e2', label:'Engine 2', torque:75, defaults:{ pa:2000, oat:14, n1:93.8, tot:745 } },
+    ];
+    ec135State = ec135State || { e1:75, e2:75 };
+
+    function engineBlock(def){
+      const fields = ec135EngineFields(def.p, def.defaults);
+      return (
+        '<div class="ec-engine">' +
+          '<div class="ec-engine-head"><span class="ec-engine-title">'+def.label+'</span>' +
+            '<div class="pc-toggle" style="width:200px;margin-top:0;">' +
+              '<button type="button" id="'+def.p+'Tq75" aria-pressed="true">75%</button>' +
+              '<button type="button" id="'+def.p+'Tq60" aria-pressed="false">60%</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="pc-grid">' +
+            '<div>' +
+              fields.map(f=>(
+                '<div class="pc-field">' +
+                  '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+ec135FormatFieldVal(f, f.value)+'</span></div>' +
+                  '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
+                '</div>'
+              )).join('') +
+            '</div>' +
+            '<div>' +
+              '<div class="pc-status-chip" id="'+def.p+'Chip"><span class="dot"></span><span id="'+def.p+'StatusText">&nbsp;</span></div>' +
+              '<div class="ec-gauge-wrap">' +
+                '<canvas id="'+def.p+'Gauge" width="280" height="170" style="width:100%;height:auto;display:block;"></canvas>' +
+                '<div class="pc-gauge-readout"><div class="pc-gauge-figure" id="'+def.p+'MarginFigure" style="font-size:22px;">&nbsp;</div><div class="pc-gauge-caption">N1 margin</div></div>' +
+              '</div>' +
+              '<div class="pc-readout-row"><span>Chart limit N1</span><span class="v" id="'+def.p+'N1LimOut">&mdash;</span></div>' +
+              '<div class="pc-readout-row"><span>Max TOT (Fig. 5-3)</span><span class="v" id="'+def.p+'TotLimOut">&mdash;</span></div>' +
+              '<div class="pc-readout-row"><span>TOT margin</span><span class="v" id="'+def.p+'TotMarginOut">&mdash;</span></div>' +
+              '<div class="pc-note-strip" id="'+def.p+'Note" hidden><span class="ico">⚠️</span><span id="'+def.p+'NoteText"></span></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">EC135 T2+ Power Check</h2>' +
+        '<p class="form-sub">Ground power check &amp; N1/TOT check &mdash; Turbomeca Arriel 2B2 &mdash; chart data digitized from the EC135 T2+ Flight Manual, Section 5.1.3 &amp; Figs. 5-1/5-2/5-3 (Rev. 17). For training and reference use only &mdash; not a substitute for the approved Flight Manual. If power is not assured, refer to the Maintenance Manual before further flight.</p>' +
+        '<div class="ec-overall">' +
+          '<span class="lbl">Overall result</span>' +
+          '<span class="pc-status-chip" id="ecOverallChip" style="margin-bottom:0;"><span class="dot"></span><span id="ecOverallText">&nbsp;</span></span>' +
+        '</div>' +
+        engineDefs.map(engineBlock).join('') +
+      '</div>';
+
+    const fEls = {};
+    engineDefs.forEach(def=>{
+      ec135EngineFields(def.p, def.defaults).forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
+    });
+
+    function syncToggle(p){
+      document.getElementById(p+'Tq75').setAttribute('aria-pressed', String(ec135State[p]===75));
+      document.getElementById(p+'Tq60').setAttribute('aria-pressed', String(ec135State[p]===60));
+    }
+    engineDefs.forEach(def=>{
+      const p = def.p;
+      document.getElementById(p+'Tq75').onclick = ()=>{ ec135State[p]=75; syncToggle(p); update(); };
+      document.getElementById(p+'Tq60').onclick = ()=>{ ec135State[p]=60; syncToggle(p); update(); };
+      syncToggle(p);
+    });
+
+    engineDefs.forEach(def=>{
+      ec135EngineFields(def.p, def.defaults).forEach(f=>{
+        fEls[f.id].addEventListener('input', ()=>{
+          document.getElementById(f.id+'Val').textContent = ec135FormatFieldVal(f, parseFloat(fEls[f.id].value));
+          update();
+        });
+      });
+    });
+
+    const EC_GMIN = -3, EC_GMAX = 6, EC_GWARN = 1;
+
+    function updateEngine(def){
+      const p = def.p;
+      const inputs = {
+        torque: ec135State[p],
+        pa: parseFloat(fEls[p+'Pa'].value),
+        oat: parseFloat(fEls[p+'Oat'].value),
+        n1: parseFloat(fEls[p+'N1'].value),
+        tot: parseFloat(fEls[p+'Tot'].value),
+      };
+      const out = ec135Compute(inputs);
+
+      const marginFigure = document.getElementById(p+'MarginFigure');
+      const sign = out.n1Margin >= 0 ? '+' : '−';
+      marginFigure.textContent = sign + Math.abs(out.n1Margin).toFixed(1) + '%';
+      marginFigure.style.color = out.n1Margin < 0 ? 'var(--bad)' : (out.n1Margin < EC_GWARN ? 'var(--warn)' : 'var(--good)');
+
+      document.getElementById(p+'N1LimOut').textContent = out.n1Limit.toFixed(1) + '%';
+      document.getElementById(p+'TotLimOut').textContent = out.totLimit.toFixed(0) + '°C';
+      const totOut = document.getElementById(p+'TotMarginOut');
+      const totSign = out.totMargin >= 0 ? '+' : '−';
+      totOut.textContent = totSign + Math.abs(out.totMargin).toFixed(0) + '°C';
+      totOut.style.color = out.totMargin < 0 ? 'var(--bad)' : (out.totMargin < 20 ? 'var(--warn)' : 'var(--good)');
+
+      const chip = document.getElementById(p+'Chip');
+      chip.classList.remove('pass','fail');
+      chip.classList.add(out.passed ? 'pass' : 'fail');
+      document.getElementById(p+'StatusText').textContent = out.passed ? 'PASSED' : 'FAILED';
+
+      const noteEl = document.getElementById(p+'Note');
+      if (out.notes.length){
+        noteEl.hidden = false;
+        document.getElementById(p+'NoteText').innerHTML = out.notes.join('<br>');
+      } else {
+        noteEl.hidden = true;
+      }
+
+      ec135DrawGauge(document.getElementById(p+'Gauge'), out.n1Margin, EC_GMIN, EC_GMAX, EC_GWARN);
+      return out.passed;
+    }
+
+    function update(){
+      const results = engineDefs.map(updateEngine);
+      const overallChip = document.getElementById('ecOverallChip');
+      overallChip.classList.remove('pass','fail');
+      const allPass = results.every(r=>r);
+      overallChip.classList.add(allPass ? 'pass' : 'fail');
+      document.getElementById('ecOverallText').textContent = allPass ? 'POWER ASSURED — BOTH ENGINES' : 'POWER NOT ASSURED';
+    }
+
+    update();
+  }
+
 
   window.__formsApp = { state, storageGet, storageSet, sha256, escapeHTML, todayISO, fmtDateNice, loadSettings, saveSettings, PHOENIX_LOGO_DATA_URI, SUPABASE_CONFIGURED };
 
