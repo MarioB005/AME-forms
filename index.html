@@ -2164,7 +2164,7 @@
   function ec135AmbientFields(defaults){
     return [
       { id:'ecPa',  label:'Zp',  unit:'pressure altitude, ft (both engines)', min:-1500, max:10000, step:10,  value:defaults.pa },
-      { id:'ecOat', label:'OAT', unit:'outside air temp, °C (both engines)', min:-35, max:50, step:1, value:defaults.oat },
+      { id:'ecOat', label:'OAT', unit:'outside air temp, °C (both engines)', min:-35, max:50, step:0.1, value:defaults.oat },
     ];
   }
 
@@ -2188,6 +2188,9 @@
     '.ec-pf-result{font-weight:800;}' +
     '.ec-pf-result.pass{color:#1a6b3f;}' +
     '.ec-pf-result.fail{color:#a3221a;}' +
+    '.ec-pf-margin-row td{padding:6px 8px;}' +
+    '.ec-pf-margin-row .ec-pf-margin-item{display:inline-block;width:49%;}' +
+    '.ec-pf-margin-val{font-size:calc(1em + 4pt);font-weight:800;text-decoration:underline;}' +
     '.ec-pf-notes{font-size:11px;margin-top:4px;color:#333;}' +
     '.ec-pf-overall{border:1.5px solid #000;padding:8px 12px;margin-top:14px;font-size:14px;font-weight:800;text-align:center;}' +
     '.ec-pf-foot{font-size:9.5px;color:#333;margin-top:14px;line-height:1.5;}' +
@@ -2200,15 +2203,17 @@
   function buildEc135PrintHtml(data){
     const engineTable = (e)=>(
       '<table class="ec-pf-table">' +
-        '<tr><th colspan="2">'+e.label+' — <span class="ec-pf-result '+(e.out.passed?'pass':'fail')+'">'+(e.out.passed?'PASSED':'FAILED')+'</span></th></tr>' +
+        '<tr><th colspan="2">'+e.label+' — S/N '+escapeHTML(e.sn||'—')+' — <span class="ec-pf-result '+(e.out.passed?'pass':'fail')+'">'+(e.out.passed?'PASSED':'FAILED')+'</span></th></tr>' +
         ec135PrintRow('Torque target', e.target+'%') +
         ec135PrintRow('Torque observed', e.torque.toFixed(1),'%') +
         ec135PrintRow('Indicated N1', e.n1.toFixed(1),'%') +
         ec135PrintRow('Chart limit N1 (Fig. 5-'+(e.target===60?'2':'1')+')', e.out.n1Limit.toFixed(2),'%') +
-        ec135PrintRow('N1 margin', (e.out.n1Margin>=0?'+':'−')+Math.abs(e.out.n1Margin).toFixed(2),'%') +
         ec135PrintRow('Indicated TOT', e.tot.toFixed(0),'°C') +
         ec135PrintRow('Max TOT (Fig. 5-3)', e.out.totLimit.toFixed(0),'°C') +
-        ec135PrintRow('TOT margin', (e.out.totMargin>=0?'+':'−')+Math.abs(e.out.totMargin).toFixed(0),'°C') +
+        '<tr class="ec-pf-margin-row"><td colspan="2">' +
+          '<span class="ec-pf-margin-item">N1 margin: <span class="ec-pf-margin-val">'+(e.out.n1Margin>=0?'+':'−')+Math.abs(e.out.n1Margin).toFixed(2)+'%</span></span>' +
+          '<span class="ec-pf-margin-item">TOT margin: <span class="ec-pf-margin-val">'+(e.out.totMargin>=0?'+':'−')+Math.abs(e.out.totMargin).toFixed(0)+'°C</span></span>' +
+        '</td></tr>' +
       '</table>' +
       (e.out.notes.length ? '<div class="ec-pf-notes">'+e.out.notes.map(n=>'⚠ '+n).join('<br>')+'</div>' : '')
     );
@@ -2221,9 +2226,9 @@
       '</div>' +
       '<div class="pf-box">' +
         '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
-          '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span>' +
-          '<span class="pf-field"><b>Performed by:</b><span class="pf-underline">'+escapeHTML(data.by)+'</span></span>' +
-          '<span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot||'')+'</span></span></div>' +
+          '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot||'')+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>AME:</b><span class="pf-underline">'+escapeHTML(data.by)+'</span></span></div>' +
         '<div class="pf-row" style="margin-top:8px;"><span class="pf-field"><b>Zp:</b><span class="pf-underline" style="min-width:70px;">'+data.pa.toLocaleString()+' ft</span></span>' +
           '<span class="pf-field"><b>OAT:</b><span class="pf-underline" style="min-width:70px;">'+data.oat.toFixed(1)+' °C</span></span></div>' +
       '</div>' +
@@ -2242,8 +2247,8 @@
 
     const ambientDefaults = prefill ? { pa: prefill.pa, oat: prefill.oat } : { pa:2000, oat:14 };
     const engineDefs = [
-      { p:'e1', label:'Engine 1', defaults: (()=>{ const e = pfEngine('e1', {torque:75, n1:94.5, tot:760}); return { torque:e.torque, n1:e.n1, tot:e.tot }; })() },
-      { p:'e2', label:'Engine 2', defaults: (()=>{ const e = pfEngine('e2', {torque:75, n1:93.8, tot:745}); return { torque:e.torque, n1:e.n1, tot:e.tot }; })() },
+      { p:'e1', label:'Engine 1', defaults: (()=>{ const e = pfEngine('e1', {torque:75, n1:94.5, tot:760, sn:''}); return { torque:e.torque, n1:e.n1, tot:e.tot, sn:e.sn||'' }; })() },
+      { p:'e2', label:'Engine 2', defaults: (()=>{ const e = pfEngine('e2', {torque:75, n1:93.8, tot:745, sn:''}); return { torque:e.torque, n1:e.n1, tot:e.tot, sn:e.sn||'' }; })() },
     ];
     ec135State = prefill
       ? { e1:{target: pfEngine('e1',{target:75}).target}, e2:{target: pfEngine('e2',{target:75}).target} }
@@ -2255,6 +2260,7 @@
       return (
         '<div class="ec-engine">' +
           '<div class="ec-engine-head"><span class="ec-engine-title">'+def.label+'</span>' +
+            '<div class="field" style="max-width:170px;margin-bottom:0;"><label for="'+def.p+'Sn" style="font-size:11px;">S/N</label><input type="text" id="'+def.p+'Sn" placeholder="Serial #" value="'+escapeHTML(def.defaults.sn||'')+'"></div>' +
             '<div class="pc-toggle" style="width:200px;margin-top:0;">' +
               '<button type="button" id="'+def.p+'Tq75" aria-pressed="'+(target===75)+'">75%</button>' +
               '<button type="button" id="'+def.p+'Tq60" aria-pressed="'+(target===60)+'">60%</button>' +
@@ -2428,6 +2434,9 @@
       const reg = document.getElementById('ecReg').value;
       const by = document.getElementById('ecBy').value;
       const pilot = document.getElementById('ecPilot').value;
+      // read S/N fresh from the DOM rather than from lastResults, since typing into it alone
+      // (with no slider touched) doesn't trigger update() and would otherwise print stale S/Ns
+      const engines = lastResults.map(r=> Object.assign({}, r, { sn: (document.getElementById(r.p+'Sn')||{}).value || '' }));
       const recordData = {
         date: dateISO,
         reg: reg,
@@ -2435,8 +2444,8 @@
         pilot: pilot,
         pa: parseFloat(ambEls.ecPa.value),
         oat: parseFloat(ambEls.ecOat.value),
-        engines: lastResults,
-        allPass: lastResults.every(r=>r.out.passed),
+        engines: engines,
+        allPass: engines.every(r=>r.out.passed),
       };
       openPrint(buildEc135PrintHtml(Object.assign({}, recordData, { date: fmtDateNice(dateISO) })));
       // keep a record of every printed report (searchable in Saved Forms, and plotted in Trend monitoring) —
