@@ -2810,7 +2810,17 @@
   // that Settings doesn't know about (linked:false) so nothing already on file gets silently dropped.
   async function ptrainBuildRoster(){
     const status = await loadPtrainPilotStatus();
-    const shared = (state.settings.pilots||[]);
+    const sharedRaw = (state.settings.pilots||[]);
+    // guard against an accidental exact-duplicate name in Settings -> Pilots itself (same overlay
+    // key either way, so this only affects how many rows are shown, not the underlying data) —
+    // the extra Settings row should still be deleted there via Settings -> Pilots.
+    const seenNames = new Set();
+    const shared = sharedRaw.filter(p=>{
+      if(!p.name) return true;
+      if(seenNames.has(p.name)) return false;
+      seenNames.add(p.name);
+      return true;
+    });
     const sharedNames = shared.map(p=>p.name);
     const rows = shared.map(p=>{
       const st = status[p.name] || ptrainEmptyStatus();
@@ -2890,18 +2900,19 @@
     }
     return items;
   }
-  function ptrainInitAdState(masterAds, existingRecordAds, selectedTypes){
+  // manualOverride stays null until the user actually clicks the checkbox — while it's null the
+  // checked state simply follows whichever A/C Type(s) are selected, so ticking a new A/C Type
+  // auto-selects the ADs tagged for it (and clears again if the type is unchecked), live.
+  function ptrainInitAdState(masterAds, existingRecordAds){
     const st = {};
     masterAds.filter(a=>!a.archived).forEach(a=>{
-      const isApplicable = selectedTypes.length>0 && (a.models||[]).some(m=>selectedTypes.includes(m));
-      let checked;
-      if(existingRecordAds) checked = existingRecordAds.some(ra=>ra.text===a.text);
-      else checked = isApplicable;
-      st[a.text] = { checked, extra:false };
+      let manualOverride = null;
+      if(existingRecordAds && existingRecordAds.some(ra=>ra.text===a.text)) manualOverride = true;
+      st[a.text] = { manualOverride, extra:false };
     });
     if(existingRecordAds){
       existingRecordAds.forEach(ra=>{
-        if(!(ra.text in st)) st[ra.text] = { checked:true, extra:true, wasAdditional: !!ra.additional };
+        if(!(ra.text in st)) st[ra.text] = { manualOverride:true, extra:true, wasAdditional: !!ra.additional };
       });
     }
     return st;
@@ -2944,11 +2955,15 @@
 
     const body = document.getElementById('ptGridBody');
     function paintRows(){
+      const linkedNames = rows.filter(r=>r.linked).map(r=>r.name);
       body.innerHTML = rows.map((p,i)=>{
         const due = ptrainDueInfo(p.trainingDate);
         const nameCell = p.linked
           ? '<span style="font-weight:700;">'+escapeHTML(p.name)+'</span>'
           : '<input type="text" data-f="name" data-i="'+i+'" value="'+escapeHTML(p.name)+'" placeholder="Name" style="min-width:100px;"><span class="pt-orphan-tag" title="Not found in Settings → Pilots"> ✦</span>';
+        const mergeCell = p.linked ? '' :
+          '<select data-role="merge" data-i="'+i+'" style="font-size:10px;max-width:70px;" title="Duplicate of an existing pilot? Fold this row into theirs."><option value="">Merge into…</option>' +
+          linkedNames.filter(n=>n!==p.name).map(n=>'<option value="'+escapeHTML(n)+'">'+escapeHTML(n)+'</option>').join('') + '</select>';
         return (
           '<tr data-i="'+i+'">' +
             '<td class="nm">'+nameCell+'</td>' +
@@ -2961,7 +2976,7 @@
             '<td><input type="date" data-f="trainingDate" data-i="'+i+'" value="'+(p.trainingDate||'')+'"></td>' +
             '<td class="pt-due '+due.cls+'">'+(due.days===null?'—':due.days)+'</td>' +
             '<td class="chk"><input type="checkbox" data-f="exEmployee" data-i="'+i+'" '+(p.exEmployee?'checked':'')+'></td>' +
-            '<td class="pt-actions-cell"><button class="pt-icon-btn" data-action="card" data-i="'+i+'" title="New Training Card">📝</button> <button class="pt-icon-btn" data-action="history" data-i="'+i+'" title="History">🕘</button> <button class="rm-btn" data-action="rm" data-i="'+i+'" title="Stop tracking here">✕</button></td>' +
+            '<td class="pt-actions-cell">'+mergeCell+' <button class="pt-icon-btn" data-action="card" data-i="'+i+'" title="New Training Card">📝</button> <button class="pt-icon-btn" data-action="history" data-i="'+i+'" title="History">🕘</button> <button class="rm-btn" data-action="rm" data-i="'+i+'" title="Stop tracking here">✕</button></td>' +
           '</tr>'
         );
       }).join('');
@@ -2982,6 +2997,20 @@
             cell.className = 'pt-due ' + due.cls;
           }
         });
+      });
+      body.querySelectorAll('select[data-role="merge"]').forEach(sel=>{
+        sel.onchange = async ()=>{
+          const i = parseInt(sel.dataset.i,10);
+          const targetName = sel.value;
+          if(!targetName){ return; }
+          const targetIdx = rows.findIndex(r=>r.linked && r.name===targetName);
+          if(targetIdx<0){ sel.value=''; return; }
+          if(!confirm('Merge "'+(rows[i].name||'this row')+'" into "'+targetName+'"? Their aircraft checkmarks and training date will be combined into the "'+targetName+'" row, and this extra row will be removed.')){ sel.value=''; return; }
+          rows[targetIdx] = Object.assign({}, rows[targetIdx], ptrainMergeStatus(rows[targetIdx], rows[i]), { name: rows[targetIdx].name, linked:true });
+          rows.splice(i,1);
+          await ptrainPersistRows(rows);
+          paintRows();
+        };
       });
       body.querySelectorAll('button[data-action]').forEach(btn=>{
         btn.onclick = async ()=>{
@@ -3111,11 +3140,17 @@
       let selectedTypes = rec.acTypes.slice();
 
       const taskItems = ptrainBuildTaskChecklist(settings.tasks, isExisting ? rec.tasks : null);
-      const adState = ptrainInitAdState(settings.ads, isExisting ? rec.ads : null, selectedTypes);
+      const adState = ptrainInitAdState(settings.ads, isExisting ? rec.ads : null);
 
       const ameNames = (state.settings.ames||[]).map(a=>a.name);
       function traineeLicenceFor(name){ const r = roster.find(r=>r.name===name); return r ? (r.licence||'') : ''; }
       function ameLicenceFor(name){ const a=(state.settings.ames||[]).find(a=>a.name===name); return a?(a.aca||''):''; }
+      function adIsApplicable(a){ return selectedTypes.length>0 && (a.models||[]).some(m=>selectedTypes.includes(m)); }
+      function adIsChecked(text, a){
+        const st = adState[text];
+        if(!st) return false;
+        return st.manualOverride !== null ? st.manualOverride : adIsApplicable(a);
+      }
 
       function renderTaskChecklistHtml(){
         let html = '';
@@ -3130,12 +3165,11 @@
       function renderAdChecklistHtml(){
         const applicable = [], other = [], extra = [];
         settings.ads.filter(a=>!a.archived).forEach(a=>{
-          const isApplicable = selectedTypes.length>0 && (a.models||[]).some(m=>selectedTypes.includes(m));
-          const st = adState[a.text] || { checked:isApplicable };
-          (isApplicable ? applicable : other).push({ text:a.text, checked:!!st.checked });
+          const isApplicable = adIsApplicable(a);
+          (isApplicable ? applicable : other).push({ text:a.text, checked: adIsChecked(a.text, a) });
         });
         Object.keys(adState).forEach(text=>{
-          if(adState[text].extra) extra.push({ text, checked:!!adState[text].checked });
+          if(adState[text].extra) extra.push({ text, checked: adState[text].manualOverride !== null ? adState[text].manualOverride : true });
         });
         function rowsHtml(list, extraCls){
           return list.map(it=>'<label class="pt-check-row'+(extraCls?' pt-extra':'')+'"><input type="checkbox" data-role="ad" data-text="'+escapeHTML(it.text)+'" '+(it.checked?'checked':'')+'> <span>'+escapeHTML(it.text)+'</span></label>').join('');
@@ -3181,7 +3215,7 @@
           '</div>' +
 
           '<div class="btn-row" style="justify-content:flex-end;">' +
-            '<button type="button" class="btn" id="ptPrintBtn">🖨️ Print Training Card (2 × 4in labels)</button>' +
+            '<button type="button" class="btn" id="ptPrintBtn">🖨️ Print Training Card (4in × 2in labels)</button>' +
             '<button type="button" class="btn primary" id="ptSaveBtn">💾 Save Record</button>' +
           '</div>' +
         '</div>';
@@ -3207,8 +3241,8 @@
         holder.querySelectorAll('input[data-role="ad"]').forEach(cb=>{
           cb.onchange = ()=>{
             const t = cb.dataset.text;
-            if(!adState[t]) adState[t] = { checked:cb.checked, extra:false };
-            else adState[t].checked = cb.checked;
+            if(!adState[t]) adState[t] = { manualOverride:cb.checked, extra:false };
+            else adState[t].manualOverride = cb.checked;
           };
         });
       }
@@ -3225,14 +3259,12 @@
         const tasks = taskItems.filter(i=>i.checked).map(i=> ({ text:i.text, additional: i.extra ? !!i.wasAdditional : !!i.isAdditionalCategory }));
         const ads = [];
         settings.ads.filter(a=>!a.archived).forEach(a=>{
-          const st = adState[a.text];
-          if(st && st.checked){
-            const isApplicable = selectedTypes.length>0 && (a.models||[]).some(m=>selectedTypes.includes(m));
-            ads.push({ text:a.text, additional: !isApplicable });
-          }
+          if(adIsChecked(a.text, a)) ads.push({ text:a.text, additional: !adIsApplicable(a) });
         });
         Object.keys(adState).forEach(text=>{
-          if(adState[text].extra && adState[text].checked) ads.push({ text, additional: !!adState[text].wasAdditional });
+          if(!adState[text].extra) return;
+          const checked = adState[text].manualOverride !== null ? adState[text].manualOverride : true;
+          if(checked) ads.push({ text, additional: !!adState[text].wasAdditional });
         });
         return {
           id: rec.id,
@@ -3277,34 +3309,62 @@
   }
 
   // ---------- print: two 4in x 2in labels (front = tasks, back = A/C types, ADs, names, dates) ----------
+  // A 4x2in label has a fixed, non-scrolling height (overflow:hidden), so a long selection has to
+  // spill onto extra labels of the same size rather than get silently clipped at the bottom.
+  const PTRAIN_TASKS_PER_LABEL = 11;   // matches the observed on-label capacity for the front (tasks) label
+  const PTRAIN_ADS_PER_COLUMN = 15;    // per column on the back label (2 columns per label)
+  function ptrainChunk(arr, size){
+    const out = [];
+    for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
+    return out;
+  }
   function buildPtrainLabelHtml(rec){
-    const taskLines = (rec.tasks||[]).map(t=>'<div>'+escapeHTML((t.additional?'* ':'')+t.text)+'</div>').join('');
-    const adCols = [[],[]];
-    (rec.ads||[]).forEach((a,i)=> adCols[i%2].push(a));
-    const adColHtml = (col)=> col.map(a=>'<div>'+escapeHTML((a.additional?'* ':'')+a.text)+'</div>').join('');
+    const tasks = rec.tasks||[];
+    const ads = rec.ads||[];
+    const taskChunks = ptrainChunk(tasks, PTRAIN_TASKS_PER_LABEL);
+    if(!taskChunks.length) taskChunks.push([]);
+    const adChunks = ptrainChunk(ads, PTRAIN_ADS_PER_COLUMN*2);
+    if(!adChunks.length) adChunks.push([]);
 
-    return (
-      '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' +
-      '<div class="ptl-label">' +
-        '<div class="ptl-head">' +
-          '<img src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="">' +
-          '<h1>Pilot Training Card</h1>' +
-          '<span class="ptl-id">ID '+escapeHTML(rec.id)+'</span>' +
-        '</div>' +
-        '<div class="ptl-sub">Valid for two years from date of issue. The signature below certifies that the individual has been trained and supervised to carry out the following tasks &amp; ADs. * indicates additional training received.</div>' +
-        '<div class="ptl-tasks">' + (taskLines || '<div>&nbsp;</div>') + '</div>' +
-      '</div>' +
-      '<div class="ptl-label">' +
-        '<div class="ptl-back-top">A/C Type Trained on: '+ PTRAIN_AIRCRAFT.map(t=> rec.acTypes.includes(t) ? '<u>'+t+'</u>' : ('<span style="color:#999;">'+t+'</span>')).join('&nbsp;&nbsp;&nbsp;') +'</div>' +
-        '<div class="ptl-ads"><div>'+adColHtml(adCols[0])+'</div><div>'+adColHtml(adCols[1])+'</div></div>' +
-        '<div class="ptl-meta">' +
-          '<div><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+'</div>' +
-          '<div><b>PRM Name/Licence:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' / '+escapeHTML(rec.trainerLicence):'')+'</div>' +
-          '<div><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'')+'</div>' +
-          '<div><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'')+'</div>' +
-        '</div>' +
-      '</div>'
-    );
+    const frontLabels = taskChunks.map((chunk,pageIdx)=>{
+      const pageTag = taskChunks.length>1 ? ' <span style="font-weight:400;">('+(pageIdx+1)+'/'+taskChunks.length+')</span>' : '';
+      const taskLines = chunk.map(t=>'<div>'+escapeHTML((t.additional?'* ':'')+t.text)+'</div>').join('');
+      return (
+        '<div class="ptl-label">' +
+          '<div class="ptl-head">' +
+            '<img src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="">' +
+            '<h1>Pilot Training Card'+pageTag+'</h1>' +
+            '<span class="ptl-id">ID '+escapeHTML(rec.id)+'</span>' +
+          '</div>' +
+          '<div class="ptl-sub">Valid for two years from date of issue. The signature below certifies that the individual has been trained and supervised to carry out the following tasks &amp; ADs. * indicates additional training received.</div>' +
+          '<div class="ptl-tasks">' + (taskLines || '<div>&nbsp;</div>') + '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    const adColHtml = (col)=> col.map(a=>'<div>'+escapeHTML((a.additional?'* ':'')+a.text)+'</div>').join('');
+    const backLabels = adChunks.map((chunk,pageIdx)=>{
+      const isLast = pageIdx === adChunks.length-1;
+      const pageTag = adChunks.length>1 ? ' ('+(pageIdx+1)+'/'+adChunks.length+')' : '';
+      const col0 = chunk.slice(0, PTRAIN_ADS_PER_COLUMN);
+      const col1 = chunk.slice(PTRAIN_ADS_PER_COLUMN);
+      return (
+        '<div class="ptl-label">' +
+          '<div class="ptl-back-top">A/C Type Trained on'+pageTag+': '+ PTRAIN_AIRCRAFT.map(t=> rec.acTypes.includes(t) ? '<u>'+t+'</u>' : ('<span style="color:#999;">'+t+'</span>')).join('&nbsp;&nbsp;&nbsp;') +'</div>' +
+          '<div class="ptl-ads"><div>'+adColHtml(col0)+'</div><div>'+adColHtml(col1)+'</div></div>' +
+          (isLast ?
+            '<div class="ptl-meta">' +
+              '<div><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+'</div>' +
+              '<div><b>PRM Name/Licence:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' / '+escapeHTML(rec.trainerLicence):'')+'</div>' +
+              '<div><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'')+'</div>' +
+              '<div><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'')+'</div>' +
+            '</div>'
+          : '') +
+        '</div>'
+      );
+    }).join('');
+
+    return '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' + frontLabels + backLabels;
   }
 
   // ---------- admin: manage the task / AD master lists (add an MCM link once your manual is hosted online) ----------
