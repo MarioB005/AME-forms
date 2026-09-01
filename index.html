@@ -2673,6 +2673,7 @@
 
   // ==================== Pilot Elementary Task Training (separately password-protected) ====================
   const PTRAIN_AIRCRAFT = ['EC120','H130','AS350','AS355','EC135'];
+  const PTRAIN_AMO_NUMBER = 'AMO # 100-96'; // appended after the PRM's ACA # (e.g. "14, AMO # 100-96")
 
   function ptrainDefaultTasks(){ return JSON.parse('[{"num":1,"category":"Servicing","appendix":"Hb","text":"Adding Oil in the Engine, Main Gearbox and Hydraulic reservoir.","mcmLink":""},{"num":2,"category":"Servicing","appendix":"Hb","text":"AS350 Bleed valve test procedure.","mcmLink":""},{"num":3,"category":"Servicing","appendix":"Hb","text":"Differing Defects Training Procedure for pilots.","mcmLink":""},{"num":4,"category":"EMT","appendix":"Hc","text":"Removal installation of external Cargo basket.","mcmLink":""},{"num":5,"category":"EMT","appendix":"Hc","text":"Removal and replacement of cabin doors.","mcmLink":""},{"num":6,"category":"EMT","appendix":"Hc","text":"Removal and replacement of passenger seats.","mcmLink":""},{"num":7,"category":"EMT","appendix":"Hc","text":"EC135 Stretcher kit Removal / Installation.","mcmLink":""},{"num":8,"category":"EMT","appendix":"Hc","text":"AS350 /AS355 Stretcher kit Removal / Installation","mcmLink":""},{"num":9,"category":"EMT","appendix":"Hc","text":"H130T2 & Stretcher kit Removal / Installation","mcmLink":""},{"num":13,"category":"Opp. Check","appendix":"","text":"ELT check.","mcmLink":""},{"num":14,"category":"Opp. Check","appendix":"","text":"Free wheel assy. - Check of the free wheel rotation.","mcmLink":""},{"num":15,"category":"Opp. Check","appendix":"Hd","text":"Airworthiness Directives & AMOC (APPENDIX “Hd” for applicable Ads).","mcmLink":""},{"num":16,"category":"Opp. Check","appendix":"","text":"Aircraft daily inspection (DI) using the procedure found in the flight manual Sec. #4.","mcmLink":""},{"num":17,"category":"Opp. Check","appendix":"He","text":"Dual Control Check / Independent Check Training Procedure as per APPENDIX “He”.","mcmLink":""},{"num":18,"category":"Opp. Check","appendix":"Hf","text":"Inspection and continuity checking of self-sealing chip detectors. (See Appendix “Hf”).","mcmLink":""},{"num":19,"category":"Opp. Check","appendix":"","text":"H130T2 Cargo sling installation check and clean.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Replacement of FDC filter.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Weight & Balance procedure.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AS355 NP Engine to MGB Flexible coupling – 25 hour visual check.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Clean, Check & Removal installation of Cargo Hook / Swing.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine, Main Gearbox, Tail Rotor Gearbox and Hydraulic reservoir. (legacy AS355 wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine, Main Gearbox reservoir. (legacy wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine reservoir. (legacy wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"H130 - Cargo sling installation check and clean with soft bristle brush. (legacy H130 wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"H130 & AS350 /AS355 Stretcher kit Removal / Installation. (legacy combined wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AS350 Cargo swing Removal / Installation.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Battery Removal / Installation","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Removal / Installation of Dual Controls on the Cabri G2.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AMOC # AARDG2019/A38 in reference to pre-flight visual inspection of blade attachment area.","mcmLink":""}]'); }
   function ptrainDefaultAds(){ return JSON.parse('[{"text":"AD 2000-340-080(A) R2","mcmLink":"","models":["AS350"],"archived":false},{"text":"AD 2004-055","mcmLink":"","models":["AS350"],"archived":false},{"text":"AD 2007-0138-E","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2007-0138 R2","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2010-0006","mcmLink":"","models":[],"archived":false},{"text":"AD 2010-0026-E","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2012-0085 R6","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0085R5","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0257-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2015-0033-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0139","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0046","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0048","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0069","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0282","mcmLink":"","models":[],"archived":false},{"text":"AD 2023-0036","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2023-0064","mcmLink":"","models":["AS350","AS355","H130"],"archived":false},{"text":"AD 2023-0083","mcmLink":"","models":[],"archived":false},{"text":"AD 2024-0139","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2024-0209","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2025-0287","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 84-045-022 (B) R4","mcmLink":"","models":[],"archived":false},{"text":"AD 84-064-037(B) R3","mcmLink":"","models":[],"archived":false}]'); }
@@ -3209,7 +3210,7 @@
             '<div class="field"><label for="ptTraineeName">Trainee Name</label><select id="ptTraineeName"><option value="">— select —</option>' + Array.from(new Set(roster.map(r=>r.name).filter(Boolean))).sort().map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.traineeName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
             '<div class="field"><label for="ptTraineeLicence">Trainee Licence</label><input type="text" id="ptTraineeLicence" value="'+escapeHTML(rec.traineeLicence||'')+'"></div>' +
             '<div class="field"><label for="ptTrainerName">PRM Name</label><select id="ptTrainerName"><option value="">— select —</option>' + ameNames.map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.trainerName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
-            '<div class="field"><label for="ptTrainerLicence">PRM Licence</label><input type="text" id="ptTrainerLicence" value="'+escapeHTML(rec.trainerLicence||'')+'"></div>' +
+            '<div class="field"><label for="ptTrainerLicence">PRM ACA #</label><input type="text" id="ptTrainerLicence" value="'+escapeHTML(rec.trainerLicence||'')+'"></div>' +
             '<div class="field"><label for="ptOriginalDate">Original Training Date</label><input type="date" id="ptOriginalDate" value="'+(rec.originalTrainingDate||'')+'"></div>' +
             '<div class="field"><label for="ptAdditionalDate">Additional Training Date</label><input type="date" id="ptAdditionalDate" value="'+(rec.additionalTrainingDate||'')+'"></div>' +
           '</div>' +
@@ -3228,7 +3229,7 @@
       });
       document.getElementById('ptTrainerName').addEventListener('change', (e)=>{
         const lic = ameLicenceFor(e.target.value);
-        if(lic) document.getElementById('ptTrainerLicence').value = lic;
+        if(lic) document.getElementById('ptTrainerLicence').value = lic + ', ' + PTRAIN_AMO_NUMBER;
       });
 
       document.getElementById('ptTaskChecklist').querySelectorAll('input[data-role="task"]').forEach(cb=>{
@@ -3311,17 +3312,27 @@
   // ---------- print: two 4in x 2in labels (front = tasks, back = A/C types, ADs, names, dates) ----------
   // A 4x2in label has a fixed, non-scrolling height (overflow:hidden), so a long selection has to
   // spill onto extra labels of the same size rather than get silently clipped at the bottom.
-  const PTRAIN_TASKS_PER_LABEL = 11;   // matches the observed on-label capacity for the front (tasks) label
+  // The disclaimer paragraph only prints on the very first label, which leaves a bit more room for
+  // tasks on every label after it — PTRAIN_TASKS_PER_LABEL_REST is an estimate for that freed space;
+  // print-preview once and nudge it up or down if it doesn't match what actually fits.
+  const PTRAIN_TASKS_PER_LABEL_FIRST = 11;
+  const PTRAIN_TASKS_PER_LABEL_REST = 13;
   const PTRAIN_ADS_PER_COLUMN = 15;    // per column on the back label (2 columns per label)
   function ptrainChunk(arr, size){
     const out = [];
     for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
     return out;
   }
+  function ptrainChunkVariable(arr, firstSize, restSize){
+    if(!arr.length) return [];
+    const out = [ arr.slice(0, firstSize) ];
+    for(let i=firstSize; i<arr.length; i+=restSize) out.push(arr.slice(i, i+restSize));
+    return out;
+  }
   function buildPtrainLabelHtml(rec){
     const tasks = rec.tasks||[];
     const ads = rec.ads||[];
-    const taskChunks = ptrainChunk(tasks, PTRAIN_TASKS_PER_LABEL);
+    const taskChunks = ptrainChunkVariable(tasks, PTRAIN_TASKS_PER_LABEL_FIRST, PTRAIN_TASKS_PER_LABEL_REST);
     if(!taskChunks.length) taskChunks.push([]);
     const adChunks = ptrainChunk(ads, PTRAIN_ADS_PER_COLUMN*2);
     if(!adChunks.length) adChunks.push([]);
@@ -3336,13 +3347,14 @@
             '<h1>Pilot Training Card'+pageTag+'</h1>' +
             '<span class="ptl-id">ID '+escapeHTML(rec.id)+'</span>' +
           '</div>' +
-          '<div class="ptl-sub">Valid for two years from date of issue. The signature below certifies that the individual has been trained and supervised to carry out the following tasks &amp; ADs. * indicates additional training received.</div>' +
+          (pageIdx===0 ? '<div class="ptl-sub">Valid for two years from date of issue. The signature below certifies that the individual has been trained and supervised to carry out the following tasks &amp; ADs. * indicates additional training received.</div>' : '') +
           '<div class="ptl-tasks">' + (taskLines || '<div>&nbsp;</div>') + '</div>' +
         '</div>'
       );
     }).join('');
 
     const adColHtml = (col)=> col.map(a=>'<div>'+escapeHTML((a.additional?'* ':'')+a.text)+'</div>').join('');
+    const trainedTypes = PTRAIN_AIRCRAFT.filter(t=> rec.acTypes.includes(t));
     const backLabels = adChunks.map((chunk,pageIdx)=>{
       const isLast = pageIdx === adChunks.length-1;
       const pageTag = adChunks.length>1 ? ' ('+(pageIdx+1)+'/'+adChunks.length+')' : '';
@@ -3350,12 +3362,12 @@
       const col1 = chunk.slice(PTRAIN_ADS_PER_COLUMN);
       return (
         '<div class="ptl-label">' +
-          '<div class="ptl-back-top">A/C Type Trained on'+pageTag+': '+ PTRAIN_AIRCRAFT.map(t=> rec.acTypes.includes(t) ? '<u>'+t+'</u>' : ('<span style="color:#999;">'+t+'</span>')).join('&nbsp;&nbsp;&nbsp;') +'</div>' +
+          '<div class="ptl-back-top">A/C Type Trained on'+pageTag+': '+ (trainedTypes.length ? trainedTypes.map(t=>'<u>'+t+'</u>').join('&nbsp;&nbsp;&nbsp;') : '—') +'</div>' +
           '<div class="ptl-ads"><div>'+adColHtml(col0)+'</div><div>'+adColHtml(col1)+'</div></div>' +
           (isLast ?
             '<div class="ptl-meta">' +
-              '<div><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+'</div>' +
-              '<div><b>PRM Name/Licence:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' / '+escapeHTML(rec.trainerLicence):'')+'</div>' +
+              '<div><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+' &nbsp; <b>Signature:</b> ________________</div>' +
+              '<div><b>PRM Name/ACA #:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' / '+escapeHTML(rec.trainerLicence):'')+' &nbsp; <b>Signature:</b> ________________</div>' +
               '<div><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'')+'</div>' +
               '<div><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'')+'</div>' +
             '</div>'
