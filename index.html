@@ -205,20 +205,20 @@
   .pt-ad-groups{display:flex;flex-wrap:wrap;gap:24px;}
   .pt-ad-col{flex:1;min-width:260px;}
   /* two 4in x 2in labels, front + back */
-  .ptl-label{width:4in;height:2in;box-sizing:border-box;border:1px solid #000;padding:0.05in 0.09in;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  .ptl-label{width:4in;height:2in;box-sizing:border-box;border:1px solid #000;padding:0.05in 0.09in;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;color:#000;background:#fff;}
   .ptl-label + .ptl-label{margin-top:0.1in;}
   .ptl-head{display:flex;align-items:center;gap:6px;margin-bottom:1px;}
   .ptl-head img{height:0.22in;width:auto;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
-  .ptl-head h1{font-size:12px;margin:0;flex:1;}
-  .ptl-head .ptl-id{font-size:11px;font-weight:800;}
-  .ptl-sub{font-size:8px;line-height:1.2;margin-bottom:2px;}
-  .ptl-tasks{font-size:9.5px;line-height:1.15;}
-  .ptl-tasks div{border-bottom:1px solid #ccc;padding:0.3px 0;}
-  .ptl-back-top{font-size:11px;font-weight:800;margin-bottom:2.5px;}
-  .ptl-ads{display:flex;gap:6px;font-size:10px;margin-bottom:2.5px;}
+  .ptl-head h1{font-size:10.7px;margin:0;flex:1;font-weight:800;}
+  .ptl-head .ptl-id{font-size:9.7px;font-weight:800;}
+  .ptl-sub{font-size:6.3px;line-height:1.2;margin-bottom:2px;font-weight:600;}
+  .ptl-tasks{font-size:6.9px;line-height:1.15;font-weight:700;}
+  .ptl-tasks div{border-bottom:1px solid #000;padding:0.3px 0;}
+  .ptl-back-top{font-size:8.7px;font-weight:800;margin-bottom:2.5px;}
+  .ptl-ads{display:flex;gap:6px;font-size:7.9px;margin-bottom:2.5px;font-weight:700;}
   .ptl-ads > div{flex:1;}
-  .ptl-ads div div{border-bottom:1px solid #ccc;padding:0.4px 0;}
-  .ptl-meta{font-size:10.5px;line-height:1.35;}
+  .ptl-ads div div{border-bottom:1px solid #000;padding:0.4px 0;}
+  .ptl-meta{font-size:8px;line-height:1.4;font-weight:600;}
   .ptl-meta b{display:inline-block;min-width:0.62in;}
   .ptl-sig-label{font-weight:800;margin-left:6px;}
   .ptl-sig-line{display:inline-block;border-bottom:1px solid #000;width:0.55in;margin-left:3px;vertical-align:bottom;}
@@ -3329,18 +3329,14 @@
   // ---------- print: two 4in x 2in labels (front = tasks, back = A/C types, ADs, names, dates) ----------
   // A 4x2in label has a fixed, non-scrolling height (overflow:hidden), so a long selection has to
   // spill onto extra labels of the same size rather than get silently clipped at the bottom.
-  // These capacities were re-measured (headless-render + overflow check) against the current,
-  // enlarged label font sizes — do not raise them without re-measuring, or text will clip silently.
+  // These capacities were re-measured (headless-render + overflow check) against the current label
+  // font sizes/weights — do not raise them without re-measuring, or text will clip silently.
   // The disclaimer paragraph only prints on the very first label, which leaves a bit more room for
   // tasks on every label after it — PTRAIN_TASKS_PER_LABEL_REST is an estimate for that freed space;
   // print-preview once and nudge it up or down if it doesn't match what actually fits.
-  const PTRAIN_TASKS_PER_LABEL_FIRST = 11;
-  const PTRAIN_TASKS_PER_LABEL_REST = 12;
-  // The meta/signature block only prints on the very last back label, which leaves much less room
-  // for ADs there than on any earlier back label — PTRAIN_ADS_PER_COL_LAST applies only to the final
-  // back label, PTRAIN_ADS_PER_COL_OTHER to every back label before it.
-  const PTRAIN_ADS_PER_COL_LAST = 5;    // per column on the LAST back label (has the meta/signature block) -> 10 ADs
-  const PTRAIN_ADS_PER_COL_OTHER = 10;  // per column on any earlier back label (no meta block) -> 20 ADs
+  const PTRAIN_TASKS_PER_LABEL_FIRST = 14;
+  const PTRAIN_TASKS_PER_LABEL_REST = 16;
+  const PTRAIN_ADS_PER_COLUMN = 8;     // per column on the back label (2 columns -> 16 ADs per label, by request)
   function ptrainChunk(arr, size){
     const out = [];
     for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
@@ -3352,22 +3348,12 @@
     for(let i=firstSize; i<arr.length; i+=restSize) out.push(arr.slice(i, i+restSize));
     return out;
   }
-  // Like ptrainChunkVariable, but the SMALLER capacity applies to the last chunk instead of the first
-  // (used for ADs, since it's the last back label that has to also fit the meta/signature block).
-  function ptrainChunkVariableFromEnd(arr, normalSize, lastSize){
-    if(!arr.length) return [];
-    if(arr.length <= lastSize) return [ arr.slice() ];
-    const leadingCount = arr.length - lastSize;
-    const out = ptrainChunk(arr.slice(0, leadingCount), normalSize);
-    out.push(arr.slice(leadingCount));
-    return out;
-  }
   function buildPtrainLabelHtml(rec){
     const tasks = rec.tasks||[];
     const ads = rec.ads||[];
     const taskChunks = ptrainChunkVariable(tasks, PTRAIN_TASKS_PER_LABEL_FIRST, PTRAIN_TASKS_PER_LABEL_REST);
     if(!taskChunks.length) taskChunks.push([]);
-    const adChunks = ptrainChunkVariableFromEnd(ads, PTRAIN_ADS_PER_COL_OTHER*2, PTRAIN_ADS_PER_COL_LAST*2);
+    const adChunks = ptrainChunk(ads, PTRAIN_ADS_PER_COLUMN*2);
     if(!adChunks.length) adChunks.push([]);
 
     const frontLabels = taskChunks.map((chunk,pageIdx)=>{
@@ -3391,9 +3377,8 @@
     const backLabels = adChunks.map((chunk,pageIdx)=>{
       const isLast = pageIdx === adChunks.length-1;
       const pageTag = adChunks.length>1 ? ' ('+(pageIdx+1)+'/'+adChunks.length+')' : '';
-      const colCap = isLast ? PTRAIN_ADS_PER_COL_LAST : PTRAIN_ADS_PER_COL_OTHER;
-      const col0 = chunk.slice(0, colCap);
-      const col1 = chunk.slice(colCap);
+      const col0 = chunk.slice(0, PTRAIN_ADS_PER_COLUMN);
+      const col1 = chunk.slice(PTRAIN_ADS_PER_COLUMN);
       return (
         '<div class="ptl-label">' +
           (pageIdx===0 ? '<img class="ptl-back-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="">' : '') +
