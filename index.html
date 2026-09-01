@@ -246,10 +246,10 @@
 <div id="ptrainGate" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:150;align-items:center;justify-content:center;">
   <div class="gate-box">
     <h2 id="ptrainGateTitle">Enter password</h2>
-    <p id="ptrainGateSub">Pilot Elementary Task Training is separately protected.</p>
+    <p id="ptrainGateSub">Reserved is separately protected.</p>
     <div class="gate-error" id="ptrainGateError"></div>
     <form id="ptrainGateForm" autocomplete="on">
-      <input type="text" name="username" value="Pilot Elementary Task Training" autocomplete="username" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <input type="text" name="username" value="Reserved" autocomplete="username" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
       <input type="password" id="ptrainGatePass" name="password" placeholder="Password" autocomplete="current-password">
       <input type="password" id="ptrainGatePass2" placeholder="Confirm password" style="display:none;" autocomplete="new-password">
       <button id="ptrainGateBtn" type="submit">Unlock</button>
@@ -283,7 +283,7 @@
         <button class="home-btn" data-view="powercheck"><span class="hb-icon">🧮</span>AS350 B2 Powercheck</button>
         <button class="home-btn" data-view="ec135pc"><span class="hb-icon">🚁</span>EC135 T2+ Power Check</button>
         <button class="home-btn" data-view="bleedvalve"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>
-        <button class="home-btn" data-view="pilottraining"><span class="hb-icon">🎓</span>Pilot Elementary Task Training</button>
+        <button class="home-btn" data-view="pilottraining"><span class="hb-icon">🔒</span>Reserved</button>
       </div>
     </div>
   </div>
@@ -299,6 +299,9 @@
   <div id="viewEc135pc" style="display:none;"></div>
   <div id="viewEc135Trend" style="display:none;"></div>
   <div id="viewBleedValve" style="display:none;"></div>
+  <div id="viewReserved" style="display:none;"></div>
+  <div id="viewMpmRevision" style="display:none;"></div>
+  <div id="viewMcmRevision" style="display:none;"></div>
   <div id="viewPilotTraining" style="display:none;"></div>
   <div id="viewPilotTrainRecords" style="display:none;"></div>
   <div id="viewPilotTrainCard" style="display:none;"></div>
@@ -673,7 +676,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -703,7 +706,7 @@
       else if(v==='powercheck') renderPowercheck();
       else if(v==='ec135pc') renderEc135Powercheck();
       else if(v==='bleedvalve') renderBleedValve();
-      else if(v==='pilottraining') openPilotTraining();
+      else if(v==='pilottraining') openReserved();
     });
   });
   document.getElementById('settingsBtn').onclick = renderSettings;
@@ -2703,14 +2706,14 @@
   function ptrainFinishUnlock(){
     try{ sessionStorage.setItem('ptrainUnlocked','1'); }catch(e){}
     document.getElementById('ptrainGate').style.display = 'none';
-    renderPilotTraining();
+    renderReservedMenu();
   }
   function ptrainLock(){
     try{ sessionStorage.removeItem('ptrainUnlocked'); }catch(e){}
     showHome();
   }
-  async function openPilotTraining(){
-    if(ptrainIsUnlocked()){ renderPilotTraining(); return; }
+  async function openReserved(){
+    if(ptrainIsUnlocked()){ renderReservedMenu(); return; }
     const gate = document.getElementById('ptrainGate');
     const title = document.getElementById('ptrainGateTitle');
     const sub = document.getElementById('ptrainGateSub');
@@ -2725,12 +2728,12 @@
     const settingUp = !existingHash;
     if(settingUp){
       title.textContent = 'Set a password';
-      sub.textContent = 'This module is kept separate from the rest of the site — create a password just for it. Anyone who knows it (in addition to the site password) can open Pilot Elementary Task Training.';
+      sub.textContent = 'This section is kept separate from the rest of the site — create a password just for it. Anyone who knows it (in addition to the site password) can open Reserved.';
       p2.style.display = 'block';
       btn.textContent = 'Set password';
     } else {
       title.textContent = 'Enter password';
-      sub.textContent = 'Pilot Elementary Task Training is separately protected.';
+      sub.textContent = 'Reserved is separately protected.';
       p2.style.display = 'none';
       btn.textContent = 'Unlock';
     }
@@ -2751,6 +2754,55 @@
       }
     };
     document.getElementById('ptrainGateCancel').onclick = ()=>{ gate.style.display = 'none'; showHome(); };
+  }
+
+  // ---------- Reserved menu (landing screen behind the gate: Pilot Training / MPM revision / MCM revision) ----------
+  function backToReservedBtn(){ return '<button class="back-btn" id="resBackBtn">‹ Back to Reserved</button>'; }
+  function renderReservedMenu(){
+    showView('Reserved');
+    const el = document.getElementById('viewReserved');
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Reserved</h2>' +
+        '<p class="form-sub">Internal-use tools and manual revisions.</p>' +
+        '<div class="home-grid">' +
+          '<button class="home-btn" id="resPilotTrainingBtn"><span class="hb-icon">🎓</span>Pilot Elementary Task Training</button>' +
+          '<button class="home-btn" id="resMpmBtn"><span class="hb-icon">📘</span>MPM Revision</button>' +
+          '<button class="home-btn" id="resMcmBtn"><span class="hb-icon">📗</span>MCM Revision</button>' +
+        '</div>' +
+        '<div class="btn-row" style="margin-top:14px;"><button type="button" class="btn" id="resLockBtn">🔒 Lock</button></div>' +
+      '</div>';
+    document.getElementById('resPilotTrainingBtn').onclick = ()=> renderPilotTraining();
+    document.getElementById('resMpmBtn').onclick = ()=> renderMpmRevision();
+    document.getElementById('resMcmBtn').onclick = ()=> renderMcmRevision();
+    document.getElementById('resLockBtn').onclick = ptrainLock;
+  }
+
+  function renderMpmRevision(){
+    showView('MpmRevision');
+    const el = document.getElementById('viewMpmRevision');
+    el.innerHTML =
+      backToReservedBtn() +
+      '<div class="panel">' +
+        '<h2 class="form-title">MPM Revision</h2>' +
+        '<p class="form-sub">No MPM revision document has been added here yet.</p>' +
+      '</div>';
+    document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
+  }
+
+  function renderMcmRevision(){
+    showView('McmRevision');
+    const el = document.getElementById('viewMcmRevision');
+    el.innerHTML =
+      backToReservedBtn() +
+      '<div class="panel">' +
+        '<h2 class="form-title">MCM Revision</h2>' +
+        '<p class="form-sub">Documents Incorporated by Reference (D.I.R.) to MCM — Appendices Section, revised Sep. 13, 2024.</p>' +
+        '<div class="btn-row"><a class="btn" href="./manuals/mcm-dir-2024-09-13.pdf" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;">⬇ Open in new tab / Download</a></div>' +
+        '<iframe src="./manuals/mcm-dir-2024-09-13.pdf" title="MCM Revision PDF" style="width:100%;height:82vh;border:1px solid var(--line);border-radius:8px;margin-top:12px;"></iframe>' +
+      '</div>';
+    document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
   }
 
   // ---------- data layer (Supabase-backed via storageGet/storageSet, same as the rest of the site) ----------
@@ -2938,7 +2990,8 @@
   async function renderPilotTraining(){
     showView('PilotTraining');
     const el = document.getElementById('viewPilotTraining');
-    el.innerHTML = backButton() + '<div class="panel"><h2 class="form-title">Pilot Elementary Task Training</h2><p class="form-sub">Loading…</p></div>';
+    el.innerHTML = backToReservedBtn() + '<div class="panel"><h2 class="form-title">Pilot Elementary Task Training</h2><p class="form-sub">Loading…</p></div>';
+    document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
     const rows = await ptrainBuildRoster();
     ptrainRenderGridBody(rows);
   }
@@ -2947,7 +3000,7 @@
     if(!el) return;
     const orphanCount = rows.filter(r=>!r.linked).length;
     el.innerHTML =
-      backButton() +
+      backToReservedBtn() +
       '<div class="panel">' +
         '<h2 class="form-title">Pilot Elementary Task Training</h2>' +
         '<p class="form-sub">This list mirrors the pilot roster in Settings → Pilots — add or rename a pilot there and it appears here automatically. "Due in Days" is one year from the Training Date shown (the printed training card itself still reads "valid for two years", per your wording).' +
@@ -3047,6 +3100,7 @@
     }
     paintRows();
 
+    document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
     document.getElementById('ptNewCardBtn').onclick = ()=> renderPilotTrainCard(null, null);
     document.getElementById('ptRecordsBtn').onclick = ()=> renderPilotTrainRecords();
     document.getElementById('ptManageBtn').onclick = ()=> renderPilotTrainManage();
