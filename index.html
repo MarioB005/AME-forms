@@ -210,16 +210,16 @@
   .ptl-label + .ptl-label{margin-top:0.1in;}
   .ptl-head{display:flex;align-items:center;gap:6px;margin-bottom:1px;}
   .ptl-head img{height:0.22in;width:auto;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
-  .ptl-head h1{font-size:10.7px;margin:0;flex:1;}
-  .ptl-head .ptl-id{font-size:9.7px;}
-  .ptl-sub{font-size:6.3px;line-height:1.2;margin-bottom:2px;}
-  .ptl-tasks{font-size:6.9px;line-height:1.15;}
+  .ptl-head h1{font-size:11.4px;margin:0;flex:1;}
+  .ptl-head .ptl-id{font-size:10.4px;}
+  .ptl-sub{font-size:7px;line-height:1.2;margin-bottom:2px;}
+  .ptl-tasks{font-size:7.6px;line-height:1.15;}
   .ptl-tasks div{border-bottom:1px solid #000;padding:0.3px 0;}
-  .ptl-back-top{font-size:8.7px;margin-bottom:2.5px;}
-  .ptl-ads{display:flex;gap:6px;font-size:7.9px;margin-bottom:2.5px;}
+  .ptl-back-top{font-size:9.4px;margin-bottom:2.5px;}
+  .ptl-ads{display:flex;gap:6px;font-size:8.6px;margin-bottom:2.5px;}
   .ptl-ads > div{flex:1;}
   .ptl-ads div div{border-bottom:1px solid #000;padding:0.4px 0;}
-  .ptl-meta{font-size:8px;line-height:1.4;}
+  .ptl-meta{font-size:8.7px;line-height:1.4;}
   .ptl-meta b{display:inline-block;min-width:0.62in;}
   .ptl-sig-label{margin-left:6px;}
   .ptl-sig-line{display:inline-block;border-bottom:1px solid #000;width:0.55in;margin-left:3px;vertical-align:bottom;}
@@ -3335,9 +3335,9 @@
   // The disclaimer paragraph only prints on the very first label, which leaves a bit more room for
   // tasks on every label after it — PTRAIN_TASKS_PER_LABEL_REST is an estimate for that freed space;
   // print-preview once and nudge it up or down if it doesn't match what actually fits.
-  const PTRAIN_TASKS_PER_LABEL_FIRST = 14;
-  const PTRAIN_TASKS_PER_LABEL_REST = 16;
-  const PTRAIN_ADS_PER_COLUMN = 8;     // per column on the back label (2 columns -> 16 ADs per label, by request)
+  const PTRAIN_TASKS_PER_LABEL_FIRST = 12;
+  const PTRAIN_TASKS_PER_LABEL_REST = 14;
+  const PTRAIN_ADS_PER_COLUMN = 6;     // per column on the back label (2 columns -> 12 ADs per label)
   function ptrainChunk(arr, size){
     const out = [];
     for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
