@@ -205,21 +205,26 @@
   .pt-ad-groups{display:flex;flex-wrap:wrap;gap:24px;}
   .pt-ad-col{flex:1;min-width:260px;}
   /* two 4in x 2in labels, front + back */
-  .ptl-label{width:4in;height:2in;box-sizing:border-box;border:1px solid #000;padding:0.08in 0.12in;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;position:relative;overflow:hidden;}
-  .ptl-label + .ptl-label{margin-top:0.15in;}
-  .ptl-head{display:flex;align-items:center;gap:8px;margin-bottom:2px;}
-  .ptl-head img{height:0.32in;width:auto;}
-  .ptl-head h1{font-size:13px;margin:0;flex:1;}
-  .ptl-head .ptl-id{font-size:13px;font-weight:800;}
-  .ptl-sub{font-size:6.5px;line-height:1.25;margin-bottom:3px;}
-  .ptl-tasks{font-size:7px;line-height:1.32;}
-  .ptl-tasks div{border-bottom:1px solid #ccc;padding:0.6px 0;}
-  .ptl-back-top{font-size:7px;font-weight:800;margin-bottom:2px;}
-  .ptl-ads{display:flex;gap:6px;font-size:6.5px;margin-bottom:3px;}
+  .ptl-label{width:4in;height:2in;box-sizing:border-box;border:1px solid #000;padding:0.05in 0.09in;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;position:relative;overflow:hidden;}
+  .ptl-label + .ptl-label{margin-top:0.1in;}
+  .ptl-head{display:flex;align-items:center;gap:6px;margin-bottom:1px;}
+  .ptl-head img{height:0.22in;width:auto;}
+  .ptl-head h1{font-size:10px;margin:0;flex:1;}
+  .ptl-head .ptl-id{font-size:9px;font-weight:800;}
+  .ptl-sub{font-size:5.6px;line-height:1.2;margin-bottom:2px;}
+  .ptl-tasks{font-size:6.2px;line-height:1.15;}
+  .ptl-tasks div{border-bottom:1px solid #ccc;padding:0.3px 0;}
+  .ptl-back-top{font-size:8px;font-weight:800;margin-bottom:2.5px;}
+  .ptl-ads{display:flex;gap:6px;font-size:7.2px;margin-bottom:2.5px;}
   .ptl-ads > div{flex:1;}
-  .ptl-ads div div{border-bottom:1px solid #ccc;padding:0.5px 0;}
-  .ptl-meta{font-size:7px;line-height:1.5;}
-  .ptl-meta b{display:inline-block;min-width:0.85in;}
+  .ptl-ads div div{border-bottom:1px solid #ccc;padding:0.4px 0;}
+  .ptl-meta{font-size:7.3px;line-height:1.4;}
+  .ptl-meta b{display:inline-block;min-width:0.62in;}
+  .ptl-sig-label{font-weight:800;margin-left:6px;}
+  .ptl-sig-line{display:inline-block;border-bottom:1px solid #000;width:0.55in;margin-left:3px;vertical-align:bottom;}
+  .ptl-sig-row{margin-bottom:10px;}   /* keeps the trainee & PRM signature lines from touching */
+  .ptl-date-gap{display:inline-block;width:0.18in;}   /* ~4-5 characters of separation */
+  .ptl-back-logo{position:absolute;top:0.05in;right:0.09in;height:0.2in;width:auto;}
 </style>
 </head>
 <body>
@@ -2673,7 +2678,7 @@
 
   // ==================== Pilot Elementary Task Training (separately password-protected) ====================
   const PTRAIN_AIRCRAFT = ['EC120','H130','AS350','AS355','EC135'];
-  const PTRAIN_AMO_NUMBER = 'AMO # 100-96'; // appended after the PRM's ACA # (e.g. "14, AMO # 100-96")
+  const PTRAIN_AMO_NUMBER = 'AMO 100-96'; // appended after the PRM's ACA # in the entry box (e.g. "14, AMO 100-96"); printed as "ACA # 14, AMO 100-96"
 
   function ptrainDefaultTasks(){ return JSON.parse('[{"num":1,"category":"Servicing","appendix":"Hb","text":"Adding Oil in the Engine, Main Gearbox and Hydraulic reservoir.","mcmLink":""},{"num":2,"category":"Servicing","appendix":"Hb","text":"AS350 Bleed valve test procedure.","mcmLink":""},{"num":3,"category":"Servicing","appendix":"Hb","text":"Differing Defects Training Procedure for pilots.","mcmLink":""},{"num":4,"category":"EMT","appendix":"Hc","text":"Removal installation of external Cargo basket.","mcmLink":""},{"num":5,"category":"EMT","appendix":"Hc","text":"Removal and replacement of cabin doors.","mcmLink":""},{"num":6,"category":"EMT","appendix":"Hc","text":"Removal and replacement of passenger seats.","mcmLink":""},{"num":7,"category":"EMT","appendix":"Hc","text":"EC135 Stretcher kit Removal / Installation.","mcmLink":""},{"num":8,"category":"EMT","appendix":"Hc","text":"AS350 /AS355 Stretcher kit Removal / Installation","mcmLink":""},{"num":9,"category":"EMT","appendix":"Hc","text":"H130T2 & Stretcher kit Removal / Installation","mcmLink":""},{"num":13,"category":"Opp. Check","appendix":"","text":"ELT check.","mcmLink":""},{"num":14,"category":"Opp. Check","appendix":"","text":"Free wheel assy. - Check of the free wheel rotation.","mcmLink":""},{"num":15,"category":"Opp. Check","appendix":"Hd","text":"Airworthiness Directives & AMOC (APPENDIX “Hd” for applicable Ads).","mcmLink":""},{"num":16,"category":"Opp. Check","appendix":"","text":"Aircraft daily inspection (DI) using the procedure found in the flight manual Sec. #4.","mcmLink":""},{"num":17,"category":"Opp. Check","appendix":"He","text":"Dual Control Check / Independent Check Training Procedure as per APPENDIX “He”.","mcmLink":""},{"num":18,"category":"Opp. Check","appendix":"Hf","text":"Inspection and continuity checking of self-sealing chip detectors. (See Appendix “Hf”).","mcmLink":""},{"num":19,"category":"Opp. Check","appendix":"","text":"H130T2 Cargo sling installation check and clean.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Replacement of FDC filter.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Weight & Balance procedure.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AS355 NP Engine to MGB Flexible coupling – 25 hour visual check.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Clean, Check & Removal installation of Cargo Hook / Swing.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine, Main Gearbox, Tail Rotor Gearbox and Hydraulic reservoir. (legacy AS355 wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine, Main Gearbox reservoir. (legacy wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Adding Oil in the Engine reservoir. (legacy wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"H130 - Cargo sling installation check and clean with soft bristle brush. (legacy H130 wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"H130 & AS350 /AS355 Stretcher kit Removal / Installation. (legacy combined wording)","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AS350 Cargo swing Removal / Installation.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Battery Removal / Installation","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"Removal / Installation of Dual Controls on the Cabri G2.","mcmLink":""},{"num":null,"category":"Additional","appendix":"","text":"AMOC # AARDG2019/A38 in reference to pre-flight visual inspection of blade attachment area.","mcmLink":""}]'); }
   function ptrainDefaultAds(){ return JSON.parse('[{"text":"AD 2000-340-080(A) R2","mcmLink":"","models":["AS350"],"archived":false},{"text":"AD 2004-055","mcmLink":"","models":["AS350"],"archived":false},{"text":"AD 2007-0138-E","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2007-0138 R2","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2010-0006","mcmLink":"","models":[],"archived":false},{"text":"AD 2010-0026-E","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2012-0085 R6","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0085R5","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0257-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2015-0033-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0139","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0046","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0048","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0069","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0282","mcmLink":"","models":[],"archived":false},{"text":"AD 2023-0036","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2023-0064","mcmLink":"","models":["AS350","AS355","H130"],"archived":false},{"text":"AD 2023-0083","mcmLink":"","models":[],"archived":false},{"text":"AD 2024-0139","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2024-0209","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2025-0287","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 84-045-022 (B) R4","mcmLink":"","models":[],"archived":false},{"text":"AD 84-064-037(B) R3","mcmLink":"","models":[],"archived":false}]'); }
@@ -3315,9 +3320,9 @@
   // The disclaimer paragraph only prints on the very first label, which leaves a bit more room for
   // tasks on every label after it — PTRAIN_TASKS_PER_LABEL_REST is an estimate for that freed space;
   // print-preview once and nudge it up or down if it doesn't match what actually fits.
-  const PTRAIN_TASKS_PER_LABEL_FIRST = 11;
-  const PTRAIN_TASKS_PER_LABEL_REST = 13;
-  const PTRAIN_ADS_PER_COLUMN = 15;    // per column on the back label (2 columns per label)
+  const PTRAIN_TASKS_PER_LABEL_FIRST = 16;
+  const PTRAIN_TASKS_PER_LABEL_REST = 17;
+  const PTRAIN_ADS_PER_COLUMN = 8;     // per column on the back label (2 columns -> 16 ADs per label, by request)
   function ptrainChunk(arr, size){
     const out = [];
     for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
@@ -3362,14 +3367,15 @@
       const col1 = chunk.slice(PTRAIN_ADS_PER_COLUMN);
       return (
         '<div class="ptl-label">' +
+          (pageIdx===0 ? '<img class="ptl-back-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="">' : '') +
+          (pageIdx===0 ? '<div class="ptl-sub" style="max-width:78%;">This individual has received the above indicated Elementary work training on the following aircraft and has also received training on the ADs indicated below: Note: "*" Indicates additional training received.</div>' : '') +
           '<div class="ptl-back-top">A/C Type Trained on'+pageTag+': '+ (trainedTypes.length ? trainedTypes.map(t=>'<u>'+t+'</u>').join('&nbsp;&nbsp;&nbsp;') : '—') +'</div>' +
           '<div class="ptl-ads"><div>'+adColHtml(col0)+'</div><div>'+adColHtml(col1)+'</div></div>' +
           (isLast ?
             '<div class="ptl-meta">' +
-              '<div><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+' &nbsp; <b>Signature:</b> ________________</div>' +
-              '<div><b>PRM Name/ACA #:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' / '+escapeHTML(rec.trainerLicence):'')+' &nbsp; <b>Signature:</b> ________________</div>' +
-              '<div><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'')+'</div>' +
-              '<div><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'')+'</div>' +
+              '<div class="ptl-sig-row"><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+'<span class="ptl-sig-label">Signature:</span><span class="ptl-sig-line"></span></div>' +
+              '<div><b>PRM Name:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?'&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;ACA # '+escapeHTML(rec.trainerLicence):'')+'<span class="ptl-sig-label">Signature:</span><span class="ptl-sig-line"></span></div>' +
+              '<div><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'')+'<span class="ptl-date-gap"></span><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'')+'</div>' +
             '</div>'
           : '') +
         '</div>'
