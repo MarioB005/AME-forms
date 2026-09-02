@@ -3172,11 +3172,12 @@
   // manualOverride stays null until the user actually clicks the checkbox — while it's null the
   // checked state simply follows whichever A/C Type(s) are selected, so ticking a new A/C Type
   // auto-selects the ADs tagged for it (and clears again if the type is unchecked), live.
-  function ptrainInitAdState(masterAds, existingRecordAds){
+  function ptrainInitAdState(masterAds, existingRecordAds, existingRecordAdsExcluded){
     const st = {};
     masterAds.filter(a=>!a.archived).forEach(a=>{
       let manualOverride = null;
       if(existingRecordAds && existingRecordAds.some(ra=>ra.text===a.text)) manualOverride = true;
+      else if(existingRecordAdsExcluded && existingRecordAdsExcluded.includes(a.text)) manualOverride = false;
       st[a.text] = { manualOverride, extra:false };
     });
     if(existingRecordAds){
@@ -3446,7 +3447,7 @@
       let selectedTypes = rec.acTypes.slice();
 
       const taskItems = ptrainBuildTaskChecklist(settings.tasks, isExisting ? rec.tasks : null);
-      const adState = ptrainInitAdState(settings.ads, isExisting ? rec.ads : null);
+      const adState = ptrainInitAdState(settings.ads, isExisting ? rec.ads : null, isExisting ? rec.adsExcluded : null);
 
       const ameNames = (state.settings.ames||[]).map(a=>a.name);
       function traineeLicenceFor(name){ const r = roster.find(r=>r.name===name); return r ? (r.licence||'') : ''; }
@@ -3578,8 +3579,14 @@
         // whenever the MCM itself is revised.
         const tasks = taskItems.filter(i=>i.checked).map(i=> ({ text:i.text, cardText:i.cardText||i.text, appendix:i.appendix||'', num:(i.num!=null?i.num:null), additional: i.extra ? !!i.wasAdditional : !!i.isAdditionalCategory }));
         const ads = [];
+        // An AD that's auto-applicable by aircraft type but was manually UNCHECKED has to be recorded
+        // explicitly (adsExcluded), not just left out of `ads` -- otherwise reopening the record recomputes
+        // it as applicable again (via adIsApplicable) and it silently reverts back to checked. This is what
+        // made unchecking a box on the card look like it "didn't save".
+        const adsExcluded = [];
         settings.ads.filter(a=>!a.archived).forEach(a=>{
           if(adIsChecked(a.text, a)) ads.push({ text:a.text, additional: !adIsApplicable(a) });
+          else if(adIsApplicable(a)) adsExcluded.push(a.text);
         });
         Object.keys(adState).forEach(text=>{
           if(!adState[text].extra) return;
@@ -3597,6 +3604,7 @@
           acTypes: selectedTypes.slice(),
           tasks: tasks,
           ads: ads,
+          adsExcluded: adsExcluded,
           hdOverrides: rec.hdOverrides || {},
           heOverrides: rec.heOverrides || {},
           imported: false,
@@ -3937,7 +3945,7 @@
       (opts.noteInline ? '' : '<div class="rpt-note">Note: If as a result of these checks, a defect is found or suspected, the aircraft shall be grounded until a qualified AME can inspect it.</div>') +
       '<div class="rpt-understand">I, <span class="ln">'+escapeHTML(rec.traineeName||'')+'</span>, understand each point mentioned above.</div>' +
       ptrainSignRow('Pilot Signature', rec.traineeLicence, dateVal) +
-      ptrainSignRow('PRM Signature <span class="who">('+escapeHTML(rec.trainerName||'')+')</span>', rec.trainerLicence, dateVal) +
+      ptrainSignRow('AME Signature', rec.trainerLicence, dateVal) +
       (rev ? (
         '<div class="rpt-footerbox">' +
           '<div class="r1"><span>Revision: # '+rev.revision+'</span><span>Page '+rev.page+'</span></div>' +
