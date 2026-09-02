@@ -3209,6 +3209,7 @@
         '</p>' +
         '<div class="btn-row">' +
           '<button type="button" class="btn primary" id="ptNewCardBtn">+ New Training Card</button>' +
+          '<button type="button" class="btn" id="ptFullQuickBtn">📄 Full Training Record (Hb–He, 8.5×11)</button>' +
           '<button type="button" class="btn" id="ptRecordsBtn">📋 All Training Records</button>' +
           '<button type="button" class="btn" id="ptManageBtn">⚙️ Manage Task / AD Lists</button>' +
           '<button type="button" class="btn" id="ptSettingsBtn">👤 Manage Pilots (Settings)</button>' +
@@ -3304,6 +3305,35 @@
 
     document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
     document.getElementById('ptNewCardBtn').onclick = ()=> renderPilotTrainCard(null, null);
+    document.getElementById('ptFullQuickBtn').onclick = ()=>{
+      // The Full Training Record report is always for one specific pilot's saved record, so this
+      // shortcut just asks which pilot inline rather than duplicating the roster picker elsewhere.
+      const existing = document.getElementById('ptFullPicker');
+      if(existing){ existing.remove(); return; }
+      const names = Array.from(new Set(rows.map(r=>r.name).filter(Boolean))).sort();
+      if(!names.length){ alert('No pilots in the roster yet — add one in Settings → Pilots first.'); return; }
+      const div = document.createElement('div');
+      div.id = 'ptFullPicker';
+      div.className = 'btn-row';
+      div.style.marginTop = '4px';
+      div.innerHTML = '<select id="ptFullPickerSel"><option value="">— choose a pilot —</option>' +
+        names.map(n=>'<option value="'+escapeHTML(n)+'">'+escapeHTML(n)+'</option>').join('') +
+        '</select> <button type="button" class="btn small primary" id="ptFullPickerGo">Open Full Record</button>';
+      document.getElementById('ptFullQuickBtn').insertAdjacentElement('afterend', div);
+      document.getElementById('ptFullPickerGo').onclick = async ()=>{
+        const name = document.getElementById('ptFullPickerSel').value;
+        if(!name) return;
+        const records = await loadPtrainRecords();
+        const matches = records.filter(r=>r.traineeName===name);
+        if(!matches.length){
+          alert('No saved Training Card yet for '+name+' — opening a new card. Save it, then use "📄 Full Training Record" there.');
+          renderPilotTrainCard(null, rows.find(r=>r.name===name)||null);
+          return;
+        }
+        matches.sort((a,b)=> a.id - b.id);
+        renderPilotTrainFull(matches[matches.length-1].id);
+      };
+    };
     document.getElementById('ptRecordsBtn').onclick = ()=> renderPilotTrainRecords();
     document.getElementById('ptManageBtn').onclick = ()=> renderPilotTrainManage();
     document.getElementById('ptSettingsBtn').onclick = ()=> renderSettings();
@@ -3816,51 +3846,153 @@
     };
   }
 
+  // Styled to match the real D.I.R.-to-MCM appendix pages (serif type, "Phoenix Heli-Flight" running
+  // header, centered APPENDIX heading, boxed revision footer) instead of the site's usual form look --
+  // this is the one printed report meant to sit next to the actual manual pages. Checkboxes print
+  // pre-filled (✓ / X) from the pilot's card, and the "I understand" + signature lines are pre-filled
+  // with the trainee/PRM names, licence numbers and training date already on the record -- only the
+  // physical signature itself is left blank.
   const PTRAIN_FULL_PRINT_STYLES = '<style>' +
-    '@page{size:letter;margin:0.55in;}' +
-    '.rpt-meta{font-size:11.5px;margin:8px 0 6px;display:flex;flex-wrap:wrap;gap:3px 24px;}' +
-    '.rpt-sec-title{font-weight:800;font-size:13px;margin:13px 0 5px;border-bottom:1.2px solid #000;padding-bottom:2px;}' +
-    '.rpt-group{font-weight:700;font-size:11.5px;margin:6px 0 2px;}' +
-    '.rpt-row{display:flex;align-items:flex-start;gap:7px;font-size:11px;line-height:1.35;padding:1.5px 0;}' +
-    '.rpt-box{display:inline-block;width:14px;height:14px;border:1.3px solid #000;text-align:center;line-height:13px;font-size:10.5px;font-weight:800;flex:0 0 auto;margin-top:1px;}' +
-    '.rpt-table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px;}' +
+    '@page{size:letter;margin:0.65in;}' +
+    '.rpt-page,.rpt-page *{font-family:Georgia,Cambria,"Times New Roman","Liberation Serif",serif;}' +
+    '.rpt-page{color:#000;page-break-after:always;min-height:9.2in;display:flex;flex-direction:column;}' +
+    '.rpt-page:last-child{page-break-after:auto;}' +
+    '.rpt-hdrow{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;}' +
+    '.rpt-doctitle{text-align:center;font-style:italic;font-size:13px;margin-bottom:2px;}' +
+    '.rpt-apptitle{text-align:center;font-size:19px;margin:4px 0 2px;}' +
+    '.rpt-plaintitle{text-align:center;font-weight:700;font-size:16px;margin:14px 0 10px;}' +
+    '.rpt-subtitle{text-align:center;font-weight:700;font-size:14px;margin-bottom:10px;}' +
+    '.rpt-subtitle .small{font-size:10px;}' +
+    '.rpt-intro{font-size:12px;line-height:1.5;margin-bottom:8px;}' +
+    '.rpt-tasklabel{font-weight:700;font-size:14px;margin:8px 0 4px;}' +
+    '.rpt-grouphead{font-size:12px;margin:9px 0 3px;padding-left:24px;font-weight:700;text-decoration:underline;}' +
+    '.rpt-groupintro{font-size:12px;line-height:1.4;margin:6px 0 3px;}' +
+    '.rpt-item{display:flex;gap:8px;font-size:12px;line-height:1.4;margin:5px 0;}' +
+    '.rpt-item.top{padding-left:0;}' +
+    '.rpt-item.sub{padding-left:34px;}' +
+    '.rpt-item .box{flex:0 0 auto;display:inline-block;width:13px;height:13px;border:1.1px solid #000;text-align:center;line-height:12px;font-size:10.5px;font-weight:800;margin-top:2px;}' +
+    '.rpt-item .lbl{font-weight:700;margin-right:2px;}' +
+    '.rpt-note{font-size:12px;line-height:1.4;margin:14px 0;}' +
+    '.rpt-understand{font-size:12px;margin:14px 0 26px;}' +
+    '.rpt-understand .ln{display:inline-block;min-width:230px;border-bottom:1px solid #000;padding:0 4px;font-weight:700;text-align:center;}' +
+    '.rpt-signblock{margin-bottom:10px;}' +
+    '.rpt-signrow{display:flex;gap:40px;flex-wrap:wrap;}' +
+    '.rpt-signrow .sc{flex:1;min-width:170px;border-bottom:1px solid #000;height:18px;}' +
+    '.rpt-signlbl{display:flex;gap:40px;font-size:11.5px;flex-wrap:wrap;margin-bottom:12px;}' +
+    '.rpt-signlbl .sc{flex:1;min-width:170px;}' +
+    '.rpt-signlbl .fill{font-weight:700;}' +
+    '.rpt-table{width:100%;border-collapse:collapse;font-size:9.6px;margin-top:8px;}' +
     '.rpt-table th,.rpt-table td{border:1px solid #000;padding:3px 5px;vertical-align:top;text-align:left;}' +
-    '.rpt-table th{background:#eee;}' +
+    '.rpt-table th{font-weight:700;text-align:center;}' +
     '.rpt-table td.ctr{text-align:center;font-weight:800;}' +
-    '.rpt-note{font-size:10px;color:#333;font-style:italic;margin-top:3px;}' +
-    '.rpt-sign{display:flex;gap:34px;flex-wrap:wrap;font-size:11.5px;margin-top:16px;}' +
-    '.rpt-sign .sl{flex:1;min-width:230px;border-bottom:1px solid #000;padding-bottom:18px;}' +
+    '.rpt-table td.appl{font-weight:700;}' +
+    '.rpt-footerbox{margin-top:auto;border:1px solid #000;padding:8px 12px;font-size:11.5px;}' +
+    '.rpt-footerbox .r1{display:flex;justify-content:space-between;}' +
+    '.rpt-footerbox .r2{margin-top:12px;}' +
   '</style>';
-  function buildPtrainFullReportPrintHtml(rec, settings, selectedTypes, taskItems, manualItems, extraTasks){
-    function box(on){ return '<span class="rpt-box">'+(on?'✓':'X')+'</span>'; }
-    let hbHtml='', hcHtml='', lastGroup=null;
-    manualItems.forEach(item=>{
-      const group = ptrainManualGroupLabel(item.appendix, item.num);
-      const groupKey = item.appendix+'|'+group;
-      let row = '';
-      if(groupKey !== lastGroup){ row += '<div class="rpt-group">'+escapeHTML(group)+'</div>'; lastGroup = groupKey; }
-      row += '<div class="rpt-row">'+box(item.checked)+'<span><b>'+escapeHTML(ptrainManualItemLabel(item.appendix,item.num))+'</b> '+escapeHTML(item.text)+'</span></div>';
-      if(item.appendix==='Hb') hbHtml += row; else hcHtml += row;
-    });
-    const extraHtml = extraTasks.length ? (
-      '<div class="rpt-sec-title">Additional Elementary Tasks (not numbered in the MCM)</div>' +
-      extraTasks.map(item=>'<div class="rpt-row">'+box(item.checked)+'<span>'+escapeHTML(item.text)+'</span></div>').join('')
-    ) : '';
-    const adHtml = settings.ads.filter(a=>!a.archived).map(a=>{
-      const checked = (rec.ads||[]).some(r=>r.text===a.text);
-      return '<div class="rpt-row">'+box(checked)+'<span>'+escapeHTML(a.text)+'</span></div>';
-    }).join('') || '<p class="rpt-note">None configured yet.</p>';
 
+  // Revision/page metadata for each real manual page -- transcribed from the D.I.R.-to-MCM PDF Mario
+  // provided (Hb Rev.6/15-Apr-2020, Hc+Hd Rev.13/13-Sep-2024, He Rev.14/08-Apr-2026). Update these three
+  // if/when he sends a newer manual revision -- there's no live link to the manual PDF's own metadata.
+  const PTRAIN_MANUAL_REVISIONS = {
+    Hb: { revision:'6',  date:'15-Apr-2020', page:'H-2' },
+    Hc: { revision:'13', date:'13-Sep-2024', page:'H-3' },
+    Hd: { revision:'13', date:'13-Sep-2024', page:'H-4' },
+    He: { revision:'14', date:'08-Apr-2026', page:'H-5' },
+  };
+  const PTRAIN_HC_GROUP_INTRO = {
+    '1': 'Removal and replacement of role equipment designed for rapid removal and replacement:',
+    '2': 'Repetitive visual inspections or operational checks, not involving disassembly and not performed as part of the aircraft maintenance schedule, that are required at intervals of less than 100 hr. air time, provided they will be performed by an appropriately rated aircraft maintenance engineer at the next scheduled maintenance check:',
+  };
+  function ptrainRptBox(on){ return '<span class="box">'+(on?'✓':'X')+'</span>'; }
+  // One printed page in the manual's own layout: running header, centered APPENDIX title (or a plain
+  // title for the non-appendix Airworthiness Directives page), the section body, the standard grounding
+  // note, an "I understand" line pre-filled with the trainee's name, and Pilot/PRM sign-off lines with
+  // licence # and date already filled in -- everything except the physical signature itself.
+  function ptrainAppendixPage(rec, opts){
+    const rev = opts.appendix ? PTRAIN_MANUAL_REVISIONS[opts.appendix] : null;
+    const dateVal = rec.originalTrainingDate || rec.additionalTrainingDate || null;
+    const trainerLicenceOnly = String(rec.trainerLicence||'').split(',')[0].trim();
+    return '<div class="rpt-page">' +
+      '<div class="rpt-hdrow"><span>Phoenix Heli-Flight</span><span>Phoenix Heli-Flight</span></div>' +
+      (opts.appendix ?
+        ('<div class="rpt-doctitle">D.I.R. Appendix to MCM</div>' +
+         '<div class="rpt-apptitle">APPENDIX &quot;'+opts.appendix+'&quot;</div>' +
+         '<div class="rpt-subtitle">'+opts.subtitle+(opts.subtitleSmall?' <span class="small">'+opts.subtitleSmall+'</span>':'')+'</div>')
+        : '<div class="rpt-plaintitle">'+opts.subtitle+'</div>'
+      ) +
+      (opts.intro ? '<div class="rpt-intro">'+opts.intro+'</div>' : '') +
+      opts.bodyHtml +
+      (opts.noteInline ? '' : '<div class="rpt-note">Note: If as a result of these checks, a defect is found or suspected, the aircraft shall be grounded until a qualified AME can inspect it.</div>') +
+      '<div class="rpt-understand">I, <span class="ln">'+escapeHTML(rec.traineeName||'')+'</span>, understand each point mentioned above.</div>' +
+      '<div class="rpt-signblock">' +
+        '<div class="rpt-signrow"><div class="sc"></div><div class="sc"></div><div class="sc"></div></div>' +
+        '<div class="rpt-signlbl"><div class="sc">Pilot Signature</div><div class="sc">Licence # <span class="fill">'+escapeHTML(rec.traineeLicence||'')+'</span></div><div class="sc">Date <span class="fill">'+(dateVal?fmtDateNice(dateVal):'')+'</span></div></div>' +
+      '</div>' +
+      '<div class="rpt-signblock">' +
+        '<div class="rpt-signrow"><div class="sc"></div><div class="sc"></div><div class="sc"></div></div>' +
+        '<div class="rpt-signlbl"><div class="sc">PRM Signature <span class="fill">('+escapeHTML(rec.trainerName||'')+')</span></div><div class="sc">Licence # <span class="fill">'+escapeHTML(trainerLicenceOnly)+'</span></div><div class="sc">Date <span class="fill">'+(dateVal?fmtDateNice(dateVal):'')+'</span></div></div>' +
+      '</div>' +
+      (rev ? (
+        '<div class="rpt-footerbox">' +
+          '<div class="r1"><span>Revision: # '+rev.revision+'</span><span>Page '+rev.page+'</span></div>' +
+          '<div class="r2">Revision Date: '+rev.date+'</div>' +
+        '</div>'
+      ) : '') +
+    '</div>';
+  }
+  function buildPtrainFullReportPrintHtml(rec, settings, selectedTypes, taskItems, manualItems, extraTasks){
+    // ---- Hb page ----
+    let hbBody = '<div class="rpt-tasklabel">Task #</div>';
+    let lastHbGroup = null;
+    manualItems.filter(i=>i.appendix==='Hb').forEach(item=>{
+      const group = ptrainManualGroupLabel('Hb', item.num);
+      if(group !== lastHbGroup){ hbBody += '<div class="rpt-grouphead">'+escapeHTML(group)+'</div>'; lastHbGroup = group; }
+      hbBody += '<div class="rpt-item sub">'+ptrainRptBox(item.checked)+'<span><span class="lbl">'+escapeHTML(item.num)+'.</span> '+escapeHTML(item.text)+'</span></div>';
+    });
+
+    // ---- Hc page (Task #1 / Task #2, each with its own manual-wording intro sentence) ----
+    let hcBody = '<div class="rpt-tasklabel">Task #</div>';
+    ['1','2'].forEach(taskNum=>{
+      const items = manualItems.filter(i=> i.appendix==='Hc' && new RegExp('^'+taskNum).test(String(i.num)));
+      if(!items.length) return;
+      hcBody += '<div class="rpt-item top"><span class="lbl">'+taskNum+'.</span> <span class="rpt-groupintro">'+escapeHTML(PTRAIN_HC_GROUP_INTRO[taskNum]||'')+'</span></div>';
+      items.forEach(item=>{
+        hcBody += '<div class="rpt-item sub">'+ptrainRptBox(item.checked)+'<span><span class="lbl">'+escapeHTML(ptrainManualItemLabel(item.appendix,item.num))+'</span> '+escapeHTML(item.text)+'</span></div>';
+      });
+    });
+    if(extraTasks.length){
+      hcBody += '<div class="rpt-grouphead">Additional (not yet numbered in the manual):</div>';
+      extraTasks.forEach(item=>{
+        hcBody += '<div class="rpt-item sub">'+ptrainRptBox(item.checked)+'<span>'+escapeHTML(item.text)+'</span></div>';
+      });
+    }
+
+    // ---- Airworthiness Directives training page (Phoenix's own pilot-training record, not a lettered
+    // manual appendix -- so it gets the plain-title header and no revision footer) ----
+    let adBody = '<div class="rpt-tasklabel">Airworthiness Directives</div>';
+    const ads = settings.ads.filter(a=>!a.archived);
+    if(ads.length){
+      ads.forEach(a=>{
+        const checked = (rec.ads||[]).some(r=>r.text===a.text);
+        adBody += '<div class="rpt-item sub">'+ptrainRptBox(checked)+'<span>'+escapeHTML(a.text)+'</span></div>';
+      });
+    } else {
+      adBody += '<p class="rpt-intro">None configured yet.</p>';
+    }
+
+    // ---- Hd / He tables (same bordered manual look; "Pilot training" stays a single computed ✓/X
+    // column per Mario's earlier instruction, rather than reverting to blank Pilot/AME Initials columns) ----
     function hdHeTable(items, colLabel, overrides){
-      if(!items || !items.length) return '<p class="rpt-note">None configured yet.</p>';
-      return '<table class="rpt-table"><thead><tr><th>Registration(s)</th><th>'+escapeHTML(colLabel)+'</th><th>Description</th><th>Interval</th><th>Pilot training</th></tr></thead><tbody>' +
+      if(!items || !items.length) return '<p class="rpt-intro">None configured yet.</p>';
+      return '<table class="rpt-table"><thead><tr><th>Aircraft applicability</th><th>'+escapeHTML(colLabel)+'</th><th>Description</th><th>Interval</th><th>Pilot training</th></tr></thead><tbody>' +
         items.map(r=>{
           const key = ptrainHdHeMapKey(colLabel, r);
           const auto = ptrainRegsApplicableToTypes(r.regs, selectedTypes);
           const effective = ptrainOverrideEffective(overrides, key, auto);
           const dispVal = colLabel==='Task' ? (r.task||'') : (r.doc||'');
           return '<tr>' +
-            '<td>'+escapeHTML((r.regs||[]).join(', '))+'</td>' +
+            '<td class="appl">'+escapeHTML((r.regs||[]).join(', '))+'</td>' +
             '<td>'+escapeHTML(dispVal).replace(/\n/g,'<br>')+'</td>' +
             '<td>'+escapeHTML(r.desc||'')+'</td>' +
             '<td>'+escapeHTML(r.interval||'')+'</td>' +
@@ -3871,27 +4003,33 @@
     }
 
     return PRINT_STYLES + PTRAIN_FULL_PRINT_STYLES +
-      '<div class="pf-head">' +
-        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
-        '<div class="pf-title-block"><h1>Elementary Task Training &amp; Compliance Record</h1><div class="pf-sub">Appendices &quot;Hb&quot; – &quot;He&quot; — company record copy (ID '+escapeHTML(String(rec.id))+')</div></div>' +
-      '</div>' +
-      '<div class="rpt-meta">' +
-        '<span><b>Trainee:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' ('+escapeHTML(rec.traineeLicence)+')':'')+'</span>' +
-        '<span><b>PRM:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' — ACA # '+escapeHTML(rec.trainerLicence):'')+'</span>' +
-        '<span><b>A/C Type(s):</b> '+(escapeHTML(selectedTypes.join(', '))||'—')+'</span>' +
-        '<span><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'—')+'</span>' +
-        '<span><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'—')+'</span>' +
-      '</div>' +
-      '<div class="rpt-sec-title">Appendix &quot;Hb&quot; — Servicing / Additional Training</div>' + (hbHtml||'<p class="rpt-note">No Hb items numbered yet.</p>') +
-      '<div class="rpt-sec-title">Appendix &quot;Hc&quot; — Elementary Task Training Form</div>' + (hcHtml||'<p class="rpt-note">No Hc items numbered yet.</p>') +
-      extraHtml +
-      '<div class="rpt-sec-title">Airworthiness Directives Training</div>' + adHtml +
-      '<div class="rpt-sec-title">Appendix &quot;Hd&quot; — Airworthiness Inspection Check</div>' + hdHeTable(settings.hdItems||[], 'Task', rec.hdOverrides) +
-      '<div class="rpt-sec-title">Appendix &quot;He&quot; — AD &amp; AMOC List</div>' + hdHeTable(settings.heItems||[], 'Document', rec.heOverrides) +
-      '<div class="rpt-sign">' +
-        '<div class="sl"><b>Trainee Signature</b> ('+escapeHTML(rec.traineeName||'')+')</div>' +
-        '<div class="sl"><b>PRM Signature</b> ('+escapeHTML(rec.trainerName||'')+')</div>' +
-      '</div>';
+      ptrainAppendixPage(rec, {
+        appendix:'Hb', subtitle:'Servicing / Additional Training',
+        intro:'This training form is used by Phoenix Heli-Flight to certify that the following employee has received the following training. These tasks may be carried out by a pilot trained under the direct supervision of AME.',
+        bodyHtml: hbBody,
+      }) +
+      ptrainAppendixPage(rec, {
+        appendix:'Hc', subtitle:'Elementary Task Training Form',
+        intro:'This training form is used by Phoenix Heli-Flight to certify that the following employee has received the following training for the performance of Elementary Task as per Standards 625 Appendix A. These tasks may be carried out by a pilot trained under the direct supervision of an AME.',
+        bodyHtml: hcBody,
+      }) +
+      ptrainAppendixPage(rec, {
+        appendix:null, subtitle:'Airworthiness Directives Training',
+        intro:'The following Airworthiness Directives training is recorded for this pilot, in support of Appendix &quot;He&quot; (AD &amp; AMOC List) applicability below.',
+        bodyHtml: adBody,
+      }) +
+      ptrainAppendixPage(rec, {
+        appendix:'Hd', subtitle:'Airworthiness Inspection Check', subtitleSmall:'(as per Airworthiness Limitations Section ALS)',
+        intro:'The following Airworthiness Inspection Checks may be carried out by a trained pilot. The pilot must be trained under the direct supervision of an AME who may then sign the pilot training document which will be kept electronically in the DATS system. This information will be available to the pilots at any time. All Tasks with a &quot;DAILY OR 10 HOURS&quot; &amp; Tasks with a &quot;EVERY 15 HOURS&quot; interval will not be tracked in AMS and will be signed as part of the Pilots Daily Inspection (ID) / Airworthiness Check (AWC). Note: If as a result of these checks, a defect is found or suspected, the aircraft shall be grounded until a qualified AME can inspect it.',
+        noteInline: true,
+        bodyHtml: hdHeTable(settings.hdItems||[], 'Task', rec.hdOverrides),
+      }) +
+      ptrainAppendixPage(rec, {
+        appendix:'He', subtitle:'AD &amp; AMOC List',
+        intro:'The following Airworthiness Directives may be carried out by a trained pilot. The pilot must be trained under the direct supervision of an AME who may then sign the pilot training document which will be kept electronically in the DATS system. This information will be available to the pilots at any time. Note: If as a result of these checks, a defect is found or suspected, the aircraft shall be grounded until a qualified AME can inspect it.',
+        noteInline: true,
+        bodyHtml: hdHeTable(settings.heItems||[], 'Document', rec.heOverrides),
+      });
   }
 
   // ---------- admin: manage the task / AD master lists (add an MCM link once your manual is hosted online) ----------
