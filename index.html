@@ -3917,6 +3917,8 @@
     Hc: { revision:'13', date:'13-Sep-2024', page:'H-3' },
     Hd: { revision:'13', date:'13-Sep-2024', page:'H-4' },
     He: { revision:'14', date:'08-Apr-2026', page:'H-5' },
+    Hf: { revision:'9',  date:'26-Aug-2021', page:'H-6' },
+    Hg: { revision:'9',  date:'26-Aug-2021', page:'H-7' },
   };
   const PTRAIN_HC_GROUP_INTRO = {
     '1': 'Removal and replacement of role equipment designed for rapid removal and replacement:',
@@ -4016,6 +4018,29 @@
       '</tbody></table>';
     }
 
+    // ---- Hf / Hg pages -- fixed procedure text transcribed from the manual (not derived from the
+    // checklist, unlike Hb/Hc/Hd/He), so every pilot's Full Report gets the same wording; only the
+    // trainee name and sign-off rows (handled by ptrainAppendixPage itself) are pilot-specific. ----
+    const hfBody =
+      [
+        'Check Cyclic for a red flag indicating that maintenance is being performed.',
+        'Ask the AME to show you what he did and review form D.I.R to MPM Appendix 22 &quot;Anticipation of Aircraft Behavior after Maintenance Form&quot;.',
+        'Carefully read the work report entry in the journey log and perform visual / tactile check of the components that were affected.',
+        'Feel the rotation of the components and check for proper installation.',
+        'Check for proper direction of installation of bolts (Head normally in the direction of flight or direction of rotation).',
+        'Check for presence of nuts, cotter pins, lockwire, etc.',
+        'Perform ground run/test flight as per Flight Manual chapter 8 (Note: Autorotation shall be checked whenever the (Pitch Links, Trim Tabs, were disturbed and / or Main Rotor Blades were replaced).',
+        'Check Journey Log Entry: Complete logbook entry.',
+      ].map((t,i)=>'<div class="rpt-item top"><span class="lbl">'+(i+1)+'.</span><span>'+t+'</span></div>').join('') +
+      '<div class="rpt-groupintro">The signatures indicate that the person trained understands and feels capable of conducting independent checks on all aircrafts operated by Phoenix Heli-flight and is considered competent in the performance of the checks by the person who has given the training.</div>';
+
+    const hgBody =
+      '<div class="rpt-groupintro">The following shall be carried out by the pilot when a Main Gear Box, Tail rotor Gear Box or an Engine &quot;Chip Light&quot; has illuminated when an aircraft is operated away from the main base:</div>' +
+      '<div class="rpt-groupintro">The pilot will take a digital photo of the material collected on the chip detector and send electronically to the DOM via e-mail or text.</div>' +
+      '<div class="rpt-groupintro">Based on the results the DOM will make a determination referencing the aircraft manufacturers documentation and then either allow the aircraft to continue flying or ground the aircraft on site.</div>' +
+      '<div class="rpt-groupintro">Should the analysis of the material found on the detector be considered minor, the DOM will respond to the pilots in writing and allow the A/C to return to base.</div>' +
+      '<div class="rpt-groupintro">Following the cleaning and reinstallation of the chip detector, the pilot in command will make an entry in the logbook as follows: &quot;MGB or Engine or TRGB chip light illuminated. Chip detector checked for material and photo sent to DOM for analysis. Material found to be minor and aircraft released for flight under DOM&rsquo;s approval. A 10-minute hover will be performed prior to flight. Upon aircraft return to base a filter check will be performed if required as per the Maintenance manual. Pilot record of training for above mentioned shall be kept electronically in DATS system.&quot;</div>';
+
     return PRINT_STYLES + PTRAIN_FULL_PRINT_STYLES +
       ptrainAppendixPage(rec, {
         appendix:'Hb', subtitle:'Servicing / Additional Training',
@@ -4038,6 +4063,15 @@
         intro:'The following Airworthiness Directives may be carried out by a trained pilot. The pilot must be trained under the direct supervision of an AME who may then sign the pilot training document which will be kept electronically in the DATS system. This information will be available to the pilots at any time. Note: If as a result of these checks, a defect is found or suspected, the aircraft shall be grounded until a qualified AME can inspect it.',
         noteInline: true,
         bodyHtml: hdHeTable(settings.heItems||[], 'Document', rec.heOverrides),
+      }) +
+      ptrainAppendixPage(rec, {
+        appendix:'Hf', subtitle:'Dual Control Check / Independent Check Training Procedure',
+        intro:'The following points were discussed during training. Independent Checks (ICC) are carried out when flight controls or engine controls have been disturbed (removed, disassembled, replaced, or adjusted including dual control installation). This training is applicable to all aircraft types operated by Phoenix Heli-Flight.',
+        bodyHtml: hfBody,
+      }) +
+      ptrainAppendixPage(rec, {
+        appendix:'Hg', subtitle:'Checking of Self-Sealing Chip Detectors Procedure',
+        bodyHtml: hgBody,
       });
   }
 
