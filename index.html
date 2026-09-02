@@ -3008,6 +3008,24 @@
     (s.tasks||[]).forEach(t=>{
       if(t.cardText===undefined){ t.cardText = ''; changed = true; }
     });
+    // Backfill any numbered manual item (Appendix + #) that's missing from this site's saved task list.
+    // A numbered task should never just silently vanish from the checklist/report -- but a site's list
+    // can drift out of sync with the current numbered set (a row edited away by accident, or a site that
+    // predates one being added), and unlike the cardText/hdItems/heItems repairs above this checks every
+    // individual numbered item, not just the list as a whole. This only ADDS a missing key back with its
+    // current default wording -- it never touches or reorders an item that's already on file, so any
+    // custom text already saved for an existing Appendix+# is left exactly as-is.
+    if(!Array.isArray(s.tasks)) s.tasks = [];
+    const existingTaskKeys = new Set(s.tasks.filter(t=>t.appendix && t.num!=null).map(t=> t.appendix+'|'+t.num));
+    ptrainDefaultTasks().forEach(defTask=>{
+      if(!defTask.appendix || defTask.num==null) return;
+      const key = defTask.appendix+'|'+defTask.num;
+      if(!existingTaskKeys.has(key)){
+        s.tasks.push(Object.assign({}, defTask));
+        existingTaskKeys.add(key);
+        changed = true;
+      }
+    });
     // Sites that already existed before Hd/He tracking was added won't have these keys yet -- seed them
     // once from the manual so "Manage Task & AD Lists" has something to show and edit going forward.
     if(!Array.isArray(s.hdItems)){ s.hdItems = ptrainDefaultHdItems(); changed = true; }
