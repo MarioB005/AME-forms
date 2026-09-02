@@ -305,6 +305,7 @@
   <div id="viewPilotTraining" style="display:none;"></div>
   <div id="viewPilotTrainRecords" style="display:none;"></div>
   <div id="viewPilotTrainCard" style="display:none;"></div>
+  <div id="viewPilotTrainFull" style="display:none;"></div>
   <div id="viewPilotTrainManage" style="display:none;"></div>
 </div>
 
@@ -676,7 +677,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainFull','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -2680,7 +2681,9 @@
 
 
   // ==================== Pilot Elementary Task Training (separately password-protected) ====================
-  const PTRAIN_AIRCRAFT = ['EC120','H130','AS350','AS355','EC135'];
+  // Split into AS350B2 / AS350B3 (previously a single generic "AS350") so each sub-model's ADs and Hd/He
+  // rows can be tracked correctly -- an AS350B3 tail (C-FHLO) is not on the same AD schedule as a B2.
+  const PTRAIN_AIRCRAFT = ['EC120','H130','AS350B2','AS350B3','AS355','EC135'];
   const PTRAIN_AMO_NUMBER = 'AMO 100-96'; // appended after the PRM's ACA # in the entry box (e.g. "14, AMO 100-96"); printed as "ACA # 14, AMO 100-96"
   const PTRAIN_DEFAULT_PRM_NAME = 'Mario Blais';
   // Makes sure the default PRM shows up as a selectable AME (shared with the rest of the site) even
@@ -2697,39 +2700,44 @@
   // Training, items 1-3; Appendix "Hc" = Elementary Task Training Form, Task #1 sub-items a-j and Task #2
   // sub-items a-g -- note "d" is genuinely skipped in Task #1 on the real manual page, not a typo here).
   // `num` is a manual-reference string (e.g. "1b", "2f"), not a sequence number -- do not parseInt() it.
+  // `text` is the canonical MCM wording -- editing it here (or in Manage) IS "revising the MCM", and every
+  // screen that reads this record (card, label print, full report) picks the change up automatically.
+  // `cardText` is an optional shortened wording for the small 4x2 card/label only; leave it blank to print
+  // the same wording as the MCM. The two are deliberately linked by `appendix`+`num`, never by text, so an
+  // abbreviated card line never breaks the match back to the manual.
   function ptrainDefaultTasks(){ return [
-    {num:"1",  category:"Servicing",  appendix:"Hb", text:"Adding Oil in the Engine, Main Gearbox and Hydraulic reservoir.", mcmLink:""},
-    {num:"2",  category:"Servicing",  appendix:"Hb", text:"AS350 Bleed valve test procedure.", mcmLink:""},
-    {num:"3",  category:"Servicing",  appendix:"Hb", text:"Differing Defects Training Procedure for pilots.", mcmLink:""},
-    {num:"1a", category:"EMT",        appendix:"Hc", text:"Removal installation of external Cargo basket.", mcmLink:""},
-    {num:"1b", category:"EMT",        appendix:"Hc", text:"Removal and replacement of cabin doors.", mcmLink:""},
-    {num:"1c", category:"EMT",        appendix:"Hc", text:"Removal and replacement of passenger seats.", mcmLink:""},
-    {num:"1e", category:"EMT",        appendix:"Hc", text:"EC135 Stretcher kit Removal / Installation.", mcmLink:""},
-    {num:"1f", category:"EMT",        appendix:"Hc", text:"AS350 /AS355 Stretcher kit Removal / Installation", mcmLink:""},
-    {num:"1g", category:"EMT",        appendix:"Hc", text:"H130T2 & Stretcher kit Removal / Installation", mcmLink:""},
-    {num:"1h", category:"EMT",        appendix:"Hc", text:"Removal / Installation of Dual Controls on the Cabri G2.", mcmLink:""},
-    {num:"1i", category:"EMT",        appendix:"Hc", text:"Battery Removal / Installation", mcmLink:""},
-    {num:"1j", category:"EMT",        appendix:"Hc", text:"AS350 Cargo swing Removal / Installation.", mcmLink:""},
-    {num:"2a", category:"Opp. Check", appendix:"Hc", text:"ELT check.", mcmLink:""},
-    {num:"2b", category:"Opp. Check", appendix:"Hc", text:"Free wheel assy. - Check of the free wheel rotation.", mcmLink:""},
-    {num:"2c", category:"Opp. Check", appendix:"Hc", text:"Airworthiness Directives & AMOC (APPENDIX “He” for applicable Ads).", mcmLink:""},
-    {num:"2d", category:"Opp. Check", appendix:"Hc", text:"Aircraft daily inspection (DI) using the procedure found in the flight manual Sec. #4.", mcmLink:""},
-    {num:"2e", category:"Opp. Check", appendix:"Hc", text:"Dual Control Check / Independent Check Training Procedure as per APPENDIX “Hf”.", mcmLink:""},
-    {num:"2f", category:"Opp. Check", appendix:"Hc", text:"Inspection and continuity checking of self-sealing chip detectors. (See Appendix “Hg”).", mcmLink:""},
-    {num:"2g", category:"Opp. Check", appendix:"Hc", text:"H130T2 Cargo sling installation check and clean.", mcmLink:""},
-    // Not yet in the manual's numbered list -- kept available on the training card but excluded from the "Manual view".
-    {num:null, category:"Additional", appendix:"", text:"Replacement of FDC filter.", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"Weight & Balance procedure.", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"AS355 NP Engine to MGB Flexible coupling – 25 hour visual check.", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"Clean, Check & Removal installation of Cargo Hook / Swing.", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"Adding Oil in the Engine, Main Gearbox, Tail Rotor Gearbox and Hydraulic reservoir. (legacy AS355 wording)", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"Adding Oil in the Engine, Main Gearbox reservoir. (legacy wording)", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"Adding Oil in the Engine reservoir. (legacy wording)", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"H130 - Cargo sling installation check and clean with soft bristle brush. (legacy H130 wording)", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"H130 & AS350 /AS355 Stretcher kit Removal / Installation. (legacy combined wording)", mcmLink:""},
-    {num:null, category:"Additional", appendix:"", text:"AMOC # AARDG2019/A38 in reference to pre-flight visual inspection of blade attachment area.", mcmLink:""},
+    {num:"1",  category:"Servicing",  appendix:"Hb", text:"Adding Oil in the Engine, Main Gearbox and Hydraulic reservoir.", cardText:"", mcmLink:""},
+    {num:"2",  category:"Servicing",  appendix:"Hb", text:"AS350 Bleed valve test procedure.", cardText:"", mcmLink:""},
+    {num:"3",  category:"Servicing",  appendix:"Hb", text:"Differing Defects Training Procedure for pilots.", cardText:"", mcmLink:""},
+    {num:"1a", category:"EMT",        appendix:"Hc", text:"Removal installation of external Cargo basket.", cardText:"", mcmLink:""},
+    {num:"1b", category:"EMT",        appendix:"Hc", text:"Removal and replacement of cabin doors.", cardText:"", mcmLink:""},
+    {num:"1c", category:"EMT",        appendix:"Hc", text:"Removal and replacement of passenger seats.", cardText:"", mcmLink:""},
+    {num:"1e", category:"EMT",        appendix:"Hc", text:"EC135 Stretcher kit Removal / Installation.", cardText:"", mcmLink:""},
+    {num:"1f", category:"EMT",        appendix:"Hc", text:"AS350 /AS355 Stretcher kit Removal / Installation", cardText:"", mcmLink:""},
+    {num:"1g", category:"EMT",        appendix:"Hc", text:"H130T2 & Stretcher kit Removal / Installation", cardText:"", mcmLink:""},
+    {num:"1h", category:"EMT",        appendix:"Hc", text:"Removal / Installation of Dual Controls on the Cabri G2.", cardText:"", mcmLink:""},
+    {num:"1i", category:"EMT",        appendix:"Hc", text:"Battery Removal / Installation", cardText:"", mcmLink:""},
+    {num:"1j", category:"EMT",        appendix:"Hc", text:"AS350 Cargo swing Removal / Installation.", cardText:"", mcmLink:""},
+    {num:"2a", category:"Opp. Check", appendix:"Hc", text:"ELT check.", cardText:"", mcmLink:""},
+    {num:"2b", category:"Opp. Check", appendix:"Hc", text:"Free wheel assy. - Check of the free wheel rotation.", cardText:"", mcmLink:""},
+    {num:"2c", category:"Opp. Check", appendix:"Hc", text:"Airworthiness Directives & AMOC (APPENDIX “He” for applicable Ads).", cardText:"", mcmLink:""},
+    {num:"2d", category:"Opp. Check", appendix:"Hc", text:"Aircraft daily inspection (DI) using the procedure found in the flight manual Sec. #4.", cardText:"", mcmLink:""},
+    {num:"2e", category:"Opp. Check", appendix:"Hc", text:"Dual Control Check / Independent Check Training Procedure as per APPENDIX “Hf”.", cardText:"", mcmLink:""},
+    {num:"2f", category:"Opp. Check", appendix:"Hc", text:"Inspection and continuity checking of self-sealing chip detectors. (See Appendix “Hg”).", cardText:"", mcmLink:""},
+    {num:"2g", category:"Opp. Check", appendix:"Hc", text:"H130T2 Cargo sling installation check and clean.", cardText:"", mcmLink:""},
+    // Not yet in the manual's numbered list -- kept available on the training card but excluded from the manual/full-report view.
+    {num:null, category:"Additional", appendix:"", text:"Replacement of FDC filter.", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"Weight & Balance procedure.", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"AS355 NP Engine to MGB Flexible coupling – 25 hour visual check.", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"Clean, Check & Removal installation of Cargo Hook / Swing.", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"Adding Oil in the Engine, Main Gearbox, Tail Rotor Gearbox and Hydraulic reservoir. (legacy AS355 wording)", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"Adding Oil in the Engine, Main Gearbox reservoir. (legacy wording)", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"Adding Oil in the Engine reservoir. (legacy wording)", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"H130 - Cargo sling installation check and clean with soft bristle brush. (legacy H130 wording)", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"H130 & AS350 /AS355 Stretcher kit Removal / Installation. (legacy combined wording)", cardText:"", mcmLink:""},
+    {num:null, category:"Additional", appendix:"", text:"AMOC # AARDG2019/A38 in reference to pre-flight visual inspection of blade attachment area.", cardText:"", mcmLink:""},
   ]; }
-  function ptrainDefaultAds(){ return JSON.parse('[{"text":"AD 2000-340-080(A) R2","mcmLink":"","models":["AS350"],"archived":false},{"text":"AD 2004-055","mcmLink":"","models":["AS350"],"archived":false},{"text":"AD 2007-0138-E","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2007-0138 R2","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2010-0006","mcmLink":"","models":[],"archived":false},{"text":"AD 2010-0026-E","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2012-0085 R6","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0085R5","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0257-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2015-0033-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0139","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0046","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0048","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0069","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0282","mcmLink":"","models":[],"archived":false},{"text":"AD 2023-0036","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2023-0064","mcmLink":"","models":["AS350","AS355","H130"],"archived":false},{"text":"AD 2023-0083","mcmLink":"","models":[],"archived":false},{"text":"AD 2024-0139","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2024-0209","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2025-0287","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 84-045-022 (B) R4","mcmLink":"","models":[],"archived":false},{"text":"AD 84-064-037(B) R3","mcmLink":"","models":[],"archived":false}]'); }
+  function ptrainDefaultAds(){ return JSON.parse('[{"text":"AD 2000-340-080(A) R2","mcmLink":"","models":["AS350B3"],"archived":false},{"text":"AD 2004-055","mcmLink":"","models":["AS350B2","AS350B3"],"archived":false},{"text":"AD 2007-0138-E","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2007-0138 R2","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2010-0006","mcmLink":"","models":[],"archived":false},{"text":"AD 2010-0026-E","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2012-0085 R6","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0085R5","mcmLink":"","models":["EC135"],"archived":false},{"text":"AD 2012-0257-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2015-0033-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104","mcmLink":"","models":[],"archived":false},{"text":"AD 2018-0104R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0139","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E","mcmLink":"","models":[],"archived":false},{"text":"AD 2019-0272-E R1","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0046","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0048","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0069","mcmLink":"","models":[],"archived":false},{"text":"AD 2021-0282","mcmLink":"","models":[],"archived":false},{"text":"AD 2023-0036","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2023-0064","mcmLink":"","models":["AS350B2","AS350B3","AS355","H130"],"archived":false},{"text":"AD 2023-0083","mcmLink":"","models":[],"archived":false},{"text":"AD 2024-0139","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 2024-0209","mcmLink":"","models":["EC120"],"archived":false},{"text":"AD 2025-0287","mcmLink":"","models":["AS355"],"archived":false},{"text":"AD 84-045-022 (B) R4","mcmLink":"","models":[],"archived":false},{"text":"AD 84-064-037(B) R3","mcmLink":"","models":[],"archived":false}]'); }
   // ---------- Hd (Airworthiness Inspection Check) / He (AD & AMOC List) reference tables ----------
   // Transcribed from the real MCM appendix pages (Hd = Rev #13, 13-Sep-2024; He = Rev #15, 28-Jul-2026).
   // "regs" are the aircraft registrations the row applies to, exactly as printed. Applicability to a given
@@ -2772,6 +2780,7 @@
   // on the Pilot Training Card (PTRAIN_AIRCRAFT). Airbus renamed the EC130 to "H130" -- that's why EC130
   // maps to the "H130" type instead of a separate one. Models with no mapping (e.g. "Cabri G2") return null:
   // rows for those tails just never show a Pilot Training checkmark, since that type isn't tracked on the card.
+  // AS350B3 must be checked before the bare "AS350" fallback, or a B3 tail would be misread as a B2.
   function ptrainModelToType(model){
     if(!model) return null;
     const m = String(model).toUpperCase();
@@ -2779,7 +2788,8 @@
     if(m.indexOf('EC130')===0) return 'H130';
     if(m.indexOf('H130')===0) return 'H130';
     if(m.indexOf('AS355')===0) return 'AS355';
-    if(m.indexOf('AS350')===0) return 'AS350';
+    if(m.indexOf('AS350B3')===0) return 'AS350B3';
+    if(m.indexOf('AS350')===0) return 'AS350B2'; // covers "AS350B2" and a bare/legacy "AS350" model string
     if(m.indexOf('EC135')===0) return 'EC135';
     return null;
   }
@@ -2832,6 +2842,13 @@
       if(m) return 'Task #'+m[1]+':';
     }
     return '';
+  }
+  // The bullet/letter shown in front of an individual manual-numbered item -- "1b" -> "b.", a bare Hb
+  // item like "2" -> "2.". Shared by the full training-record report (the Pilot Training Card itself no
+  // longer has its own "Manual view"; that presentation now lives only in that report).
+  function ptrainManualItemLabel(appendix, num){
+    if(appendix==='Hc' && num){ const m = /^\d+([a-z]+)$/.exec(num); if(m) return m[1]+'.'; }
+    return (num!=null?num:'')+'.';
   }
 
   function ptrainDefaultPilots(){ return JSON.parse('[{"name":"Paul Spring","licence":"CH216904 (Paul S)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":false,"trainingDate":"2026-02-21","exEmployee":false},{"name":"Marc McGee","licence":"AH427749 (Marc)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-06-12","exEmployee":false},{"name":"Roger Jamieson","licence":"AH787923 (Roger)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-03-14","exEmployee":false},{"name":"John Valiant","licence":"AH503887 (John)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-02-01","exEmployee":false},{"name":"Cameron Spring","licence":"CH471718 (Cam)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":true,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Steve Tomlinson","licence":"CH476037 (Steve T)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":false,"trainingDate":"2026-04-12","exEmployee":false},{"name":"Jessie Bergey","licence":"CH447789 (Jessie)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Craig de Jong","licence":"CH477797 (Craig)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-25","exEmployee":false},{"name":"Steve Harmer","licence":"AH425724 (Steve H)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":true,"trainingDate":"2026-02-20","exEmployee":false},{"name":"Matthew Wasserman","licence":"AH308537 (Matt)","ec120":false,"h130":false,"as350":false,"as355":false,"ec135":true,"trainingDate":"2026-06-18","exEmployee":false},{"name":"Andrew Grinham","licence":"515603 (Andrew)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Kilian Andrian","licence":"519957 (Kilian)","ec120":true,"h130":true,"as350":true,"as355":true,"ec135":true,"trainingDate":"2026-03-14","exEmployee":false},{"name":"Tyler McElroy","licence":"CH449803 (tyler)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Cameron Bengough","licence":"CH852256 (Cam B)","ec120":true,"h130":false,"as350":false,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Paul Kendall","licence":"CH302952 (Paul K)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":true,"trainingDate":"2026-02-01","exEmployee":false},{"name":"Robert Magee","licence":"AH358607 (Rob M)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":true,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Jeff Kvist","licence":"CH501886 (Jeff K)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"JF Tremblay","licence":"CH774430 (JF T)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false},{"name":"Brendan McCormick","licence":"AH789550 (Bren M)","ec120":true,"h130":true,"as350":true,"as355":false,"ec135":false,"trainingDate":"2026-02-19","exEmployee":false}]'); }
@@ -2950,6 +2967,19 @@
     (s.ads||[]).forEach(a=>{
       if(!Array.isArray(a.models)){ a.models = []; changed = true; }
       if(typeof a.archived !== 'boolean'){ a.archived = false; changed = true; }
+      // Sites tagged before the AS350B2/B3 split only ever had a generic "AS350" model tag -- fold it
+      // forward onto BOTH sub-models (never distinguished at the time) rather than silently dropping
+      // the applicability. A site that re-tags a specific AD to just one sub-model afterwards is fine;
+      // this only fires once, for the still-generic "AS350" tag.
+      if(a.models.includes('AS350')){
+        const set = new Set(a.models.filter(m=>m!=='AS350'));
+        set.add('AS350B2'); set.add('AS350B3');
+        a.models = Array.from(set);
+        changed = true;
+      }
+    });
+    (s.tasks||[]).forEach(t=>{
+      if(t.cardText===undefined){ t.cardText = ''; changed = true; }
     });
     // Sites that already existed before Hd/He tracking was added won't have these keys yet -- seed them
     // once from the manual so "Manage Task & AD Lists" has something to show and edit going forward.
@@ -2978,11 +3008,22 @@
   // shared roster at state.settings.pilots (Settings → Pilots). This is what makes "is this pilot
   // linked to Settings" actually true: the grid is built by walking state.settings.pilots and
   // looking up each name here, rather than keeping a second, separately-typed pilot list.
-  function ptrainEmptyStatus(){ return { ec120:false,h130:false,as350:false,as355:false,ec135:false,trainingDate:'',exEmployee:false,licence:'' }; }
+  function ptrainEmptyStatus(){ return { ec120:false,h130:false,as350b2:false,as350b3:false,as355:false,ec135:false,trainingDate:'',exEmployee:false,licence:'' }; }
   function ptrainNormalizeName(n){ return (n||'').replace(/\s*\([^)]*\)\s*$/, '').trim(); }
+  // Historical status entries (saved before the AS350B2/B3 split) only ever had a single "as350" flag --
+  // fold it forward onto BOTH new sub-model flags (never distinguished at the time, so this is the only
+  // safe default) whenever the new flags aren't already present. Read-side only; a real save via the
+  // roster grid persists the split flags going forward.
+  function ptrainMigrateStatusEntry(st){
+    if(st && st.as350 && st.as350b2===undefined && st.as350b3===undefined){
+      st = Object.assign({}, st, { as350b2:true, as350b3:true });
+    }
+    return st;
+  }
   function ptrainMergeStatus(a,b){
+    a = ptrainMigrateStatusEntry(a); b = ptrainMigrateStatusEntry(b);
     return {
-      ec120: !!(a.ec120||b.ec120), h130: !!(a.h130||b.h130), as350: !!(a.as350||b.as350),
+      ec120: !!(a.ec120||b.ec120), h130: !!(a.h130||b.h130), as350b2: !!(a.as350b2||b.as350b2), as350b3: !!(a.as350b3||b.as350b3),
       as355: !!(a.as355||b.as355), ec135: !!(a.ec135||b.ec135),
       exEmployee: !!(a.exEmployee||b.exEmployee),
       trainingDate: [a.trainingDate,b.trainingDate].filter(Boolean).sort().pop() || '',
@@ -3008,7 +3049,7 @@
     source.forEach(p=>{
       const key = ptrainNormalizeName(p.name);
       if(!key) return;
-      const entry = { ec120:!!p.ec120, h130:!!p.h130, as350:!!p.as350, as355:!!p.as355, ec135:!!p.ec135, trainingDate:p.trainingDate||'', exEmployee:!!p.exEmployee, licence:p.licence||'' };
+      const entry = { ec120:!!p.ec120, h130:!!p.h130, as350b2:!!p.as350, as350b3:!!p.as350, as355:!!p.as355, ec135:!!p.ec135, trainingDate:p.trainingDate||'', exEmployee:!!p.exEmployee, licence:p.licence||'' };
       map[key] = map[key] ? ptrainMergeStatus(map[key], entry) : entry;
     });
     ptrainPilotStatusCache = map;
@@ -3034,18 +3075,18 @@
     });
     const sharedNames = shared.map(p=>p.name);
     const rows = shared.map(p=>{
-      const st = status[p.name] || ptrainEmptyStatus();
+      const st = ptrainMigrateStatusEntry(status[p.name] || ptrainEmptyStatus());
       return Object.assign({}, ptrainEmptyStatus(), st, { name:p.name, licence: st.licence || p.license || '', linked:true });
     });
     Object.keys(status).forEach(name=>{
       if(!sharedNames.includes(name)){
-        rows.push(Object.assign({}, ptrainEmptyStatus(), status[name], { name, linked:false }));
+        rows.push(Object.assign({}, ptrainEmptyStatus(), ptrainMigrateStatusEntry(status[name]), { name, linked:false }));
       }
     });
     return rows;
   }
   function ptrainRowToStatus(r){
-    return { ec120:!!r.ec120, h130:!!r.h130, as350:!!r.as350, as355:!!r.as355, ec135:!!r.ec135, trainingDate:r.trainingDate||'', exEmployee:!!r.exEmployee, licence:r.licence||'' };
+    return { ec120:!!r.ec120, h130:!!r.h130, as350b2:!!r.as350b2, as350b3:!!r.as350b3, as355:!!r.as355, ec135:!!r.ec135, trainingDate:r.trainingDate||'', exEmployee:!!r.exEmployee, licence:r.licence||'' };
   }
   async function ptrainPersistRows(rows){
     const map = {};
@@ -3092,21 +3133,38 @@
   function backToPtBtn(){ return '<button class="back-btn" id="ptBackBtn">‹ Back to Pilot Training</button>'; }
 
   // ---------- checklist builders for the entry form (show everything; uncheck what doesn't apply) ----------
+  // A saved record's task is matched back to the master task by MCM key (appendix+num) whenever both sides
+  // have one -- NOT by text -- so re-wording a task in Manage (i.e. revising the MCM) never orphans a
+  // previously-checked box. Older saved records made before this only ever stored {text}, so those still
+  // fall back to a text match for backward compatibility.
+  function ptrainTaskKey(t){ return (t && t.appendix && t.num!=null) ? (t.appendix+'|'+t.num) : null; }
+  // A record's task matches a master task by MCM key (appendix+num) when BOTH sides have one; otherwise
+  // falls back to a text match. This is what makes an old record (saved before keys existed, so it only
+  // has {text}) still line up correctly with a master list that now carries keys.
+  function ptrainTaskMatches(rt, t, key){
+    const rtKey = ptrainTaskKey(rt);
+    if(rtKey && key) return rtKey===key;
+    return rt.text===t.text;
+  }
   function ptrainBuildTaskChecklist(masterTasks, existingRecordTasks){
-    const matched = new Set();
+    const matchedKeys = new Set(), matchedText = new Set();
     const items = masterTasks.map(t=>{
-      let checked;
+      const key = ptrainTaskKey(t);
+      let checked = false;
       if(existingRecordTasks){
-        checked = existingRecordTasks.some(rt=>rt.text===t.text);
-        if(checked) matched.add(t.text);
+        checked = existingRecordTasks.some(rt=> ptrainTaskMatches(rt, t, key));
+        if(checked){ if(key) matchedKeys.add(key); matchedText.add(t.text); }
       } else {
         checked = (t.num!=null); // current numbered items on by default; legacy "Additional" items off by default
       }
-      return { text:t.text, label:(t.num!=null?('#'+t.num+' '):'')+t.text, cat:t.category||'Other', checked, extra:false, isAdditionalCategory:(t.num==null), appendix:t.appendix||'', num:t.num };
+      const cardText = t.cardText || t.text;
+      return { text:t.text, cardText, label:(t.num!=null?(t.num+'. '):'')+cardText, cat:t.category||'Other', checked, extra:false, isAdditionalCategory:(t.num==null), appendix:t.appendix||'', num:t.num };
     });
     if(existingRecordTasks){
       existingRecordTasks.forEach(rt=>{
-        if(!matched.has(rt.text)) items.push({ text:rt.text, label:rt.text, cat:'Other (as recorded)', checked:true, extra:true, wasAdditional: !!rt.additional, appendix:'', num:null });
+        const rtKey = ptrainTaskKey(rt);
+        const already = (rtKey && matchedKeys.has(rtKey)) || matchedText.has(rt.text);
+        if(!already) items.push({ text:rt.text, cardText: rt.cardText||rt.text, label:rt.text, cat:'Other (as recorded)', checked:true, extra:true, wasAdditional: !!rt.additional, appendix:rt.appendix||'', num:rt.num!=null?rt.num:null });
       });
     }
     return items;
@@ -3157,9 +3215,9 @@
           '<button type="button" class="btn" id="ptLockBtn" style="margin-left:auto;">🔒 Lock</button>' +
         '</div>' +
         '<table class="pt-table">' +
-          '<colgroup><col style="width:150px;"><col style="width:110px;"><col style="width:40px;"><col style="width:40px;"><col style="width:40px;"><col style="width:40px;"><col style="width:40px;"><col style="width:92px;"><col style="width:48px;"><col style="width:52px;"><col style="width:76px;"></colgroup>' +
+          '<colgroup><col style="width:150px;"><col style="width:110px;"><col style="width:40px;"><col style="width:40px;"><col style="width:44px;"><col style="width:44px;"><col style="width:40px;"><col style="width:40px;"><col style="width:92px;"><col style="width:48px;"><col style="width:52px;"><col style="width:76px;"></colgroup>' +
           '<thead><tr>' +
-            '<th>Name</th><th>Licence</th><th>120</th><th>H130</th><th>350</th><th>355</th><th>135</th><th>Training Date</th><th>Due</th><th>Ex-Emp</th><th></th>' +
+            '<th>Name</th><th>Licence</th><th>120</th><th>H130</th><th>350B2</th><th>350B3</th><th>355</th><th>135</th><th>Training Date</th><th>Due</th><th>Ex-Emp</th><th></th>' +
           '</tr></thead><tbody id="ptGridBody"></tbody>' +
         '</table>' +
         '<div class="btn-row" style="margin-top:12px;"><button type="button" class="btn small" id="ptAddOrphanBtn">+ Track a pilot not yet in Settings roster</button></div>' +
@@ -3182,7 +3240,8 @@
             '<td class="lic"><input type="text" data-f="licence" data-i="'+i+'" value="'+escapeHTML(p.licence||'')+'"></td>' +
             '<td class="chk"><input type="checkbox" data-f="ec120" data-i="'+i+'" '+(p.ec120?'checked':'')+'></td>' +
             '<td class="chk"><input type="checkbox" data-f="h130" data-i="'+i+'" '+(p.h130?'checked':'')+'></td>' +
-            '<td class="chk"><input type="checkbox" data-f="as350" data-i="'+i+'" '+(p.as350?'checked':'')+'></td>' +
+            '<td class="chk"><input type="checkbox" data-f="as350b2" data-i="'+i+'" '+(p.as350b2?'checked':'')+'></td>' +
+            '<td class="chk"><input type="checkbox" data-f="as350b3" data-i="'+i+'" '+(p.as350b3?'checked':'')+'></td>' +
             '<td class="chk"><input type="checkbox" data-f="as355" data-i="'+i+'" '+(p.as355?'checked':'')+'></td>' +
             '<td class="chk"><input type="checkbox" data-f="ec135" data-i="'+i+'" '+(p.ec135?'checked':'')+'></td>' +
             '<td><input type="date" data-f="trainingDate" data-i="'+i+'" value="'+(p.trainingDate||'')+'"></td>' +
@@ -3317,7 +3376,7 @@
           '<td>'+escapeHTML(r.originalTrainingDate?fmtDateNice(r.originalTrainingDate):'—')+'</td>' +
           '<td>'+escapeHTML(r.additionalTrainingDate?fmtDateNice(r.additionalTrainingDate):'—')+'</td>' +
           '<td>'+escapeHTML(r.trainerName||'—')+'</td>' +
-          '<td style="white-space:nowrap;"><button class="btn small" data-action="view" data-id="'+r.id+'">View / Edit</button> <button class="btn small" data-action="print" data-id="'+r.id+'">Print</button></td>' +
+          '<td style="white-space:nowrap;"><button class="btn small" data-action="view" data-id="'+r.id+'">View / Edit</button> <button class="btn small" data-action="print" data-id="'+r.id+'">Print</button> <button class="btn small" data-action="full" data-id="'+r.id+'">Full Report</button></td>' +
         '</tr>'
       ).join('') +
       '</tbody></table>';
@@ -3327,6 +3386,7 @@
         const rec = records.find(r=>String(r.id)===btn.dataset.id);
         if(!rec) return;
         if(btn.dataset.action==='view') renderPilotTrainCard(rec, null);
+        else if(btn.dataset.action==='full') renderPilotTrainFull(rec.id);
         else openPrint(buildPtrainLabelHtml(rec));
       };
     });
@@ -3367,60 +3427,18 @@
         return st.manualOverride !== null ? st.manualOverride : adIsApplicable(a);
       }
 
-      // Two presentations of the exact same taskItems array / checked state -- toggling never loses or
-      // duplicates a checkmark, since both views just read and write the same underlying objects by index.
-      let taskViewMode = 'site';
-      function ptrainManualItemLabel(appendix, num){
-        if(appendix==='Hc' && num){ const m = /^\d+([a-z]+)$/.exec(num); if(m) return m[1]+'.'; }
-        return (num!=null?num:'')+'.';
-      }
+      // Only one presentation of the task checklist now -- grouped by site category, labelled with the
+      // MCM number ("1b. …") wherever the task is tied to one. The Hb/Hc manual layout, and the Hd/He
+      // tables, moved to the full Training Record report (see renderPilotTrainFull) since they're
+      // company-record/print concerns, not something you edit from this entry form.
       function renderTaskChecklistHtml(){
         let html = '';
-        if(taskViewMode==='manual'){
-          const manualItems = [];
-          taskItems.forEach((item,idx)=>{ if(item.appendix) manualItems.push({item,idx}); });
-          manualItems.sort((a,b)=>{
-            if(a.item.appendix !== b.item.appendix) return a.item.appendix < b.item.appendix ? -1 : 1;
-            return String(a.item.num).localeCompare(String(b.item.num), undefined, {numeric:true});
-          });
-          let lastGroup = null;
-          manualItems.forEach(({item,idx})=>{
-            const group = ptrainManualGroupLabel(item.appendix, item.num);
-            const groupKey = item.appendix+'|'+group;
-            if(groupKey !== lastGroup){
-              html += '<div class="pt-check-cat">Appendix "'+item.appendix+'"'+(group?' — '+escapeHTML(group):'')+'</div>';
-              lastGroup = groupKey;
-            }
-            html += '<label class="pt-check-row'+(item.extra?' pt-extra':'')+'"><input type="checkbox" data-role="task" data-idx="'+idx+'" '+(item.checked?'checked':'')+'> <span><b>'+escapeHTML(ptrainManualItemLabel(item.appendix,item.num))+'</b> '+escapeHTML(item.text)+'</span></label>';
-          });
-          const notInManual = taskItems.filter(i=>!i.appendix).length;
-          if(notInManual) html += '<p class="note" style="margin-top:8px;">'+notInManual+' task(s) on this card aren\'t numbered in the manual yet — switch to Site view to see (and check) them.</p>';
-          if(!manualItems.length) html = '<p class="note">No tasks are tagged with a manual appendix/# yet — set them in Manage Task &amp; AD Lists.</p>';
-          return html;
-        }
         let lastCat = null;
         taskItems.forEach((item,idx)=>{
           if(item.cat !== lastCat){ html += '<div class="pt-check-cat">'+escapeHTML(item.cat)+'</div>'; lastCat = item.cat; }
           html += '<label class="pt-check-row'+(item.extra?' pt-extra':'')+'"><input type="checkbox" data-role="task" data-idx="'+idx+'" '+(item.checked?'checked':'')+'> <span>'+escapeHTML(item.label)+'</span></label>';
         });
         return html;
-      }
-
-      function ptrainRenderApplicabilityTable(items, colLabel){
-        if(!items || !items.length) return '<p class="note">None configured yet — add rows in Manage Task &amp; AD Lists.</p>';
-        return '<div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th style="width:22%;">Aircraft applicability</th><th style="width:22%;">'+escapeHTML(colLabel)+'</th><th>Description</th><th style="width:14%;">Interval</th><th style="width:10%;">Pilot training</th></tr></thead><tbody>' +
-          items.map(r=>{
-            const ok = ptrainRegsApplicableToTypes(r.regs, selectedTypes);
-            const mainField = colLabel==='Task' ? r.task : r.doc;
-            return '<tr>' +
-              '<td>'+escapeHTML((r.regs||[]).join(', '))+'</td>' +
-              '<td>'+escapeHTML(mainField||'').replace(/\n/g,'<br>')+'</td>' +
-              '<td>'+escapeHTML(r.desc||'')+'</td>' +
-              '<td>'+escapeHTML(r.interval||'')+'</td>' +
-              '<td style="text-align:center;font-weight:800;">'+(ok?'✓':'')+'</td>' +
-            '</tr>';
-          }).join('') +
-        '</tbody></table></div>';
       }
 
       function renderAdChecklistHtml(){
@@ -3460,17 +3478,12 @@
           '</div>' +
 
           '<div class="pt-section-title">Elementary Work, Servicing &amp; Additional Training</div>' +
-          '<div class="btn-row" style="margin-bottom:6px;"><button type="button" class="btn small" id="ptTaskViewSite">Site view</button><button type="button" class="btn small" id="ptTaskViewManual">Manual view (Hb / Hc)</button></div>' +
           '<div id="ptTaskChecklist" class="pt-check-grid">' + renderTaskChecklistHtml() + '</div>' +
 
           '<div class="pt-section-title">Airworthiness Directives</div>' +
           '<div id="ptAdChecklist">' + renderAdChecklistHtml() + '</div>' +
 
-          '<div class="pt-section-title">Airworthiness Inspection Check (Appendix Hd)</div>' +
-          '<div id="ptHdTable">' + ptrainRenderApplicabilityTable(settings.hdItems||[], 'Task') + '</div>' +
-
-          '<div class="pt-section-title">AD &amp; AMOC List (Appendix He)</div>' +
-          '<div id="ptHeTable">' + ptrainRenderApplicabilityTable(settings.heItems||[], 'Document') + '</div>' +
+          '<p class="note">Appendix "Hd" (Airworthiness Inspection Check) and Appendix "He" (AD &amp; AMOC List) are on the full Training Record report — use the button below once this card is saved.</p>' +
 
           '<div class="pt-section-title">Trainee &amp; PRM</div>' +
           '<div class="field-grid">' +
@@ -3484,6 +3497,7 @@
 
           '<div class="btn-row" style="justify-content:flex-end;">' +
             '<button type="button" class="btn" id="ptPrintBtn">🖨️ Print Training Card (4in × 2in labels)</button>' +
+            '<button type="button" class="btn" id="ptFullBtn">📄 Full Training Record (Hb–He, 8.5×11)</button>' +
             '<button type="button" class="btn primary" id="ptSaveBtn">💾 Save Record</button>' +
           '</div>' +
         '</div>';
@@ -3505,12 +3519,8 @@
         holder.querySelectorAll('input[data-role="task"]').forEach(cb=>{
           cb.onchange = ()=>{ taskItems[parseInt(cb.dataset.idx,10)].checked = cb.checked; };
         });
-        document.getElementById('ptTaskViewSite').classList.toggle('primary', taskViewMode==='site');
-        document.getElementById('ptTaskViewManual').classList.toggle('primary', taskViewMode==='manual');
       }
       paintTaskChecklist();
-      document.getElementById('ptTaskViewSite').onclick = ()=>{ taskViewMode='site'; paintTaskChecklist(); };
-      document.getElementById('ptTaskViewManual').onclick = ()=>{ taskViewMode='manual'; paintTaskChecklist(); };
 
       function paintAdChecklist(){
         const holder = document.getElementById('ptAdChecklist');
@@ -3529,13 +3539,14 @@
         cb.onchange = ()=>{
           selectedTypes = PTRAIN_AIRCRAFT.filter(t=> document.querySelector('[data-ac="'+t+'"]').checked);
           paintAdChecklist();
-          document.getElementById('ptHdTable').innerHTML = ptrainRenderApplicabilityTable(settings.hdItems||[], 'Task');
-          document.getElementById('ptHeTable').innerHTML = ptrainRenderApplicabilityTable(settings.heItems||[], 'Document');
         };
       });
 
       function collectRecord(){
-        const tasks = taskItems.filter(i=>i.checked).map(i=> ({ text:i.text, additional: i.extra ? !!i.wasAdditional : !!i.isAdditionalCategory }));
+        // appendix/num/cardText travel with each checked task so a later load can match it back to the
+        // master list by MCM key (see ptrainTaskKey) instead of by text -- text is expected to change
+        // whenever the MCM itself is revised.
+        const tasks = taskItems.filter(i=>i.checked).map(i=> ({ text:i.text, cardText:i.cardText||i.text, appendix:i.appendix||'', num:(i.num!=null?i.num:null), additional: i.extra ? !!i.wasAdditional : !!i.isAdditionalCategory }));
         const ads = [];
         settings.ads.filter(a=>!a.archived).forEach(a=>{
           if(adIsChecked(a.text, a)) ads.push({ text:a.text, additional: !adIsApplicable(a) });
@@ -3556,12 +3567,16 @@
           acTypes: selectedTypes.slice(),
           tasks: tasks,
           ads: ads,
+          hdOverrides: rec.hdOverrides || {},
+          heOverrides: rec.heOverrides || {},
           imported: false,
           createdAt: rec.createdAt || new Date().toISOString(),
         };
       }
 
-      document.getElementById('ptSaveBtn').onclick = async ()=>{
+      // Shared by both Save and Full Training Record (which also has to save first, since the report
+      // is generated from the saved record) so the roster/due-date sync only lives in one place.
+      async function ptrainSaveAndSyncStatus(){
         const newRec = collectRecord();
         const idx = records.findIndex(r=>r.id===newRec.id);
         if(idx>=0) records[idx] = newRec; else records.push(newRec);
@@ -3569,7 +3584,7 @@
 
         if(newRec.traineeName){
           const status = await loadPtrainPilotStatus();
-          const cur = Object.assign(ptrainEmptyStatus(), status[newRec.traineeName]||{});
+          const cur = Object.assign(ptrainEmptyStatus(), ptrainMigrateStatusEntry(status[newRec.traineeName])||{});
           if(newRec.traineeLicence) cur.licence = newRec.traineeLicence;
           newRec.acTypes.forEach(t=>{ cur[t.toLowerCase()] = true; });
           const latest = [newRec.originalTrainingDate, newRec.additionalTrainingDate].filter(Boolean).sort().pop();
@@ -3577,12 +3592,22 @@
           status[newRec.traineeName] = cur;
           await savePtrainPilotStatus(status);
         }
+        return newRec;
+      }
+
+      document.getElementById('ptSaveBtn').onclick = async ()=>{
+        await ptrainSaveAndSyncStatus();
         // back to the main page so the updated due date is visible right away
         renderPilotTraining();
       };
 
       document.getElementById('ptPrintBtn').onclick = ()=>{
         openPrint(buildPtrainLabelHtml(collectRecord()));
+      };
+
+      document.getElementById('ptFullBtn').onclick = async ()=>{
+        const newRec = await ptrainSaveAndSyncStatus();
+        renderPilotTrainFull(newRec.id);
       };
     });
   }
@@ -3650,6 +3675,225 @@
     return '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' + frontLabels + backLabels;
   }
 
+  // ---------- Full Training Record (Appendix "Hb" - "He"), company record copy printed on 8.5x11 ----------
+  // Same underlying record as the 4x2 training-card label (tasks/ads/acTypes) but laid out like the manual
+  // itself, plus the Hd/He applicability tables with a per-row manual override -- a specific tail's actual
+  // inspection programme can differ from its type's default. This screen only ever DISPLAYS the Hb/Hc/AD
+  // checklist (edit that on the Training Card itself, which is the single source of truth); only the Hd/He
+  // "Pilot training" column is editable here, since that's the one thing this report adds beyond the card.
+  function ptrainOverrideEffective(map, key, auto){
+    return Object.prototype.hasOwnProperty.call(map||{}, key) ? !!map[key] : auto;
+  }
+  function ptrainHdHeMapKey(colLabel, r){
+    return colLabel==='Task' ? (r.task||'') : String(r.doc||'').split('\n')[0];
+  }
+  async function renderPilotTrainFull(recordId){
+    showView('PilotTrainFull');
+    const el = document.getElementById('viewPilotTrainFull');
+    el.innerHTML = backToPtBtn() + '<div class="panel"><p class="form-sub">Loading…</p></div>';
+    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+
+    const [settings, records] = await Promise.all([loadPtrainSettings(), loadPtrainRecords()]);
+    const rec = records.find(r=> String(r.id)===String(recordId));
+    if(!rec){
+      el.innerHTML = backToPtBtn() + '<div class="panel"><p class="form-sub">Record not found — open the pilot&rsquo;s Training Card and save it first.</p></div>';
+      document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
+      return;
+    }
+    if(!rec.hdOverrides) rec.hdOverrides = {};
+    if(!rec.heOverrides) rec.heOverrides = {};
+    const selectedTypes = (rec.acTypes||[]).slice();
+    const taskItems = ptrainBuildTaskChecklist(settings.tasks, rec.tasks);
+
+    const manualItems = [];
+    taskItems.forEach(item=>{ if(item.appendix) manualItems.push(item); });
+    manualItems.sort((a,b)=>{
+      if(a.appendix !== b.appendix) return a.appendix < b.appendix ? -1 : 1;
+      return String(a.num).localeCompare(String(b.num), undefined, {numeric:true});
+    });
+    const extraTasks = taskItems.filter(i=>!i.appendix);
+
+    function manualRowsHtml(appendixFilter){
+      let html = '', lastGroup = null;
+      manualItems.filter(i=>i.appendix===appendixFilter).forEach(item=>{
+        const group = ptrainManualGroupLabel(item.appendix, item.num);
+        if(group !== lastGroup){ html += '<div class="pt-check-cat">'+escapeHTML(group)+'</div>'; lastGroup = group; }
+        html += '<label class="pt-check-row"><input type="checkbox" disabled '+(item.checked?'checked':'')+'> <span><b>'+escapeHTML(ptrainManualItemLabel(item.appendix,item.num))+'</b> '+escapeHTML(item.text)+'</span></label>';
+      });
+      return html || '<p class="note">No items numbered yet — set appendix/# in Manage Task &amp; AD Lists.</p>';
+    }
+    function adRowsHtml(){
+      return settings.ads.filter(a=>!a.archived).map(a=>{
+        const checked = (rec.ads||[]).some(r=>r.text===a.text);
+        return '<label class="pt-check-row"><input type="checkbox" disabled '+(checked?'checked':'')+'> <span>'+escapeHTML(a.text)+'</span></label>';
+      }).join('') || '<p class="note">None configured yet.</p>';
+    }
+    function hdHeTableHtml(items, colLabel, overrides){
+      if(!items || !items.length) return '<p class="note">None configured yet — add rows in Manage Task &amp; AD Lists.</p>';
+      return '<div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th style="width:20%;">Registration(s)</th><th style="width:20%;">'+escapeHTML(colLabel)+'</th><th>Description</th><th style="width:13%;">Interval</th><th style="width:12%;">Pilot training</th></tr></thead><tbody>' +
+        items.map(r=>{
+          const key = ptrainHdHeMapKey(colLabel, r);
+          const auto = ptrainRegsApplicableToTypes(r.regs, selectedTypes);
+          const effective = ptrainOverrideEffective(overrides, key, auto);
+          const overridden = Object.prototype.hasOwnProperty.call(overrides, key);
+          const dispVal = colLabel==='Task' ? (r.task||'') : (r.doc||'');
+          return '<tr>' +
+            '<td>'+escapeHTML((r.regs||[]).join(', '))+'</td>' +
+            '<td>'+escapeHTML(dispVal).replace(/\n/g,'<br>')+'</td>' +
+            '<td>'+escapeHTML(r.desc||'')+'</td>' +
+            '<td>'+escapeHTML(r.interval||'')+'</td>' +
+            '<td style="text-align:center;">' +
+              '<input type="checkbox" data-hhkey="'+escapeHTML(key)+'" '+(effective?'checked':'')+'>' +
+              (overridden ? ' <a href="#" class="hh-clear" data-hhkey="'+escapeHTML(key)+'" title="Clear manual override — back to automatic">↺</a>' : '') +
+            '</td>' +
+          '</tr>';
+        }).join('') +
+      '</tbody></table></div>';
+    }
+
+    el.innerHTML =
+      backToPtBtn() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Full Training Record <span style="font-weight:400;color:var(--grey-strong);font-size:14px;">— ID '+rec.id+'</span></h2>' +
+        '<p class="form-sub">Company record copy of this pilot&rsquo;s Elementary Task Training, pre-filled from the Pilot Training Card (read-only here — edit the checklist itself on the Training Card). Appendix &quot;Hd&quot;/&quot;He&quot; rows can be overridden per registration below; clear an override with ↺ to go back to automatic.</p>' +
+        '<div class="field-grid" style="margin-bottom:6px;">' +
+          '<div class="field"><label>Trainee</label><div>'+escapeHTML(rec.traineeName||'—')+(rec.traineeLicence?' ('+escapeHTML(rec.traineeLicence)+')':'')+'</div></div>' +
+          '<div class="field"><label>PRM</label><div>'+escapeHTML(rec.trainerName||'—')+(rec.trainerLicence?' — ACA # '+escapeHTML(rec.trainerLicence):'')+'</div></div>' +
+          '<div class="field"><label>A/C Type(s) trained on</label><div>'+(escapeHTML(selectedTypes.join(', '))||'—')+'</div></div>' +
+          '<div class="field"><label>Original / Additional Training Date</label><div>'+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'—')+' / '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'—')+'</div></div>' +
+        '</div>' +
+
+        '<div class="pt-section-title">Appendix &quot;Hb&quot; — Servicing / Additional Training</div>' +
+        '<div class="pt-check-grid">' + manualRowsHtml('Hb') + '</div>' +
+
+        '<div class="pt-section-title">Appendix &quot;Hc&quot; — Elementary Task Training Form</div>' +
+        '<div class="pt-check-grid">' + manualRowsHtml('Hc') + '</div>' +
+
+        (extraTasks.length ? (
+          '<div class="pt-section-title">Additional Elementary Tasks (not numbered in the MCM)</div>' +
+          '<div class="pt-check-grid">' + extraTasks.map(item=>'<label class="pt-check-row"><input type="checkbox" disabled '+(item.checked?'checked':'')+'> <span>'+escapeHTML(item.text)+'</span></label>').join('') + '</div>'
+        ) : '') +
+
+        '<div class="pt-section-title">Airworthiness Directives Training</div>' +
+        '<div class="pt-check-grid">' + adRowsHtml() + '</div>' +
+
+        '<div class="pt-section-title">Appendix &quot;Hd&quot; — Airworthiness Inspection Check</div>' +
+        '<div id="rptHdTable">' + hdHeTableHtml(settings.hdItems||[], 'Task', rec.hdOverrides) + '</div>' +
+
+        '<div class="pt-section-title">Appendix &quot;He&quot; — AD &amp; AMOC List</div>' +
+        '<div id="rptHeTable">' + hdHeTableHtml(settings.heItems||[], 'Document', rec.heOverrides) + '</div>' +
+
+        '<div class="btn-row" style="justify-content:flex-end;margin-top:14px;">' +
+          '<button type="button" class="btn primary" id="rptPrintBtn">🖨️ Print Full Report (8.5 × 11)</button>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTrainCard(rec, null);
+
+    function wireOverrides(){
+      el.querySelectorAll('#rptHdTable input[type="checkbox"]').forEach(cb=>{
+        cb.onchange = async ()=>{ rec.hdOverrides[cb.dataset.hhkey] = cb.checked; await savePtrainRecords(records); paintTable('Hd'); };
+      });
+      el.querySelectorAll('#rptHeTable input[type="checkbox"]').forEach(cb=>{
+        cb.onchange = async ()=>{ rec.heOverrides[cb.dataset.hhkey] = cb.checked; await savePtrainRecords(records); paintTable('He'); };
+      });
+      el.querySelectorAll('#rptHdTable a.hh-clear').forEach(a=>{
+        a.onclick = async (e)=>{ e.preventDefault(); delete rec.hdOverrides[a.dataset.hhkey]; await savePtrainRecords(records); paintTable('Hd'); };
+      });
+      el.querySelectorAll('#rptHeTable a.hh-clear').forEach(a=>{
+        a.onclick = async (e)=>{ e.preventDefault(); delete rec.heOverrides[a.dataset.hhkey]; await savePtrainRecords(records); paintTable('He'); };
+      });
+    }
+    function paintTable(which){
+      if(which==='Hd') document.getElementById('rptHdTable').innerHTML = hdHeTableHtml(settings.hdItems||[], 'Task', rec.hdOverrides);
+      else document.getElementById('rptHeTable').innerHTML = hdHeTableHtml(settings.heItems||[], 'Document', rec.heOverrides);
+      wireOverrides();
+    }
+    wireOverrides();
+
+    document.getElementById('rptPrintBtn').onclick = ()=>{
+      openPrint(buildPtrainFullReportPrintHtml(rec, settings, selectedTypes, taskItems, manualItems, extraTasks));
+    };
+  }
+
+  const PTRAIN_FULL_PRINT_STYLES = '<style>' +
+    '@page{size:letter;margin:0.55in;}' +
+    '.rpt-meta{font-size:11.5px;margin:8px 0 6px;display:flex;flex-wrap:wrap;gap:3px 24px;}' +
+    '.rpt-sec-title{font-weight:800;font-size:13px;margin:13px 0 5px;border-bottom:1.2px solid #000;padding-bottom:2px;}' +
+    '.rpt-group{font-weight:700;font-size:11.5px;margin:6px 0 2px;}' +
+    '.rpt-row{display:flex;align-items:flex-start;gap:7px;font-size:11px;line-height:1.35;padding:1.5px 0;}' +
+    '.rpt-box{display:inline-block;width:14px;height:14px;border:1.3px solid #000;text-align:center;line-height:13px;font-size:10.5px;font-weight:800;flex:0 0 auto;margin-top:1px;}' +
+    '.rpt-table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px;}' +
+    '.rpt-table th,.rpt-table td{border:1px solid #000;padding:3px 5px;vertical-align:top;text-align:left;}' +
+    '.rpt-table th{background:#eee;}' +
+    '.rpt-table td.ctr{text-align:center;font-weight:800;}' +
+    '.rpt-note{font-size:10px;color:#333;font-style:italic;margin-top:3px;}' +
+    '.rpt-sign{display:flex;gap:34px;flex-wrap:wrap;font-size:11.5px;margin-top:16px;}' +
+    '.rpt-sign .sl{flex:1;min-width:230px;border-bottom:1px solid #000;padding-bottom:18px;}' +
+  '</style>';
+  function buildPtrainFullReportPrintHtml(rec, settings, selectedTypes, taskItems, manualItems, extraTasks){
+    function box(on){ return '<span class="rpt-box">'+(on?'✓':'X')+'</span>'; }
+    let hbHtml='', hcHtml='', lastGroup=null;
+    manualItems.forEach(item=>{
+      const group = ptrainManualGroupLabel(item.appendix, item.num);
+      const groupKey = item.appendix+'|'+group;
+      let row = '';
+      if(groupKey !== lastGroup){ row += '<div class="rpt-group">'+escapeHTML(group)+'</div>'; lastGroup = groupKey; }
+      row += '<div class="rpt-row">'+box(item.checked)+'<span><b>'+escapeHTML(ptrainManualItemLabel(item.appendix,item.num))+'</b> '+escapeHTML(item.text)+'</span></div>';
+      if(item.appendix==='Hb') hbHtml += row; else hcHtml += row;
+    });
+    const extraHtml = extraTasks.length ? (
+      '<div class="rpt-sec-title">Additional Elementary Tasks (not numbered in the MCM)</div>' +
+      extraTasks.map(item=>'<div class="rpt-row">'+box(item.checked)+'<span>'+escapeHTML(item.text)+'</span></div>').join('')
+    ) : '';
+    const adHtml = settings.ads.filter(a=>!a.archived).map(a=>{
+      const checked = (rec.ads||[]).some(r=>r.text===a.text);
+      return '<div class="rpt-row">'+box(checked)+'<span>'+escapeHTML(a.text)+'</span></div>';
+    }).join('') || '<p class="rpt-note">None configured yet.</p>';
+
+    function hdHeTable(items, colLabel, overrides){
+      if(!items || !items.length) return '<p class="rpt-note">None configured yet.</p>';
+      return '<table class="rpt-table"><thead><tr><th>Registration(s)</th><th>'+escapeHTML(colLabel)+'</th><th>Description</th><th>Interval</th><th>Pilot training</th></tr></thead><tbody>' +
+        items.map(r=>{
+          const key = ptrainHdHeMapKey(colLabel, r);
+          const auto = ptrainRegsApplicableToTypes(r.regs, selectedTypes);
+          const effective = ptrainOverrideEffective(overrides, key, auto);
+          const dispVal = colLabel==='Task' ? (r.task||'') : (r.doc||'');
+          return '<tr>' +
+            '<td>'+escapeHTML((r.regs||[]).join(', '))+'</td>' +
+            '<td>'+escapeHTML(dispVal).replace(/\n/g,'<br>')+'</td>' +
+            '<td>'+escapeHTML(r.desc||'')+'</td>' +
+            '<td>'+escapeHTML(r.interval||'')+'</td>' +
+            '<td class="ctr">'+(effective?'✓':'X')+'</td>' +
+          '</tr>';
+        }).join('') +
+      '</tbody></table>';
+    }
+
+    return PRINT_STYLES + PTRAIN_FULL_PRINT_STYLES +
+      '<div class="pf-head">' +
+        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+        '<div class="pf-title-block"><h1>Elementary Task Training &amp; Compliance Record</h1><div class="pf-sub">Appendices &quot;Hb&quot; – &quot;He&quot; — company record copy (ID '+escapeHTML(String(rec.id))+')</div></div>' +
+      '</div>' +
+      '<div class="rpt-meta">' +
+        '<span><b>Trainee:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' ('+escapeHTML(rec.traineeLicence)+')':'')+'</span>' +
+        '<span><b>PRM:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?' — ACA # '+escapeHTML(rec.trainerLicence):'')+'</span>' +
+        '<span><b>A/C Type(s):</b> '+(escapeHTML(selectedTypes.join(', '))||'—')+'</span>' +
+        '<span><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'—')+'</span>' +
+        '<span><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'—')+'</span>' +
+      '</div>' +
+      '<div class="rpt-sec-title">Appendix &quot;Hb&quot; — Servicing / Additional Training</div>' + (hbHtml||'<p class="rpt-note">No Hb items numbered yet.</p>') +
+      '<div class="rpt-sec-title">Appendix &quot;Hc&quot; — Elementary Task Training Form</div>' + (hcHtml||'<p class="rpt-note">No Hc items numbered yet.</p>') +
+      extraHtml +
+      '<div class="rpt-sec-title">Airworthiness Directives Training</div>' + adHtml +
+      '<div class="rpt-sec-title">Appendix &quot;Hd&quot; — Airworthiness Inspection Check</div>' + hdHeTable(settings.hdItems||[], 'Task', rec.hdOverrides) +
+      '<div class="rpt-sec-title">Appendix &quot;He&quot; — AD &amp; AMOC List</div>' + hdHeTable(settings.heItems||[], 'Document', rec.heOverrides) +
+      '<div class="rpt-sign">' +
+        '<div class="sl"><b>Trainee Signature</b> ('+escapeHTML(rec.traineeName||'')+')</div>' +
+        '<div class="sl"><b>PRM Signature</b> ('+escapeHTML(rec.trainerName||'')+')</div>' +
+      '</div>';
+  }
+
   // ---------- admin: manage the task / AD master lists (add an MCM link once your manual is hosted online) ----------
   async function renderPilotTrainManage(){
     showView('PilotTrainManage');
@@ -3670,9 +3914,9 @@
         '<h2 class="form-title">Manage Task &amp; AD Lists</h2>' +
         '<p class="form-sub">These are the options offered on every Pilot Training Card. Tag each AD with the aircraft model(s) it applies to so the entry form can show it automatically for that model — archive an AD instead of deleting it to keep it out of new cards without losing it from past records. Add an MCM link once your Maintenance Control Manual is hosted online.</p>' +
         '<div class="pt-section-title">Elementary Work / Servicing / Opp. Check tasks</div>' +
-        '<p class="note">"Appendix" + "#" are the manual reference (e.g. Hc / 1b) shown in the training card\'s "Manual view" — leave blank for tasks not yet in the manual. Auto-fill matches by wording against the real Hb/Hc pages; review before saving, it never touches the text.</p>' +
+        '<p class="note">"Appendix" + "#" are the manual reference (e.g. Hc / 1b) shown on the Full Training Record report — leave blank for tasks not yet in the manual. "Text" is the canonical MCM wording (editing it here IS revising the MCM — the change flows through to the card and the full report automatically). "Card Text" is an optional shortened version for the small 4×2 card/label only; leave it blank to print the same wording as the MCM. Auto-fill matches by wording against the real Hb/Hc pages and only ever sets Appendix/#; review before saving, it never touches either text field.</p>' +
         '<div class="btn-row"><button class="btn small" id="ptmAutoNumber">🪄 Auto-fill Hb/Hc numbering from manual</button></div>' +
-        '<div style="overflow-x:auto;"><table class="list-table"><thead><tr><th>Appendix</th><th>#</th><th>Category</th><th>Text</th><th>MCM Link</th><th></th></tr></thead><tbody id="ptmTaskRows"></tbody></table></div>' +
+        '<div style="overflow-x:auto;"><table class="list-table"><thead><tr><th>Appendix</th><th>#</th><th>Category</th><th>Text (MCM wording)</th><th>Card Text (optional)</th><th>MCM Link</th><th></th></tr></thead><tbody id="ptmTaskRows"></tbody></table></div>' +
         '<div class="btn-row"><button class="btn small" id="ptmAddTask">+ Add task</button></div>' +
         '<div class="pt-section-title">Airworthiness Directives</div>' +
         '<div style="overflow-x:auto;"><table class="list-table"><thead><tr><th>AD</th>' + PTRAIN_AIRCRAFT.map(t=>'<th>'+t+'</th>').join('') + '<th>MCM / AD Link</th><th>Status</th><th></th></tr></thead><tbody id="ptmAdRows"></tbody></table></div>' +
@@ -3693,7 +3937,8 @@
         '<td><input data-i="'+i+'" data-f="appendix" value="'+escapeHTML(t.appendix||'')+'" style="width:60px;" placeholder="Hc"></td>' +
         '<td><input data-i="'+i+'" data-f="num" value="'+(t.num!=null?t.num:'')+'" style="width:50px;" placeholder="1b"></td>' +
         '<td><input data-i="'+i+'" data-f="category" value="'+escapeHTML(t.category||'')+'" style="width:100px;"></td>' +
-        '<td><input data-i="'+i+'" data-f="text" value="'+escapeHTML(t.text)+'" style="min-width:260px;width:100%;"></td>' +
+        '<td><input data-i="'+i+'" data-f="text" value="'+escapeHTML(t.text)+'" style="min-width:220px;width:100%;"></td>' +
+        '<td><input data-i="'+i+'" data-f="cardText" value="'+escapeHTML(t.cardText||'')+'" placeholder="(same as MCM text)" style="min-width:180px;width:100%;"></td>' +
         '<td><input data-i="'+i+'" data-f="mcmLink" value="'+escapeHTML(t.mcmLink||'')+'" placeholder="https://…" style="min-width:160px;width:100%;"></td>' +
         '<td><button class="rm-btn" data-role="rmTask" data-i="'+i+'">✕</button></td>' +
       '</tr>'
@@ -3791,7 +4036,7 @@
       ptrainManageBody(settings);
       alert(n ? ('Filled in appendix/# for '+n+' task(s) that matched the manual\'s wording. Review the highlighted columns, then Save Lists.') : 'No new matches found — every task\'s wording either already matches or isn\'t in Hb/Hc yet.');
     };
-    document.getElementById('ptmAddTask').onclick = ()=>{ settings.tasks.push({num:null,category:'Additional',text:'',appendix:'',mcmLink:''}); ptrainManageBody(settings); };
+    document.getElementById('ptmAddTask').onclick = ()=>{ settings.tasks.push({num:null,category:'Additional',text:'',cardText:'',appendix:'',mcmLink:''}); ptrainManageBody(settings); };
     document.getElementById('ptmAddAd').onclick = ()=>{ settings.ads.push({text:'',mcmLink:'',models:[],archived:false}); ptrainManageBody(settings); };
     document.getElementById('ptmAddHd').onclick = ()=>{ settings.hdItems.push({regs:[],task:'',desc:'',interval:''}); ptrainManageBody(settings); };
     document.getElementById('ptmAddHe').onclick = ()=>{ settings.heItems.push({regs:[],doc:'',desc:'',interval:''}); ptrainManageBody(settings); };
