@@ -3554,7 +3554,8 @@
             '<div class="field"><label for="ptAdditionalDate">Additional Training Date</label><input type="date" id="ptAdditionalDate" value="'+(rec.additionalTrainingDate||'')+'"></div>' +
           '</div>' +
 
-          '<div class="btn-row" style="justify-content:flex-end;">' +
+          '<div class="btn-row" style="justify-content:flex-end;align-items:center;">' +
+            '<span id="ptSaveStatus" style="font-size:13px;color:var(--grey-strong);"></span>' +
             '<button type="button" class="btn" id="ptPrintBtn">🖨️ Print Training Card (4in × 2in labels)</button>' +
             '<button type="button" class="btn" id="ptFullBtn">📄 Full Training Record (Hb–He, 8.5×11)</button>' +
             '<button type="button" class="btn primary" id="ptSaveBtn">💾 Save Record</button>' +
@@ -3663,16 +3664,26 @@
       }
 
       document.getElementById('ptSaveBtn').onclick = async ()=>{
+        const statusEl = document.getElementById('ptSaveStatus');
+        if(statusEl) statusEl.textContent = 'Saving…';
         const saved = await ptrainSaveAndSyncStatus();
+        // Keep this card's own `rec` (id, createdAt, etc.) in sync with what was just saved, WITHOUT
+        // navigating away or rebuilding the form -- Mario asked to stay on this exact page after Save
+        // instead of being bounced back to the roster, so the checklist/AC-type/date fields on screen
+        // are left exactly as he left them; only the bookkeeping fields need to follow the saved record
+        // (otherwise a second Save on a brand-new record would mint a fresh "createdAt" every time).
+        Object.assign(rec, saved);
         // The record's own local copy (and this browser's cache) is always updated regardless -- this
         // warning only fires when the write to the shared cloud database itself was rejected, which is
         // exactly the failure mode that used to look like "I unchecked a box and it didn't save": the
         // change looked fine here but never actually reached the database, so it reverted on next load.
         if(saved.__synced === false){
+          if(statusEl) statusEl.textContent = '';
           alert('Saved on this device, but the cloud sync failed, so this change may not show up elsewhere or after a reload.\n\nDetails: ' + (window.__storageLastError || 'unknown error') + '\n\nPlease try Save again, and let Mario know if this keeps happening.');
+        } else if(statusEl){
+          statusEl.textContent = '✅ Saved';
+          setTimeout(()=>{ if(statusEl.textContent==='✅ Saved') statusEl.textContent=''; }, 4000);
         }
-        // back to the main page so the updated due date is visible right away
-        renderPilotTraining();
       };
 
       document.getElementById('ptPrintBtn').onclick = ()=>{
@@ -3957,10 +3968,10 @@
   // since that one's filled in by hand. The PRM's licence value carries the full "ACA #, AMO 100-96"
   // string (rec.trainerLicence already includes the AMO suffix -- see PTRAIN_AMO_NUMBER) rather than
   // just the bare ACA number.
-  function ptrainSignRow(signerCaption, licenceVal, dateVal){
+  function ptrainSignRow(signerCaption, licenceVal, dateVal, licenceCaption){
     return '<div class="rpt-signgrid">' +
       '<div class="rpt-signcol"><div class="rpt-signval">&nbsp;</div><div class="rpt-signline"></div><div class="rpt-signcap">'+signerCaption+'</div></div>' +
-      '<div class="rpt-signcol"><div class="rpt-signval">'+escapeHTML(licenceVal||'')+'</div><div class="rpt-signline"></div><div class="rpt-signcap">Licence #</div></div>' +
+      '<div class="rpt-signcol"><div class="rpt-signval">'+escapeHTML(licenceVal||'')+'</div><div class="rpt-signline"></div><div class="rpt-signcap">'+(licenceCaption||'Licence #')+'</div></div>' +
       '<div class="rpt-signcol"><div class="rpt-signval">'+(dateVal?fmtDateNice(dateVal):'')+'</div><div class="rpt-signline"></div><div class="rpt-signcap">Date</div></div>' +
     '</div>';
   }
@@ -3984,7 +3995,7 @@
       (opts.noteInline ? '' : '<div class="rpt-note">Note: If as a result of these checks, a defect is found or suspected, the aircraft shall be grounded until a qualified AME can inspect it.</div>') +
       '<div class="rpt-understand">I, <span class="ln">'+escapeHTML(rec.traineeName||'')+'</span>, understand each point mentioned above.</div>' +
       ptrainSignRow('Pilot Signature', rec.traineeLicence, dateVal) +
-      ptrainSignRow('AME Signature', rec.trainerLicence, dateVal) +
+      ptrainSignRow('AME Signature', (rec.trainerName ? rec.trainerName+' — ' : '')+(rec.trainerLicence||''), dateVal, 'AME Name / Licence #') +
       (rev ? (
         '<div class="rpt-footerbox">' +
           '<div class="r1"><span>Revision: # '+rev.revision+'</span><span>Page '+rev.page+'</span></div>' +
