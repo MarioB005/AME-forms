@@ -3853,42 +3853,42 @@
   // with the trainee/PRM names, licence numbers and training date already on the record -- only the
   // physical signature itself is left blank.
   const PTRAIN_FULL_PRINT_STYLES = '<style>' +
-    '@page{size:letter;margin:0.65in;}' +
+    '@page{size:letter;margin:0.55in;}' +
     '.rpt-page,.rpt-page *{font-family:Georgia,Cambria,"Times New Roman","Liberation Serif",serif;}' +
     '.rpt-page{color:#000;page-break-after:always;min-height:9.2in;display:flex;flex-direction:column;}' +
     '.rpt-page:last-child{page-break-after:auto;}' +
-    '.rpt-hdrow{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;}' +
-    '.rpt-doctitle{text-align:center;font-style:italic;font-size:13px;margin-bottom:2px;}' +
-    '.rpt-apptitle{text-align:center;font-size:19px;margin:4px 0 2px;}' +
+    '.rpt-hdrow{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}' +
+    '.rpt-doctitle{text-align:center;font-style:italic;font-size:12px;margin-bottom:2px;}' +
+    '.rpt-apptitle{text-align:center;font-size:18px;margin:3px 0 2px;}' +
     '.rpt-plaintitle{text-align:center;font-weight:700;font-size:16px;margin:14px 0 10px;}' +
-    '.rpt-subtitle{text-align:center;font-weight:700;font-size:14px;margin-bottom:10px;}' +
+    '.rpt-subtitle{text-align:center;font-weight:700;font-size:13px;margin-bottom:7px;}' +
     '.rpt-subtitle .small{font-size:10px;}' +
-    '.rpt-intro{font-size:12px;line-height:1.5;margin-bottom:8px;}' +
-    '.rpt-tasklabel{font-weight:700;font-size:14px;margin:8px 0 4px;}' +
-    '.rpt-grouphead{font-size:12px;margin:9px 0 3px;padding-left:24px;font-weight:700;text-decoration:underline;}' +
-    '.rpt-groupintro{font-size:12px;line-height:1.4;margin:6px 0 3px;}' +
-    '.rpt-item{display:flex;gap:8px;font-size:12px;line-height:1.4;margin:5px 0;}' +
+    '.rpt-intro{font-size:11px;line-height:1.35;margin-bottom:5px;}' +
+    '.rpt-tasklabel{font-weight:700;font-size:13px;margin:6px 0 3px;}' +
+    '.rpt-grouphead{font-size:11px;margin:5px 0 2px;padding-left:24px;font-weight:700;text-decoration:underline;}' +
+    '.rpt-groupintro{font-size:11px;line-height:1.25;margin:4px 0 2px;}' +
+    '.rpt-item{display:flex;gap:8px;font-size:11px;line-height:1.25;margin:2.5px 0;}' +
     '.rpt-item.top{padding-left:0;}' +
     '.rpt-item.sub{padding-left:34px;}' +
-    '.rpt-item .box{flex:0 0 auto;display:inline-block;width:13px;height:13px;border:1.1px solid #000;text-align:center;line-height:12px;font-size:10.5px;font-weight:800;margin-top:2px;}' +
+    '.rpt-item .box{flex:0 0 auto;display:inline-block;width:12px;height:12px;border:1.1px solid #000;text-align:center;line-height:11px;font-size:10px;font-weight:800;margin-top:2px;}' +
     '.rpt-item .lbl{font-weight:700;margin-right:2px;}' +
-    '.rpt-note{font-size:12px;line-height:1.4;margin:14px 0;}' +
-    '.rpt-understand{font-size:12px;margin:14px 0 26px;}' +
+    '.rpt-note{font-size:11px;line-height:1.3;margin:8px 0;}' +
+    '.rpt-understand{font-size:11px;margin:8px 0 10px;}' +
     '.rpt-understand .ln{display:inline-block;min-width:230px;border-bottom:1px solid #000;padding:0 4px;font-weight:700;text-align:center;}' +
-    '.rpt-signblock{margin-bottom:10px;}' +
-    '.rpt-signrow{display:flex;gap:40px;flex-wrap:wrap;}' +
-    '.rpt-signrow .sc{flex:1;min-width:170px;border-bottom:1px solid #000;height:18px;}' +
-    '.rpt-signlbl{display:flex;gap:40px;font-size:11.5px;flex-wrap:wrap;margin-bottom:12px;}' +
-    '.rpt-signlbl .sc{flex:1;min-width:170px;}' +
-    '.rpt-signlbl .fill{font-weight:700;}' +
-    '.rpt-table{width:100%;border-collapse:collapse;font-size:9.6px;margin-top:8px;}' +
-    '.rpt-table th,.rpt-table td{border:1px solid #000;padding:3px 5px;vertical-align:top;text-align:left;}' +
+    '.rpt-signgrid{display:flex;gap:32px;flex-wrap:wrap;margin-bottom:6px;}' +
+    '.rpt-signcol{flex:1;min-width:160px;}' +
+    '.rpt-signval{font-size:11px;font-weight:700;min-height:13px;}' +
+    '.rpt-signline{border-bottom:1px solid #000;height:13px;}' +
+    '.rpt-signcap{font-size:10.5px;margin-top:2px;}' +
+    '.rpt-signcap .who{font-weight:700;}' +
+    '.rpt-table{width:100%;border-collapse:collapse;font-size:8.6px;margin-top:5px;}' +
+    '.rpt-table th,.rpt-table td{border:1px solid #000;padding:2px 4px;vertical-align:top;text-align:left;line-height:1.2;}' +
     '.rpt-table th{font-weight:700;text-align:center;}' +
     '.rpt-table td.ctr{text-align:center;font-weight:800;}' +
     '.rpt-table td.appl{font-weight:700;}' +
-    '.rpt-footerbox{margin-top:auto;border:1px solid #000;padding:8px 12px;font-size:11.5px;}' +
+    '.rpt-footerbox{margin-top:auto;border:1px solid #000;padding:6px 12px;font-size:11px;}' +
     '.rpt-footerbox .r1{display:flex;justify-content:space-between;}' +
-    '.rpt-footerbox .r2{margin-top:12px;}' +
+    '.rpt-footerbox .r2{margin-top:8px;}' +
   '</style>';
 
   // Revision/page metadata for each real manual page -- transcribed from the D.I.R.-to-MCM PDF Mario
@@ -3905,14 +3905,25 @@
     '2': 'Repetitive visual inspections or operational checks, not involving disassembly and not performed as part of the aircraft maintenance schedule, that are required at intervals of less than 100 hr. air time, provided they will be performed by an appropriately rated aircraft maintenance engineer at the next scheduled maintenance check:',
   };
   function ptrainRptBox(on){ return '<span class="box">'+(on?'✓':'X')+'</span>'; }
-  // One printed page in the manual's own layout: running header, centered APPENDIX title (or a plain
-  // title for the non-appendix Airworthiness Directives page), the section body, the standard grounding
-  // note, an "I understand" line pre-filled with the trainee's name, and Pilot/PRM sign-off lines with
-  // licence # and date already filled in -- everything except the physical signature itself.
+  // One sign-off row (Signature / Licence # / Date): the pre-filled value sits ABOVE its blank rule,
+  // with just the plain caption below it -- the signature column itself stays blank above the line
+  // since that one's filled in by hand. The PRM's licence value carries the full "ACA #, AMO 100-96"
+  // string (rec.trainerLicence already includes the AMO suffix -- see PTRAIN_AMO_NUMBER) rather than
+  // just the bare ACA number.
+  function ptrainSignRow(signerCaption, licenceVal, dateVal){
+    return '<div class="rpt-signgrid">' +
+      '<div class="rpt-signcol"><div class="rpt-signval">&nbsp;</div><div class="rpt-signline"></div><div class="rpt-signcap">'+signerCaption+'</div></div>' +
+      '<div class="rpt-signcol"><div class="rpt-signval">'+escapeHTML(licenceVal||'')+'</div><div class="rpt-signline"></div><div class="rpt-signcap">Licence #</div></div>' +
+      '<div class="rpt-signcol"><div class="rpt-signval">'+(dateVal?fmtDateNice(dateVal):'')+'</div><div class="rpt-signline"></div><div class="rpt-signcap">Date</div></div>' +
+    '</div>';
+  }
+  // One printed page in the manual's own layout: running header, centered APPENDIX title, the section
+  // body, the standard grounding note, an "I understand" line pre-filled with the trainee's name, and
+  // Pilot/PRM sign-off rows with licence # and date already filled in above their lines -- everything
+  // except the physical signature itself.
   function ptrainAppendixPage(rec, opts){
     const rev = opts.appendix ? PTRAIN_MANUAL_REVISIONS[opts.appendix] : null;
     const dateVal = rec.originalTrainingDate || rec.additionalTrainingDate || null;
-    const trainerLicenceOnly = String(rec.trainerLicence||'').split(',')[0].trim();
     return '<div class="rpt-page">' +
       '<div class="rpt-hdrow"><span>Phoenix Heli-Flight</span><span>Phoenix Heli-Flight</span></div>' +
       (opts.appendix ?
@@ -3925,14 +3936,8 @@
       opts.bodyHtml +
       (opts.noteInline ? '' : '<div class="rpt-note">Note: If as a result of these checks, a defect is found or suspected, the aircraft shall be grounded until a qualified AME can inspect it.</div>') +
       '<div class="rpt-understand">I, <span class="ln">'+escapeHTML(rec.traineeName||'')+'</span>, understand each point mentioned above.</div>' +
-      '<div class="rpt-signblock">' +
-        '<div class="rpt-signrow"><div class="sc"></div><div class="sc"></div><div class="sc"></div></div>' +
-        '<div class="rpt-signlbl"><div class="sc">Pilot Signature</div><div class="sc">Licence # <span class="fill">'+escapeHTML(rec.traineeLicence||'')+'</span></div><div class="sc">Date <span class="fill">'+(dateVal?fmtDateNice(dateVal):'')+'</span></div></div>' +
-      '</div>' +
-      '<div class="rpt-signblock">' +
-        '<div class="rpt-signrow"><div class="sc"></div><div class="sc"></div><div class="sc"></div></div>' +
-        '<div class="rpt-signlbl"><div class="sc">PRM Signature <span class="fill">('+escapeHTML(rec.trainerName||'')+')</span></div><div class="sc">Licence # <span class="fill">'+escapeHTML(trainerLicenceOnly)+'</span></div><div class="sc">Date <span class="fill">'+(dateVal?fmtDateNice(dateVal):'')+'</span></div></div>' +
-      '</div>' +
+      ptrainSignRow('Pilot Signature', rec.traineeLicence, dateVal) +
+      ptrainSignRow('PRM Signature <span class="who">('+escapeHTML(rec.trainerName||'')+')</span>', rec.trainerLicence, dateVal) +
       (rev ? (
         '<div class="rpt-footerbox">' +
           '<div class="r1"><span>Revision: # '+rev.revision+'</span><span>Page '+rev.page+'</span></div>' +
@@ -3968,18 +3973,9 @@
       });
     }
 
-    // ---- Airworthiness Directives training page (Phoenix's own pilot-training record, not a lettered
-    // manual appendix -- so it gets the plain-title header and no revision footer) ----
-    let adBody = '<div class="rpt-tasklabel">Airworthiness Directives</div>';
-    const ads = settings.ads.filter(a=>!a.archived);
-    if(ads.length){
-      ads.forEach(a=>{
-        const checked = (rec.ads||[]).some(r=>r.text===a.text);
-        adBody += '<div class="rpt-item sub">'+ptrainRptBox(checked)+'<span>'+escapeHTML(a.text)+'</span></div>';
-      });
-    } else {
-      adBody += '<p class="rpt-intro">None configured yet.</p>';
-    }
+    // Note: there is no separate "Airworthiness Directives Training" page here -- AD/AMOC training is
+    // already fully covered by the Appendix "He" table below (and by item 2c on the Appendix "Hc" page),
+    // so a standalone AD checklist page would just duplicate it.
 
     // ---- Hd / He tables (same bordered manual look; "Pilot training" stays a single computed ✓/X
     // column per Mario's earlier instruction, rather than reverting to blank Pilot/AME Initials columns) ----
@@ -4012,11 +4008,6 @@
         appendix:'Hc', subtitle:'Elementary Task Training Form',
         intro:'This training form is used by Phoenix Heli-Flight to certify that the following employee has received the following training for the performance of Elementary Task as per Standards 625 Appendix A. These tasks may be carried out by a pilot trained under the direct supervision of an AME.',
         bodyHtml: hcBody,
-      }) +
-      ptrainAppendixPage(rec, {
-        appendix:null, subtitle:'Airworthiness Directives Training',
-        intro:'The following Airworthiness Directives training is recorded for this pilot, in support of Appendix &quot;He&quot; (AD &amp; AMOC List) applicability below.',
-        bodyHtml: adBody,
       }) +
       ptrainAppendixPage(rec, {
         appendix:'Hd', subtitle:'Airworthiness Inspection Check', subtitleSmall:'(as per Airworthiness Limitations Section ALS)',
