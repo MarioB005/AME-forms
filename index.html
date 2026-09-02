@@ -320,11 +320,18 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_ioAPLi8DWuC0HCUUYEeQ3Q_dildZYKI';
   const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
 
+  // Surfaced so a caller that cares (e.g. the Pilot Training Card save button) can tell the user their
+  // change didn't actually reach the cloud, instead of the write failing completely silently -- which is
+  // exactly what was making edits (an unchecked box, etc.) look like they "didn't save": the POST below
+  // was never checking its response status, so a rejected write (auth, RLS, whatever) looked identical to
+  // a successful one, and the next load elsewhere would pull the old un-edited row right back down.
+  window.__storageLastError = null;
+
   async function storageGet(key){
     if(SUPABASE_CONFIGURED){
       try{
         const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?key=eq.' + encodeURIComponent(key) + '&select=value', {
-          headers: { apikey: SUPABASE_ANON_KEY }
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }
         });
         if(res.ok){
           const rows = await res.json();
@@ -332,9 +339,13 @@
             try{ localStorage.setItem('cache:'+key, rows[0].value); }catch(e){}
             return rows[0].value;
           }
-          return null;
+          // No row on the server yet for this key -- fall through to whatever's cached locally rather
+          // than treating "server has nothing" as "the answer is nothing" (a transient/empty response
+          // here should never be able to stomp a value we already have cached from a previous save).
+        } else {
+          window.__storageLastError = 'GET ' + key + ': HTTP ' + res.status;
         }
-      }catch(e){ /* offline — fall back to cache */ }
+      }catch(e){ window.__storageLastError = 'GET ' + key + ': ' + e; /* offline — fall back to cache */ }
     }
     try{ return localStorage.getItem('cache:'+key); }catch(e){ return null; }
   }
@@ -344,25 +355,42 @@
   // snapshot could land after a newer one and silently overwrite it.
   let __storageWriteQueue = Promise.resolve();
 
+  // Returns true only once the row has actually been confirmed written (HTTP 2xx) -- callers that skip
+  // checking this will keep behaving exactly as before (local cache is always updated first), but a
+  // caller that DOES check it can now tell the user "this didn't actually sync" instead of staying quiet.
   async function storageSet(key, value){
     try{ localStorage.setItem('cache:'+key, value); }catch(e){}
     if(!SUPABASE_CONFIGURED) return true;
+    let ok = true;
     const doWrite = async ()=>{
       try{
-        await fetch(SUPABASE_URL + '/rest/v1/app_data', {
+        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?on_conflict=key', {
           method: 'POST',
           headers: {
             apikey: SUPABASE_ANON_KEY,
+            Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
             'Content-Type': 'application/json',
             Prefer: 'resolution=merge-duplicates,return=minimal'
           },
           body: JSON.stringify({ key: key, value: value })
         });
-      }catch(e){ /* best effort — local cache above still has it */ }
+        if(!res.ok){
+          ok = false;
+          let detail = '';
+          try{ detail = await res.text(); }catch(e2){}
+          window.__storageLastError = 'PUT ' + key + ': HTTP ' + res.status + (detail?(' — '+detail.slice(0,300)):'');
+          console.error('storageSet failed', key, res.status, detail);
+        }
+      }catch(e){
+        ok = false;
+        window.__storageLastError = 'PUT ' + key + ': ' + e;
+        console.error('storageSet failed', key, e);
+        /* best effort — local cache above still has it */
+      }
     };
     __storageWriteQueue = __storageWriteQueue.then(doWrite, doWrite);
     await __storageWriteQueue;
-    return true;
+    return ok;
   }
 
   async function sha256(text){
@@ -3113,7 +3141,7 @@
       return ptrainRecordsCache;
     }
   }
-  async function savePtrainRecords(list){ ptrainRecordsCache = list; await storageSet('ptrain:records', JSON.stringify(list)); }
+  async function savePtrainRecords(list){ ptrainRecordsCache = list; return await storageSet('ptrain:records', JSON.stringify(list)); }
 
   function ptrainNextId(records){
     let max = 0;
@@ -3618,7 +3646,7 @@
         const newRec = collectRecord();
         const idx = records.findIndex(r=>r.id===newRec.id);
         if(idx>=0) records[idx] = newRec; else records.push(newRec);
-        await savePtrainRecords(records);
+        const synced = await savePtrainRecords(records);
 
         if(newRec.traineeName){
           const status = await loadPtrainPilotStatus();
@@ -3630,11 +3658,19 @@
           status[newRec.traineeName] = cur;
           await savePtrainPilotStatus(status);
         }
+        newRec.__synced = synced;
         return newRec;
       }
 
       document.getElementById('ptSaveBtn').onclick = async ()=>{
-        await ptrainSaveAndSyncStatus();
+        const saved = await ptrainSaveAndSyncStatus();
+        // The record's own local copy (and this browser's cache) is always updated regardless -- this
+        // warning only fires when the write to the shared cloud database itself was rejected, which is
+        // exactly the failure mode that used to look like "I unchecked a box and it didn't save": the
+        // change looked fine here but never actually reached the database, so it reverted on next load.
+        if(saved.__synced === false){
+          alert('Saved on this device, but the cloud sync failed, so this change may not show up elsewhere or after a reload.\n\nDetails: ' + (window.__storageLastError || 'unknown error') + '\n\nPlease try Save again, and let Mario know if this keeps happening.');
+        }
         // back to the main page so the updated due date is visible right away
         renderPilotTraining();
       };
@@ -3645,6 +3681,9 @@
 
       document.getElementById('ptFullBtn').onclick = async ()=>{
         const newRec = await ptrainSaveAndSyncStatus();
+        if(newRec.__synced === false){
+          alert('Saved on this device, but the cloud sync failed, so this change may not show up elsewhere or after a reload.\n\nDetails: ' + (window.__storageLastError || 'unknown error') + '\n\nPlease try again, and let Mario know if this keeps happening.');
+        }
         renderPilotTrainFull(newRec.id);
       };
     });
