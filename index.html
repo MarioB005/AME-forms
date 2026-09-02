@@ -305,7 +305,6 @@
   <div id="viewPilotTraining" style="display:none;"></div>
   <div id="viewPilotTrainRecords" style="display:none;"></div>
   <div id="viewPilotTrainCard" style="display:none;"></div>
-  <div id="viewPilotTrainFull" style="display:none;"></div>
   <div id="viewPilotTrainManage" style="display:none;"></div>
 </div>
 
@@ -705,7 +704,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainFull','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -3174,6 +3173,19 @@
     if(rtKey && key) return rtKey===key;
     return rt.text===t.text;
   }
+  // Shared by the Training Card's "Print Full Report" handler: splits the checklist into the numbered
+  // manual items (grouped/sorted by Appendix+#, used on the Hb/Hc pages) and the un-numbered "Additional"
+  // items (their own section on the report).
+  function ptrainComputeManualItems(taskItems){
+    const manualItems = [];
+    taskItems.forEach(item=>{ if(item.appendix) manualItems.push(item); });
+    manualItems.sort((a,b)=>{
+      if(a.appendix !== b.appendix) return a.appendix < b.appendix ? -1 : 1;
+      return String(a.num).localeCompare(String(b.num), undefined, {numeric:true});
+    });
+    const extraTasks = taskItems.filter(i=>!i.appendix);
+    return { manualItems, extraTasks };
+  }
   function ptrainBuildTaskChecklist(masterTasks, existingRecordTasks){
     const matchedKeys = new Set(), matchedText = new Set();
     const items = masterTasks.map(t=>{
@@ -3238,7 +3250,7 @@
         '</p>' +
         '<div class="btn-row">' +
           '<button type="button" class="btn primary" id="ptNewCardBtn">+ New Training Card</button>' +
-          '<button type="button" class="btn" id="ptFullQuickBtn">📄 Full Training Record (Hb–He, 8.5×11)</button>' +
+          '<button type="button" class="btn" id="ptFullQuickBtn">🗂️ Open Existing Card</button>' +
           '<button type="button" class="btn" id="ptRecordsBtn">📋 All Training Records</button>' +
           '<button type="button" class="btn" id="ptManageBtn">⚙️ Manage Task / AD Lists</button>' +
           '<button type="button" class="btn" id="ptSettingsBtn">👤 Manage Pilots (Settings)</button>' +
@@ -3347,7 +3359,7 @@
       div.style.marginTop = '4px';
       div.innerHTML = '<select id="ptFullPickerSel"><option value="">— choose a pilot —</option>' +
         names.map(n=>'<option value="'+escapeHTML(n)+'">'+escapeHTML(n)+'</option>').join('') +
-        '</select> <button type="button" class="btn small primary" id="ptFullPickerGo">Open Full Record</button>';
+        '</select> <button type="button" class="btn small primary" id="ptFullPickerGo">Open Card</button>';
       document.getElementById('ptFullQuickBtn').insertAdjacentElement('afterend', div);
       document.getElementById('ptFullPickerGo').onclick = async ()=>{
         const name = document.getElementById('ptFullPickerSel').value;
@@ -3355,12 +3367,11 @@
         const records = await loadPtrainRecords();
         const matches = records.filter(r=>r.traineeName===name);
         if(!matches.length){
-          alert('No saved Training Card yet for '+name+' — opening a new card. Save it, then use "📄 Full Training Record" there.');
           renderPilotTrainCard(null, rows.find(r=>r.name===name)||null);
           return;
         }
         matches.sort((a,b)=> a.id - b.id);
-        renderPilotTrainFull(matches[matches.length-1].id);
+        renderPilotTrainCard(matches[matches.length-1], null);
       };
     };
     document.getElementById('ptRecordsBtn').onclick = ()=> renderPilotTrainRecords();
@@ -3435,7 +3446,7 @@
           '<td>'+escapeHTML(r.originalTrainingDate?fmtDateNice(r.originalTrainingDate):'—')+'</td>' +
           '<td>'+escapeHTML(r.additionalTrainingDate?fmtDateNice(r.additionalTrainingDate):'—')+'</td>' +
           '<td>'+escapeHTML(r.trainerName||'—')+'</td>' +
-          '<td style="white-space:nowrap;"><button class="btn small" data-action="view" data-id="'+r.id+'">View / Edit</button> <button class="btn small" data-action="print" data-id="'+r.id+'">Print</button> <button class="btn small" data-action="full" data-id="'+r.id+'">Full Report</button></td>' +
+          '<td style="white-space:nowrap;"><button class="btn small" data-action="view" data-id="'+r.id+'">View / Edit</button> <button class="btn small" data-action="print" data-id="'+r.id+'">Print Card</button></td>' +
         '</tr>'
       ).join('') +
       '</tbody></table>';
@@ -3445,7 +3456,6 @@
         const rec = records.find(r=>String(r.id)===btn.dataset.id);
         if(!rec) return;
         if(btn.dataset.action==='view') renderPilotTrainCard(rec, null);
-        else if(btn.dataset.action==='full') renderPilotTrainFull(rec.id);
         else openPrint(buildPtrainLabelHtml(rec));
       };
     });
@@ -3467,17 +3477,18 @@
         traineeLicence: prefillPilot ? (prefillPilot.licence||'') : '',
         trainerName: PTRAIN_DEFAULT_PRM_NAME,
         trainerLicence: defaultPrmAca ? (defaultPrmAca + ', ' + PTRAIN_AMO_NUMBER) : '',
-        originalTrainingDate: '', additionalTrainingDate: '',
+        originalTrainingDate: todayISO(), additionalTrainingDate: '',
         acTypes: prefillPilot ? PTRAIN_AIRCRAFT.filter(t=> prefillPilot[t.toLowerCase()]) : [],
-        tasks: [], ads: [],
+        tasks: [], ads: [], hdOverrides: {}, heOverrides: {},
       };
+      if(!rec.hdOverrides) rec.hdOverrides = {};
+      if(!rec.heOverrides) rec.heOverrides = {};
       const isExisting = !!existingRecord;
       let selectedTypes = rec.acTypes.slice();
 
       const taskItems = ptrainBuildTaskChecklist(settings.tasks, isExisting ? rec.tasks : null);
       const adState = ptrainInitAdState(settings.ads, isExisting ? rec.ads : null, isExisting ? rec.adsExcluded : null);
 
-      const ameNames = (state.settings.ames||[]).map(a=>a.name);
       function traineeLicenceFor(name){ const r = roster.find(r=>r.name===name); return r ? (r.licence||'') : ''; }
       function adIsApplicable(a){ return selectedTypes.length>0 && (a.models||[]).some(m=>selectedTypes.includes(m)); }
       function adIsChecked(text, a){
@@ -3486,10 +3497,10 @@
         return st.manualOverride !== null ? st.manualOverride : adIsApplicable(a);
       }
 
-      // Only one presentation of the task checklist now -- grouped by site category, labelled with the
-      // MCM number ("1b. …") wherever the task is tied to one. The Hb/Hc manual layout, and the Hd/He
-      // tables, moved to the full Training Record report (see renderPilotTrainFull) since they're
-      // company-record/print concerns, not something you edit from this entry form.
+      // Only one presentation of the task checklist here -- grouped by site category, labelled with the
+      // MCM number ("1b. …") wherever the task is tied to one. The Hb/Hc manual-page layout itself only
+      // appears on the printed Full Report (see buildPtrainFullReportPrintHtml); the Hd/He applicability
+      // tables, though, are edited right on this same card (see hdHeTableHtml below).
       function renderTaskChecklistHtml(){
         let html = '';
         let lastCat = null;
@@ -3525,6 +3536,32 @@
         );
       }
 
+      // Appendix "Hd"/"He" applicability tables, editable inline here (per-registration manual override) --
+      // this used to be its own "Full Training Record" screen; it now lives directly on the card since
+      // that's the one thing beyond the checklist itself that needs setting up before printing the report.
+      function hdHeTableHtml(items, colLabel, overrides){
+        if(!items || !items.length) return '<p class="note">None configured yet — add rows in Manage Task &amp; AD Lists.</p>';
+        return '<div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th style="width:20%;">Registration(s)</th><th style="width:20%;">'+escapeHTML(colLabel)+'</th><th>Description</th><th style="width:13%;">Interval</th><th style="width:12%;">Pilot training</th></tr></thead><tbody>' +
+          items.map(r=>{
+            const key = ptrainHdHeMapKey(colLabel, r);
+            const auto = ptrainRegsApplicableToTypes(r.regs, selectedTypes);
+            const effective = ptrainOverrideEffective(overrides, key, auto);
+            const overridden = Object.prototype.hasOwnProperty.call(overrides, key);
+            const dispVal = colLabel==='Task' ? (r.task||'') : (r.doc||'');
+            return '<tr>' +
+              '<td>'+escapeHTML((r.regs||[]).join(', '))+'</td>' +
+              '<td>'+escapeHTML(dispVal).replace(/\n/g,'<br>')+'</td>' +
+              '<td>'+escapeHTML(r.desc||'')+'</td>' +
+              '<td>'+escapeHTML(r.interval||'')+'</td>' +
+              '<td style="text-align:center;">' +
+                '<input type="checkbox" data-hhkey="'+escapeHTML(key)+'" '+(effective?'checked':'')+'>' +
+                (overridden ? ' <a href="#" class="hh-clear" data-hhkey="'+escapeHTML(key)+'" title="Clear manual override — back to automatic">↺</a>' : '') +
+              '</td>' +
+            '</tr>';
+          }).join('') +
+        '</tbody></table></div>';
+      }
+
       el.innerHTML =
         backToPtBtn() +
         '<div class="panel">' +
@@ -3542,14 +3579,20 @@
           '<div class="pt-section-title">Airworthiness Directives</div>' +
           '<div id="ptAdChecklist">' + renderAdChecklistHtml() + '</div>' +
 
-          '<p class="note">Appendix "Hd" (Airworthiness Inspection Check) and Appendix "He" (AD &amp; AMOC List) are on the full Training Record report — use the button below once this card is saved.</p>' +
+          '<div class="pt-section-title">Appendix &quot;Hd&quot; — Airworthiness Inspection Check</div>' +
+          '<div id="ptHdTable">' + hdHeTableHtml(settings.hdItems||[], 'Task', rec.hdOverrides) + '</div>' +
+
+          '<div class="pt-section-title">Appendix &quot;He&quot; — AD &amp; AMOC List</div>' +
+          '<div id="ptHeTable">' + hdHeTableHtml(settings.heItems||[], 'Document', rec.heOverrides) + '</div>' +
 
           '<div class="pt-section-title">Trainee &amp; PRM</div>' +
           '<div class="field-grid">' +
             '<div class="field"><label for="ptTraineeName">Trainee Name</label><select id="ptTraineeName"><option value="">— select —</option>' + Array.from(new Set(roster.map(r=>r.name).filter(Boolean))).sort().map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.traineeName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
             '<div class="field"><label for="ptTraineeLicence">Trainee Licence</label><input type="text" id="ptTraineeLicence" value="'+escapeHTML(rec.traineeLicence||'')+'"></div>' +
-            '<div class="field"><label for="ptTrainerName">PRM Name</label><select id="ptTrainerName"><option value="">— select —</option>' + ameNames.map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.trainerName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
-            '<div class="field"><label for="ptTrainerLicence">PRM ACA #</label><input type="text" id="ptTrainerLicence" value="'+escapeHTML(rec.trainerLicence||'')+'"></div>' +
+            '<div class="field"><label>PRM (fixed)</label><div style="font-weight:700;padding-top:6px;">'+escapeHTML(PTRAIN_DEFAULT_PRM_NAME)+
+              (defaultPrmAca ? ' — ACA # '+escapeHTML(defaultPrmAca)+', '+escapeHTML(PTRAIN_AMO_NUMBER)
+                : ' <span style="color:#b00020;font-weight:400;">⚠ ACA # not set — add it in Settings → AMEs</span>') +
+            '</div></div>' +
             '<div class="field"><label for="ptOriginalDate">Original Training Date</label><input type="date" id="ptOriginalDate" value="'+(rec.originalTrainingDate||'')+'"></div>' +
             '<div class="field"><label for="ptAdditionalDate">Additional Training Date</label><input type="date" id="ptAdditionalDate" value="'+(rec.additionalTrainingDate||'')+'"></div>' +
           '</div>' +
@@ -3557,8 +3600,7 @@
           '<div class="btn-row" style="justify-content:flex-end;align-items:center;">' +
             '<span id="ptSaveStatus" style="font-size:13px;color:var(--grey-strong);"></span>' +
             '<button type="button" class="btn" id="ptPrintBtn">🖨️ Print Training Card (4in × 2in labels)</button>' +
-            '<button type="button" class="btn" id="ptFullBtn">📄 Full Training Record (Hb–He, 8.5×11)</button>' +
-            '<button type="button" class="btn primary" id="ptSaveBtn">💾 Save Record</button>' +
+            '<button type="button" class="btn primary" id="ptFullBtn">🖨️ Print Full Report (Hb–He, 8.5×11)</button>' +
           '</div>' +
         '</div>';
 
@@ -3567,10 +3609,6 @@
       document.getElementById('ptTraineeName').addEventListener('change', (e)=>{
         const lic = traineeLicenceFor(e.target.value);
         if(lic) document.getElementById('ptTraineeLicence').value = lic;
-      });
-      document.getElementById('ptTrainerName').addEventListener('change', (e)=>{
-        const lic = ameLicenceFor(e.target.value);
-        if(lic) document.getElementById('ptTrainerLicence').value = lic + ', ' + PTRAIN_AMO_NUMBER;
       });
 
       function paintTaskChecklist(){
@@ -3595,10 +3633,33 @@
       }
       paintAdChecklist();
 
+      function paintHdHeTable(which){
+        if(which==='Hd') document.getElementById('ptHdTable').innerHTML = hdHeTableHtml(settings.hdItems||[], 'Task', rec.hdOverrides);
+        else document.getElementById('ptHeTable').innerHTML = hdHeTableHtml(settings.heItems||[], 'Document', rec.heOverrides);
+        wireHdHeOverrides();
+      }
+      function wireHdHeOverrides(){
+        document.getElementById('ptHdTable').querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+          cb.onchange = ()=>{ rec.hdOverrides[cb.dataset.hhkey] = cb.checked; paintHdHeTable('Hd'); };
+        });
+        document.getElementById('ptHeTable').querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+          cb.onchange = ()=>{ rec.heOverrides[cb.dataset.hhkey] = cb.checked; paintHdHeTable('He'); };
+        });
+        document.getElementById('ptHdTable').querySelectorAll('a.hh-clear').forEach(a=>{
+          a.onclick = (e)=>{ e.preventDefault(); delete rec.hdOverrides[a.dataset.hhkey]; paintHdHeTable('Hd'); };
+        });
+        document.getElementById('ptHeTable').querySelectorAll('a.hh-clear').forEach(a=>{
+          a.onclick = (e)=>{ e.preventDefault(); delete rec.heOverrides[a.dataset.hhkey]; paintHdHeTable('He'); };
+        });
+      }
+      wireHdHeOverrides();
+
       document.getElementById('ptAcGrid').querySelectorAll('input[data-ac]').forEach(cb=>{
         cb.onchange = ()=>{
           selectedTypes = PTRAIN_AIRCRAFT.filter(t=> document.querySelector('[data-ac="'+t+'"]').checked);
           paintAdChecklist();
+          paintHdHeTable('Hd');
+          paintHdHeTable('He');
         };
       });
 
@@ -3626,8 +3687,8 @@
           id: rec.id,
           traineeName: document.getElementById('ptTraineeName').value,
           traineeLicence: document.getElementById('ptTraineeLicence').value,
-          trainerName: document.getElementById('ptTrainerName').value,
-          trainerLicence: document.getElementById('ptTrainerLicence').value,
+          trainerName: PTRAIN_DEFAULT_PRM_NAME,
+          trainerLicence: defaultPrmAca ? (defaultPrmAca + ', ' + PTRAIN_AMO_NUMBER) : '',
           originalTrainingDate: document.getElementById('ptOriginalDate').value || null,
           additionalTrainingDate: document.getElementById('ptAdditionalDate').value || null,
           acTypes: selectedTypes.slice(),
@@ -3663,15 +3724,14 @@
         return newRec;
       }
 
-      document.getElementById('ptSaveBtn').onclick = async ()=>{
+      // Both print buttons save the record first (there's no separate "Save Record" button any more --
+      // printing IS the save action, per Mario's instructions) then perform their own print, staying on
+      // this exact page throughout. Keep this card's own `rec` (id, createdAt, etc.) in sync with what was
+      // just saved, WITHOUT navigating away or rebuilding the form.
+      async function saveThenReport(){
         const statusEl = document.getElementById('ptSaveStatus');
         if(statusEl) statusEl.textContent = 'Saving…';
         const saved = await ptrainSaveAndSyncStatus();
-        // Keep this card's own `rec` (id, createdAt, etc.) in sync with what was just saved, WITHOUT
-        // navigating away or rebuilding the form -- Mario asked to stay on this exact page after Save
-        // instead of being bounced back to the roster, so the checklist/AC-type/date fields on screen
-        // are left exactly as he left them; only the bookkeeping fields need to follow the saved record
-        // (otherwise a second Save on a brand-new record would mint a fresh "createdAt" every time).
         Object.assign(rec, saved);
         // The record's own local copy (and this browser's cache) is always updated regardless -- this
         // warning only fires when the write to the shared cloud database itself was rejected, which is
@@ -3679,23 +3739,23 @@
         // change looked fine here but never actually reached the database, so it reverted on next load.
         if(saved.__synced === false){
           if(statusEl) statusEl.textContent = '';
-          alert('Saved on this device, but the cloud sync failed, so this change may not show up elsewhere or after a reload.\n\nDetails: ' + (window.__storageLastError || 'unknown error') + '\n\nPlease try Save again, and let Mario know if this keeps happening.');
+          alert('Saved on this device, but the cloud sync failed, so this change may not show up elsewhere or after a reload.\n\nDetails: ' + (window.__storageLastError || 'unknown error') + '\n\nPlease try again, and let Mario know if this keeps happening.');
         } else if(statusEl){
           statusEl.textContent = '✅ Saved';
           setTimeout(()=>{ if(statusEl.textContent==='✅ Saved') statusEl.textContent=''; }, 4000);
         }
-      };
+        return saved;
+      }
 
-      document.getElementById('ptPrintBtn').onclick = ()=>{
-        openPrint(buildPtrainLabelHtml(collectRecord()));
+      document.getElementById('ptPrintBtn').onclick = async ()=>{
+        const saved = await saveThenReport();
+        openPrint(buildPtrainLabelHtml(saved));
       };
 
       document.getElementById('ptFullBtn').onclick = async ()=>{
-        const newRec = await ptrainSaveAndSyncStatus();
-        if(newRec.__synced === false){
-          alert('Saved on this device, but the cloud sync failed, so this change may not show up elsewhere or after a reload.\n\nDetails: ' + (window.__storageLastError || 'unknown error') + '\n\nPlease try again, and let Mario know if this keeps happening.');
-        }
-        renderPilotTrainFull(newRec.id);
+        const saved = await saveThenReport();
+        const { manualItems, extraTasks } = ptrainComputeManualItems(taskItems);
+        openPrint(buildPtrainFullReportPrintHtml(saved, settings, selectedTypes, taskItems, manualItems, extraTasks));
       };
     });
   }
@@ -3763,147 +3823,16 @@
     return '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' + frontLabels + backLabels;
   }
 
-  // ---------- Full Training Record (Appendix "Hb" - "He"), company record copy printed on 8.5x11 ----------
-  // Same underlying record as the 4x2 training-card label (tasks/ads/acTypes) but laid out like the manual
-  // itself, plus the Hd/He applicability tables with a per-row manual override -- a specific tail's actual
-  // inspection programme can differ from its type's default. This screen only ever DISPLAYS the Hb/Hc/AD
-  // checklist (edit that on the Training Card itself, which is the single source of truth); only the Hd/He
-  // "Pilot training" column is editable here, since that's the one thing this report adds beyond the card.
+  // ---------- helpers shared by the Hd/He tables (now inline on the Training Card itself) ----------
+  // A specific tail's actual inspection programme can differ from its type's default, so each Hd/He row
+  // can be manually overridden; ptrainOverrideEffective resolves the override (if any) or falls back to
+  // the automatic aircraft-type match.
   function ptrainOverrideEffective(map, key, auto){
     return Object.prototype.hasOwnProperty.call(map||{}, key) ? !!map[key] : auto;
   }
   function ptrainHdHeMapKey(colLabel, r){
     return colLabel==='Task' ? (r.task||'') : String(r.doc||'').split('\n')[0];
   }
-  async function renderPilotTrainFull(recordId){
-    showView('PilotTrainFull');
-    const el = document.getElementById('viewPilotTrainFull');
-    el.innerHTML = backToPtBtn() + '<div class="panel"><p class="form-sub">Loading…</p></div>';
-    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
-
-    const [settings, records] = await Promise.all([loadPtrainSettings(), loadPtrainRecords()]);
-    const rec = records.find(r=> String(r.id)===String(recordId));
-    if(!rec){
-      el.innerHTML = backToPtBtn() + '<div class="panel"><p class="form-sub">Record not found — open the pilot&rsquo;s Training Card and save it first.</p></div>';
-      document.getElementById('ptBackBtn').onclick = ()=> renderPilotTraining();
-      return;
-    }
-    if(!rec.hdOverrides) rec.hdOverrides = {};
-    if(!rec.heOverrides) rec.heOverrides = {};
-    const selectedTypes = (rec.acTypes||[]).slice();
-    const taskItems = ptrainBuildTaskChecklist(settings.tasks, rec.tasks);
-
-    const manualItems = [];
-    taskItems.forEach(item=>{ if(item.appendix) manualItems.push(item); });
-    manualItems.sort((a,b)=>{
-      if(a.appendix !== b.appendix) return a.appendix < b.appendix ? -1 : 1;
-      return String(a.num).localeCompare(String(b.num), undefined, {numeric:true});
-    });
-    const extraTasks = taskItems.filter(i=>!i.appendix);
-
-    function manualRowsHtml(appendixFilter){
-      let html = '', lastGroup = null;
-      manualItems.filter(i=>i.appendix===appendixFilter).forEach(item=>{
-        const group = ptrainManualGroupLabel(item.appendix, item.num);
-        if(group !== lastGroup){ html += '<div class="pt-check-cat">'+escapeHTML(group)+'</div>'; lastGroup = group; }
-        html += '<label class="pt-check-row"><input type="checkbox" disabled '+(item.checked?'checked':'')+'> <span><b>'+escapeHTML(ptrainManualItemLabel(item.appendix,item.num))+'</b> '+escapeHTML(item.text)+'</span></label>';
-      });
-      return html || '<p class="note">No items numbered yet — set appendix/# in Manage Task &amp; AD Lists.</p>';
-    }
-    function adRowsHtml(){
-      return settings.ads.filter(a=>!a.archived).map(a=>{
-        const checked = (rec.ads||[]).some(r=>r.text===a.text);
-        return '<label class="pt-check-row"><input type="checkbox" disabled '+(checked?'checked':'')+'> <span>'+escapeHTML(a.text)+'</span></label>';
-      }).join('') || '<p class="note">None configured yet.</p>';
-    }
-    function hdHeTableHtml(items, colLabel, overrides){
-      if(!items || !items.length) return '<p class="note">None configured yet — add rows in Manage Task &amp; AD Lists.</p>';
-      return '<div style="overflow-x:auto;"><table class="pt-table"><thead><tr><th style="width:20%;">Registration(s)</th><th style="width:20%;">'+escapeHTML(colLabel)+'</th><th>Description</th><th style="width:13%;">Interval</th><th style="width:12%;">Pilot training</th></tr></thead><tbody>' +
-        items.map(r=>{
-          const key = ptrainHdHeMapKey(colLabel, r);
-          const auto = ptrainRegsApplicableToTypes(r.regs, selectedTypes);
-          const effective = ptrainOverrideEffective(overrides, key, auto);
-          const overridden = Object.prototype.hasOwnProperty.call(overrides, key);
-          const dispVal = colLabel==='Task' ? (r.task||'') : (r.doc||'');
-          return '<tr>' +
-            '<td>'+escapeHTML((r.regs||[]).join(', '))+'</td>' +
-            '<td>'+escapeHTML(dispVal).replace(/\n/g,'<br>')+'</td>' +
-            '<td>'+escapeHTML(r.desc||'')+'</td>' +
-            '<td>'+escapeHTML(r.interval||'')+'</td>' +
-            '<td style="text-align:center;">' +
-              '<input type="checkbox" data-hhkey="'+escapeHTML(key)+'" '+(effective?'checked':'')+'>' +
-              (overridden ? ' <a href="#" class="hh-clear" data-hhkey="'+escapeHTML(key)+'" title="Clear manual override — back to automatic">↺</a>' : '') +
-            '</td>' +
-          '</tr>';
-        }).join('') +
-      '</tbody></table></div>';
-    }
-
-    el.innerHTML =
-      backToPtBtn() +
-      '<div class="panel">' +
-        '<h2 class="form-title">Full Training Record <span style="font-weight:400;color:var(--grey-strong);font-size:14px;">— ID '+rec.id+'</span></h2>' +
-        '<p class="form-sub">Company record copy of this pilot&rsquo;s Elementary Task Training, pre-filled from the Pilot Training Card (read-only here — edit the checklist itself on the Training Card). Appendix &quot;Hd&quot;/&quot;He&quot; rows can be overridden per registration below; clear an override with ↺ to go back to automatic.</p>' +
-        '<div class="field-grid" style="margin-bottom:6px;">' +
-          '<div class="field"><label>Trainee</label><div>'+escapeHTML(rec.traineeName||'—')+(rec.traineeLicence?' ('+escapeHTML(rec.traineeLicence)+')':'')+'</div></div>' +
-          '<div class="field"><label>PRM</label><div>'+escapeHTML(rec.trainerName||'—')+(rec.trainerLicence?' — ACA # '+escapeHTML(rec.trainerLicence):'')+'</div></div>' +
-          '<div class="field"><label>A/C Type(s) trained on</label><div>'+(escapeHTML(selectedTypes.join(', '))||'—')+'</div></div>' +
-          '<div class="field"><label>Original / Additional Training Date</label><div>'+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'—')+' / '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'—')+'</div></div>' +
-        '</div>' +
-
-        '<div class="pt-section-title">Appendix &quot;Hb&quot; — Servicing / Additional Training</div>' +
-        '<div class="pt-check-grid">' + manualRowsHtml('Hb') + '</div>' +
-
-        '<div class="pt-section-title">Appendix &quot;Hc&quot; — Elementary Task Training Form</div>' +
-        '<div class="pt-check-grid">' + manualRowsHtml('Hc') + '</div>' +
-
-        (extraTasks.length ? (
-          '<div class="pt-section-title">Additional Elementary Tasks (not numbered in the MCM)</div>' +
-          '<div class="pt-check-grid">' + extraTasks.map(item=>'<label class="pt-check-row"><input type="checkbox" disabled '+(item.checked?'checked':'')+'> <span>'+escapeHTML(item.text)+'</span></label>').join('') + '</div>'
-        ) : '') +
-
-        '<div class="pt-section-title">Airworthiness Directives Training</div>' +
-        '<div class="pt-check-grid">' + adRowsHtml() + '</div>' +
-
-        '<div class="pt-section-title">Appendix &quot;Hd&quot; — Airworthiness Inspection Check</div>' +
-        '<div id="rptHdTable">' + hdHeTableHtml(settings.hdItems||[], 'Task', rec.hdOverrides) + '</div>' +
-
-        '<div class="pt-section-title">Appendix &quot;He&quot; — AD &amp; AMOC List</div>' +
-        '<div id="rptHeTable">' + hdHeTableHtml(settings.heItems||[], 'Document', rec.heOverrides) + '</div>' +
-
-        '<div class="btn-row" style="justify-content:flex-end;margin-top:14px;">' +
-          '<button type="button" class="btn primary" id="rptPrintBtn">🖨️ Print Full Report (8.5 × 11)</button>' +
-        '</div>' +
-      '</div>';
-
-    document.getElementById('ptBackBtn').onclick = ()=> renderPilotTrainCard(rec, null);
-
-    function wireOverrides(){
-      el.querySelectorAll('#rptHdTable input[type="checkbox"]').forEach(cb=>{
-        cb.onchange = async ()=>{ rec.hdOverrides[cb.dataset.hhkey] = cb.checked; await savePtrainRecords(records); paintTable('Hd'); };
-      });
-      el.querySelectorAll('#rptHeTable input[type="checkbox"]').forEach(cb=>{
-        cb.onchange = async ()=>{ rec.heOverrides[cb.dataset.hhkey] = cb.checked; await savePtrainRecords(records); paintTable('He'); };
-      });
-      el.querySelectorAll('#rptHdTable a.hh-clear').forEach(a=>{
-        a.onclick = async (e)=>{ e.preventDefault(); delete rec.hdOverrides[a.dataset.hhkey]; await savePtrainRecords(records); paintTable('Hd'); };
-      });
-      el.querySelectorAll('#rptHeTable a.hh-clear').forEach(a=>{
-        a.onclick = async (e)=>{ e.preventDefault(); delete rec.heOverrides[a.dataset.hhkey]; await savePtrainRecords(records); paintTable('He'); };
-      });
-    }
-    function paintTable(which){
-      if(which==='Hd') document.getElementById('rptHdTable').innerHTML = hdHeTableHtml(settings.hdItems||[], 'Task', rec.hdOverrides);
-      else document.getElementById('rptHeTable').innerHTML = hdHeTableHtml(settings.heItems||[], 'Document', rec.heOverrides);
-      wireOverrides();
-    }
-    wireOverrides();
-
-    document.getElementById('rptPrintBtn').onclick = ()=>{
-      openPrint(buildPtrainFullReportPrintHtml(rec, settings, selectedTypes, taskItems, manualItems, extraTasks));
-    };
-  }
-
   // Styled to match the real D.I.R.-to-MCM appendix pages (serif type, "Phoenix Heli-Flight" running
   // header, centered APPENDIX heading, boxed revision footer) instead of the site's usual form look --
   // this is the one printed report meant to sit next to the actual manual pages. Checkboxes print
