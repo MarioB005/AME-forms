@@ -3489,6 +3489,7 @@
       const taskItems = ptrainBuildTaskChecklist(settings.tasks, isExisting ? rec.tasks : null);
       const adState = ptrainInitAdState(settings.ads, isExisting ? rec.ads : null, isExisting ? rec.adsExcluded : null);
 
+      const ameNames = (state.settings.ames||[]).map(a=>a.name);
       function traineeLicenceFor(name){ const r = roster.find(r=>r.name===name); return r ? (r.licence||'') : ''; }
       function adIsApplicable(a){ return selectedTypes.length>0 && (a.models||[]).some(m=>selectedTypes.includes(m)); }
       function adIsChecked(text, a){
@@ -3585,17 +3586,16 @@
           '<div class="pt-section-title">Appendix &quot;He&quot; — AD &amp; AMOC List</div>' +
           '<div id="ptHeTable">' + hdHeTableHtml(settings.heItems||[], 'Document', rec.heOverrides) + '</div>' +
 
-          '<div class="pt-section-title">Trainee &amp; PRM</div>' +
+          '<div class="pt-section-title">Trainee &amp; AME</div>' +
           '<div class="field-grid">' +
             '<div class="field"><label for="ptTraineeName">Trainee Name</label><select id="ptTraineeName"><option value="">— select —</option>' + Array.from(new Set(roster.map(r=>r.name).filter(Boolean))).sort().map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.traineeName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
             '<div class="field"><label for="ptTraineeLicence">Trainee Licence</label><input type="text" id="ptTraineeLicence" value="'+escapeHTML(rec.traineeLicence||'')+'"></div>' +
-            '<div class="field"><label>PRM (fixed)</label><div style="font-weight:700;padding-top:6px;">'+escapeHTML(PTRAIN_DEFAULT_PRM_NAME)+
-              (defaultPrmAca ? ' — ACA # '+escapeHTML(defaultPrmAca)+', '+escapeHTML(PTRAIN_AMO_NUMBER)
-                : ' <span style="color:#b00020;font-weight:400;">⚠ ACA # not set — add it in Settings → AMEs</span>') +
-            '</div></div>' +
+            '<div class="field"><label for="ptTrainerName">AME (trains this pilot)</label><select id="ptTrainerName"><option value="">— select —</option>' + ameNames.map(n=>'<option value="'+escapeHTML(n)+'"'+(n===rec.trainerName?' selected':'')+'>'+escapeHTML(n)+'</option>').join('') + '</select></div>' +
+            '<div class="field"><label for="ptTrainerLicence">AME ACA #</label><input type="text" id="ptTrainerLicence" value="'+escapeHTML(rec.trainerLicence||'')+'"></div>' +
             '<div class="field"><label for="ptOriginalDate">Original Training Date</label><input type="date" id="ptOriginalDate" value="'+(rec.originalTrainingDate||'')+'"></div>' +
             '<div class="field"><label for="ptAdditionalDate">Additional Training Date</label><input type="date" id="ptAdditionalDate" value="'+(rec.additionalTrainingDate||'')+'"></div>' +
           '</div>' +
+          '<p class="note">The AME selected above prints on the &quot;AME Signature&quot; line of the Full Report only. The printed Pilot Training Card (4×2 label) always shows Mario Blais'+(defaultPrmAca?' — ACA # '+escapeHTML(defaultPrmAca):' — <span style="color:#b00020;">⚠ his ACA # isn&rsquo;t set yet, add it in Settings → AMEs</span>')+', AMO 100-96 as the PRM, regardless of which AME is selected here.</p>' +
 
           '<div class="btn-row" style="justify-content:flex-end;align-items:center;">' +
             '<span id="ptSaveStatus" style="font-size:13px;color:var(--grey-strong);"></span>' +
@@ -3609,6 +3609,10 @@
       document.getElementById('ptTraineeName').addEventListener('change', (e)=>{
         const lic = traineeLicenceFor(e.target.value);
         if(lic) document.getElementById('ptTraineeLicence').value = lic;
+      });
+      document.getElementById('ptTrainerName').addEventListener('change', (e)=>{
+        const lic = ameLicenceFor(e.target.value);
+        if(lic) document.getElementById('ptTrainerLicence').value = lic + ', ' + PTRAIN_AMO_NUMBER;
       });
 
       function paintTaskChecklist(){
@@ -3687,8 +3691,8 @@
           id: rec.id,
           traineeName: document.getElementById('ptTraineeName').value,
           traineeLicence: document.getElementById('ptTraineeLicence').value,
-          trainerName: PTRAIN_DEFAULT_PRM_NAME,
-          trainerLicence: defaultPrmAca ? (defaultPrmAca + ', ' + PTRAIN_AMO_NUMBER) : '',
+          trainerName: document.getElementById('ptTrainerName').value,
+          trainerLicence: document.getElementById('ptTrainerLicence').value,
           originalTrainingDate: document.getElementById('ptOriginalDate').value || null,
           additionalTrainingDate: document.getElementById('ptAdditionalDate').value || null,
           acTypes: selectedTypes.slice(),
@@ -3774,9 +3778,18 @@
     for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
     return out;
   }
+  // The printed 4x2 Training Card always names Mario Blais as the PRM, regardless of which AME is
+  // recorded on the record as having trained this particular pilot (that AME prints on the Full Report's
+  // "AME Signature" line instead -- see buildPtrainFullReportPrintHtml / ptrainSignRow).
+  function ptrainCardPrmLicence(){
+    const a = (state.settings.ames||[]).find(a=>a.name===PTRAIN_DEFAULT_PRM_NAME);
+    const aca = a ? (a.aca||'') : '';
+    return aca ? (aca + ', ' + PTRAIN_AMO_NUMBER) : '';
+  }
   function buildPtrainLabelHtml(rec){
     const tasks = rec.tasks||[];
     const ads = rec.ads||[];
+    const cardPrmLicence = ptrainCardPrmLicence();
     const taskChunks = ptrainChunk(tasks, PTRAIN_TASKS_PER_LABEL);
     if(!taskChunks.length) taskChunks.push([]);
     const adChunks = ptrainChunk(ads, PTRAIN_ADS_PER_COLUMN*2);
@@ -3812,7 +3825,7 @@
           (isLast ?
             '<div class="ptl-meta">' +
               '<div class="ptl-sig-row"><b>Trainee Name/Licence:</b> '+escapeHTML(rec.traineeName||'')+(rec.traineeLicence?' / '+escapeHTML(rec.traineeLicence):'')+'<span class="ptl-sig-label">Signature:</span><span class="ptl-sig-line"></span></div>' +
-              '<div><b>PRM Name:</b> '+escapeHTML(rec.trainerName||'')+(rec.trainerLicence?'&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;ACA # '+escapeHTML(rec.trainerLicence):'')+'<span class="ptl-sig-label">Signature:</span><span class="ptl-sig-line"></span></div>' +
+              '<div><b>PRM Name:</b> '+escapeHTML(PTRAIN_DEFAULT_PRM_NAME)+(cardPrmLicence?'&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;ACA # '+escapeHTML(cardPrmLicence):'')+'<span class="ptl-sig-label">Signature:</span><span class="ptl-sig-line"></span></div>' +
               '<div><b>Original Training Date:</b> '+(rec.originalTrainingDate?fmtDateNice(rec.originalTrainingDate):'')+'<span class="ptl-date-gap"></span><b>Additional Training Date:</b> '+(rec.additionalTrainingDate?fmtDateNice(rec.additionalTrainingDate):'')+'</div>' +
             '</div>'
           : '') +
