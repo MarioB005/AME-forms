@@ -297,6 +297,7 @@
   <div id="viewMinorMod" style="display:none;"></div>
   <div id="viewAnticipation" style="display:none;"></div>
   <div id="viewPowercheck" style="display:none;"></div>
+  <div id="viewPowercheckTrend" style="display:none;"></div>
   <div id="viewEc135pc" style="display:none;"></div>
   <div id="viewEc135Trend" style="display:none;"></div>
   <div id="viewBleedValve" style="display:none;"></div>
@@ -520,6 +521,7 @@
       case 'minormod': return buildModHtml('minormod', 'Minor', rec.data);
       case 'anticipation': return buildAnticipationHtml(rec.data);
       case 'ec135pc': return buildEc135PrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
+      case 'powercheck': return buildPowercheckPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       default: return null;
     }
   }
@@ -532,6 +534,7 @@
       case 'minormod': renderModForm('MinorMod', 'Minor', rec.data); break;
       case 'anticipation': renderAnticipation(rec.data); break;
       case 'ec135pc': renderEc135Powercheck(rec.data); break;
+      case 'powercheck': renderPowercheck(rec.data); break;
     }
   }
 
@@ -705,7 +708,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -1888,21 +1891,32 @@
     });
   }
 
-  function renderPowercheck(){
+  function renderPowercheck(prefill){
     showView('Powercheck');
     const el = document.getElementById('viewPowercheck');
+    const s = state.settings;
     const fields = [
-      { id:'pcNr', label:'NR', unit:'rotor speed, RPM', min:380, max:400, step:0.1, value:394 },
-      { id:'pcTq', label:'Torque', unit:'observed, %', min:50, max:95, step:0.1, value:84 },
-      { id:'pcHp', label:'Hp', unit:'pressure altitude, ft', min:0, max:12000, step:10, value:3200 },
-      { id:'pcOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-30, max:50, step:0.1, value:16 },
-      { id:'pcNg', label:'Ng', unit:'gas generator, %', min:91, max:98, step:0.1, value:96.9 },
+      { id:'pcNr', label:'NR', unit:'rotor speed, RPM', min:380, max:400, step:1, value: prefill ? prefill.nr : 394 },
+      { id:'pcTq', label:'Torque', unit:'observed, %', min:50, max:95, step:0.1, value: prefill ? prefill.torque : 84 },
+      { id:'pcHp', label:'Hp', unit:'pressure altitude, ft', min:0, max:12000, step:10, value: prefill ? prefill.hp : 3200 },
+      { id:'pcOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-30, max:50, step:0.1, value: prefill ? prefill.oat : 16 },
+      { id:'pcNg', label:'Ng', unit:'gas generator, %', min:91, max:98, step:0.1, value: prefill ? prefill.ng : 96.9 },
     ];
+    if (prefill) pcSandInstalled = !!prefill.sandFilterInstalled;
+    // Powercheck applies only to the AS350 B2, so the registration dropdown is filtered to
+    // aircraft whose model resolves to that type (same model->type mapping the Pilot Training
+    // section uses) rather than listing every aircraft in the fleet.
+    const as350Aircraft = (s.aircraft||[]).filter(a => ptrainModelToType(a.model) === 'AS350B2');
     el.innerHTML =
       backButton() +
       '<div class="panel">' +
         '<h2 class="form-title">AS350 B2 Powercheck</h2>' +
         '<p class="form-sub">Torque-available performance check &mdash; chart data digitized from &ldquo;Eurocopter &ndash; AS350-B2 Powercheck v1.2&rdquo; &copy; 2012 Guy Fisher. For training and reference use only &mdash; not a substitute for the approved Rotorcraft Flight Manual.</p>' +
+        '<div class="field-grid" style="margin-bottom:16px;">' +
+          '<div class="field"><label for="pcReg">A/C registration</label><select id="pcReg">'+opts(as350Aircraft, a=>a.reg, a=>a.reg, 'Select registration')+'</select></div>' +
+          '<div class="field"><label for="pcDate">Date</label><input type="date" id="pcDate"></div>' +
+          '<div class="field"><label for="pcPilot">Pilot</label><select id="pcPilot">'+opts(s.pilots, p=>p.name, p=>p.name, 'Select pilot')+'</select></div>' +
+        '</div>' +
         '<div class="pc-grid">' +
           '<div>' +
             fields.map(f=> pcFieldHtmlWithSteppers(f, pcFormatFieldVal)).join('') +
@@ -1926,7 +1940,16 @@
             '<details class="pc-tech"><summary>Intermediate chart values</summary><div class="pc-tech-grid" id="pcTechGrid"></div></details>' +
           '</div>' +
         '</div>' +
+        '<div class="btn-row" style="justify-content:flex-end;">' +
+          '<button type="button" class="btn" id="pcTrendBtn">📈 Trend monitoring</button>' +
+          '<button type="button" class="btn primary" id="pcPrintBtn">🖨️ Print report (PDF)</button>' +
+        '</div>' +
       '</div>';
+
+    document.getElementById('pcReg').value = prefill ? (prefill.reg||'') : '';
+    document.getElementById('pcDate').value = prefill ? (prefill.date||todayISO()) : todayISO();
+    if (prefill && prefill.pilot) document.getElementById('pcPilot').value = prefill.pilot;
+    document.getElementById('pcTrendBtn').onclick = ()=> renderPowercheckTrend();
 
     const fEls = {};
     fields.forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
@@ -1992,8 +2015,192 @@
       pcDrawGauge(document.getElementById('pcGauge'), out.torqueMargin);
     }
 
+    document.getElementById('pcPrintBtn').onclick = ()=>{
+      const dateISO = document.getElementById('pcDate').value;
+      const reg = document.getElementById('pcReg').value;
+      const pilot = document.getElementById('pcPilot').value;
+      const inputs = readInputs();
+      const out = pcEngine.compute(inputs);
+      const recordData = {
+        date: dateISO,
+        reg: reg,
+        pilot: pilot,
+        nr: inputs.nr,
+        torque: inputs.torque,
+        hp: inputs.hp,
+        oat: inputs.oat,
+        ng: inputs.ng,
+        sandFilterInstalled: inputs.sandFilterInstalled,
+        out: out,
+      };
+      openPrint(buildPowercheckPrintHtml(Object.assign({}, recordData, { date: fmtDateNice(dateISO) })));
+      // keep a record of every printed report (searchable in Saved Forms, and plotted in Trend
+      // monitoring) -- best-effort: saveRecord/storageSet never reject, so this never blocks or
+      // breaks the print itself.
+      const desc = 'Pilot: '+(pilot||'—')+' — '+(out.passed?'PASSED':'FAILED');
+      saveRecord(buildRecord('powercheck', 'AS350 B2 Powercheck', reg, dateISO, desc, recordData)).catch(()=>{});
+    };
+
     syncSand();
     update();
+  }
+
+  // ---------- AS350 B2 Powercheck print report ----------
+  function buildPowercheckPrintHtml(data){
+    const resultTable = (
+      '<table class="ec-pf-table">' +
+        '<tr><th colspan="2">Torque-Available Check — <span class="ec-pf-result '+(data.out.passed?'pass':'fail')+'">'+(data.out.passed?'PASSED':'FAILED')+'</span></th></tr>' +
+        ec135PrintRow('NR', data.nr.toFixed(0), ' RPM') +
+        ec135PrintRow('Torque observed', data.torque.toFixed(1), '%') +
+        ec135PrintRow('Hp (pressure altitude)', data.hp.toLocaleString(), ' ft') +
+        ec135PrintRow('OAT', data.oat.toFixed(1), ' °C') +
+        ec135PrintRow('Ng (gas generator)', data.ng.toFixed(1), '%') +
+        ec135PrintRow('Sand filter', data.sandFilterInstalled ? 'Installed' : 'None') +
+        ec135PrintRow('Minimum torque required', data.out.minimumTorque.toFixed(1), '%') +
+        '<tr class="ec-pf-margin-row"><td colspan="2">' +
+          '<span class="ec-pf-margin-item">Torque margin: <span class="ec-pf-margin-val">'+(data.out.torqueMargin>=0?'+':'−')+Math.abs(data.out.torqueMargin).toFixed(2)+'%</span></span>' +
+        '</td></tr>' +
+      '</table>' +
+      (data.out.extrapolated ? '<div class="ec-pf-notes">⚠ This reading falls outside the digitized chart data and has been linearly extrapolated. Cross-check against the printed Flight Manual performance charts before relying on it.</div>' : '')
+    );
+
+    return (
+      PRINT_STYLES + EC135_PRINT_STYLES +
+      '<div class="ec-pf-head">' +
+        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+        '<div class="pf-title-block"><h1>AS350 B2 Powercheck</h1><div class="pf-sub">Torque-available performance check — chart data digitized from &ldquo;Eurocopter &ndash; AS350-B2 Powercheck v1.2&rdquo; &copy; 2012 Guy Fisher</div></div>' +
+      '</div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
+          '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot||'')+'</span></span></div>' +
+      '</div>' +
+      resultTable +
+      '<div class="ec-pf-overall">Overall result: '+(data.out.passed?'POWER ASSURED':'POWER NOT ASSURED')+'</div>' +
+      '<div class="ec-pf-foot">Chart data digitized from “Eurocopter – AS350-B2 Powercheck v1.2” © 2012 Guy Fisher. For training and reference use only — the approved Rotorcraft Flight Manual is the sole authority. Printed '+fmtDateNice(todayISO())+' from Phoenix Heli-Flight Maintenance Forms.</div>'
+    );
+  }
+
+  // ---------- AS350 B2 Powercheck trend monitoring (torque margin history) ----------
+  let pcTrendFilter = { reg:'' };
+  let pcTrendCache = null;
+
+  function pcTrendBackHTML(){
+    return '<button class="back-btn" id="pcTrendBackBtn">‹ Back to Powercheck</button>';
+  }
+
+  async function renderPowercheckTrend(){
+    showView('PowercheckTrend');
+    const el = document.getElementById('viewPowercheckTrend');
+    el.innerHTML = pcTrendBackHTML() + '<div class="panel"><h2 class="form-title">AS350 B2 Powercheck — Trend Monitoring</h2><p class="form-sub">Loading…</p></div>';
+    document.getElementById('pcTrendBackBtn').onclick = ()=> renderPowercheck();
+    const all = await loadRecords();
+    pcTrendCache = all
+      .filter(r=>r.formType==='powercheck')
+      .sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.createdAt||'').localeCompare(b.createdAt||''));
+    renderPowercheckTrendBody();
+  }
+
+  function renderPowercheckTrendBody(){
+    const el = document.getElementById('viewPowercheckTrend');
+    if(!el) return; // user navigated away before records finished loading
+    const records = pcTrendCache || [];
+    const regs = Array.from(new Set(records.map(r=>r.reg).filter(Boolean))).sort();
+    const filtered = pcTrendFilter.reg ? records.filter(r=>r.reg===pcTrendFilter.reg) : records;
+
+    el.innerHTML =
+      pcTrendBackHTML() +
+      '<div class="panel">' +
+        '<h2 class="form-title">AS350 B2 Powercheck — Trend Monitoring</h2>' +
+        '<p class="form-sub">Torque margin recorded automatically every time a report is printed, plotted by the date/time the check was performed. Use this to watch for gradual power-margin decay between checks.</p>' +
+        '<div class="field-grid" style="margin-bottom:6px;">' +
+          '<div class="field"><label for="pcTrendRegFilter">Aircraft Reg</label><select id="pcTrendRegFilter"><option value="">All aircraft</option>' +
+            regs.map(r=>'<option value="'+escapeHTML(r)+'"'+(r===pcTrendFilter.reg?' selected':'')+'>'+escapeHTML(r)+'</option>').join('') +
+          '</select></div>' +
+        '</div>' +
+        (filtered.length ?
+          (
+            '<div style="margin-top:10px;">' +
+              '<div class="pc-gauge-caption" style="margin-bottom:6px;">Torque margin, % (dashed line = 0% margin)</div>' +
+              '<canvas id="pcTrendCanvas" width="720" height="220" style="width:100%;height:auto;display:block;"></canvas>' +
+            '</div>' +
+            '<table class="list-table" style="margin-top:20px;"><thead><tr><th>Date</th><th>Reg</th><th>Pilot</th><th>Torque margin</th><th>Result</th></tr></thead><tbody>' +
+              filtered.slice().reverse().map(r=>
+                '<tr><td>'+escapeHTML(fmtDateNice(r.date)||r.date||'')+'</td>' +
+                  '<td>'+escapeHTML(r.reg||'')+'</td>' +
+                  '<td>'+escapeHTML(r.data.pilot||'')+'</td>' +
+                  '<td>'+(r.data.out.torqueMargin>=0?'+':'−')+Math.abs(r.data.out.torqueMargin).toFixed(2)+'%</td>' +
+                  '<td>'+(r.data.out.passed?'PASS':'FAIL')+'</td></tr>'
+              ).join('') +
+            '</tbody></table>'
+          ) :
+          '<p class="note" style="margin-top:16px;">No power checks recorded yet'+(pcTrendFilter.reg?' for '+escapeHTML(pcTrendFilter.reg):'')+'. A record is saved automatically every time "Print report (PDF)" is pressed.</p>'
+        ) +
+      '</div>';
+
+    document.getElementById('pcTrendBackBtn').onclick = ()=> renderPowercheck();
+    document.getElementById('pcTrendRegFilter').onchange = (e)=>{ pcTrendFilter.reg = e.target.value; renderPowercheckTrendBody(); };
+
+    if(filtered.length){
+      pcDrawSingleTrendChart(document.getElementById('pcTrendCanvas'), filtered, r=>r.data.out.torqueMargin);
+    }
+  }
+
+  // Single-series variant of ec135DrawTrendChart (below), since the AS350 Powercheck has one
+  // torque-margin result per record rather than the EC135's per-engine pair.
+  function pcDrawSingleTrendChart(canvas, records, valueFn){
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    const padL = 48, padR = 14, padT = 20, padB = 30;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+
+    const allVals = records.map(valueFn);
+    if(!allVals.length) return;
+    let vMin = Math.min(0, Math.min.apply(null, allVals));
+    let vMax = Math.max.apply(null, allVals);
+    const pad = (vMax - vMin) * 0.15 || 1;
+    vMin -= pad; vMax += pad;
+
+    function xFor(i){ return padL + (records.length<=1 ? plotW/2 : plotW * i/(records.length-1)); }
+    function yFor(v){ return padT + plotH * (1 - (v - vMin)/(vMax - vMin)); }
+
+    ctx.strokeStyle = pcCssVar('--line');
+    ctx.lineWidth = 1;
+    ctx.fillStyle = pcCssVar('--grey-strong');
+    ctx.font = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    const ticks = 4;
+    for(let t=0;t<=ticks;t++){
+      const v = vMin + (vMax-vMin)*t/ticks;
+      const y = yFor(v);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.fillText(v.toFixed(1), padL-6, y);
+    }
+    if(vMin < 0 && vMax > 0){
+      ctx.strokeStyle = pcCssVar('--bad');
+      ctx.setLineDash([4,3]);
+      const y0 = yFor(0);
+      ctx.beginPath(); ctx.moveTo(padL,y0); ctx.lineTo(W-padR,y0); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    const pts = records.map((r,i)=>({ x:xFor(i), y:yFor(valueFn(r)) }));
+    ctx.strokeStyle = pcCssVar('--accent');
+    ctx.fillStyle = pcCssVar('--accent');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach((pt,i)=> i===0 ? ctx.moveTo(pt.x,pt.y) : ctx.lineTo(pt.x,pt.y));
+    ctx.stroke();
+    pts.forEach(pt=>{ ctx.beginPath(); ctx.arc(pt.x,pt.y,3,0,Math.PI*2); ctx.fill(); });
+
+    ctx.fillStyle = pcCssVar('--grey-strong');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const labelIdxs = records.length>1 ? [0, Math.floor((records.length-1)/2), records.length-1] : [0];
+    labelIdxs.forEach(i=>{
+      const label = (fmtDateNice(records[i].date) || records[i].date || '').split(',')[0];
+      ctx.fillText(label, xFor(i), H-padB+8);
+    });
   }
 
 
