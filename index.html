@@ -170,6 +170,7 @@
   .pc-step-btn{width:28px;height:28px;border:none;background:var(--panel);color:var(--ink);font-size:15px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
   .pc-step-btn:active{background:var(--accent);color:#fff;}
   .pc-step-btn + .pc-step-btn{border-left:1px solid var(--line);}
+  .pc-step-btn.wide{width:auto;height:28px;padding:0 12px;font-size:11.5px;font-weight:700;white-space:nowrap;}
 
   /* ---------- Bleed Valve Test ---------- */
   .bv-check{padding:12px 0;border-bottom:1px solid var(--line);}
@@ -1832,9 +1833,59 @@
     ctx.beginPath(); ctx.fillStyle = ink; ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
   }
 
+  // Number of decimal places implied by a slider's step (e.g. 0.01 -> 2, 10 -> 0) -- used so the
+  // readout next to a slider actually shows the extra precision once a field's step is made finer
+  // (a 0.01-step OAT field displayed with only 1 decimal would make the Up/Down buttons look like
+  // they're doing nothing).
+  function pcStepDecimals(step){
+    const s = String(step);
+    const i = s.indexOf('.');
+    return i === -1 ? 0 : (s.length - i - 1);
+  }
   function pcFormatFieldVal(f, val){
-    if (f.step < 1) return val.toFixed(1);
-    return Math.round(val).toLocaleString();
+    const d = pcStepDecimals(f.step);
+    return d > 0 ? val.toFixed(d) : Math.round(val).toLocaleString();
+  }
+  // Shared "range slider + Up/Down fine-adjust buttons" row, used by both the AS350 B2 Powercheck
+  // and the Arriel 1D1 Bleed Valve Test (the EC135 Power Check has its own compact +/- version of
+  // the same idea -- ec135FieldHTML below -- left as-is since it wasn't part of this request).
+  function pcFieldHtmlWithSteppers(f, formatFn){
+    return (
+      '<div class="pc-field">' +
+        '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+formatFn(f, f.value)+'</span></div>' +
+        '<div class="pc-field-row">' +
+          '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
+          '<div class="pc-stepper">' +
+            '<button type="button" class="pc-step-btn wide" data-target="'+f.id+'" data-dir="-1" aria-label="Decrease '+f.label+'">Down</button>' +
+            '<button type="button" class="pc-step-btn wide" data-target="'+f.id+'" data-dir="1" aria-label="Increase '+f.label+'">Up</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+  // Rounds a stepped value back onto the step grid and clamps it to [min,max], cleaning up the
+  // floating-point noise a fine step like 0.01 would otherwise leave behind (e.g. 0.1+0.2).
+  function pcRoundToStep(val, step, min, max){
+    const decimals = Math.max(pcStepDecimals(step), 6);
+    let v = Math.round(val/step) * step;
+    v = parseFloat(v.toFixed(decimals));
+    return Math.max(min, Math.min(max, v));
+  }
+  // Delegated click handler for every "Up"/"Down" stepper button inside `container` -- one listener
+  // covers all of a view's fields since the buttons are re-rendered along with everything else.
+  function pcWireSteppers(container){
+    container.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.pc-step-btn');
+      if (!btn) return;
+      const inp = document.getElementById(btn.dataset.target);
+      if (!inp) return;
+      const step = parseFloat(inp.step) || 1;
+      const min = parseFloat(inp.min), max = parseFloat(inp.max);
+      const dir = parseFloat(btn.dataset.dir);
+      const val = pcRoundToStep(parseFloat(inp.value) + dir*step, step, min, max);
+      inp.value = val;
+      inp.dispatchEvent(new Event('input', { bubbles:true }));
+    });
   }
 
   function renderPowercheck(){
@@ -1843,8 +1894,8 @@
     const fields = [
       { id:'pcNr', label:'NR', unit:'rotor speed, RPM', min:380, max:400, step:0.1, value:394 },
       { id:'pcTq', label:'Torque', unit:'observed, %', min:50, max:95, step:0.1, value:84 },
-      { id:'pcHp', label:'Hp', unit:'pressure altitude, ft', min:0, max:12000, step:50, value:3200 },
-      { id:'pcOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-30, max:50, step:0.5, value:16 },
+      { id:'pcHp', label:'Hp', unit:'pressure altitude, ft', min:0, max:12000, step:10, value:3200 },
+      { id:'pcOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-30, max:50, step:0.1, value:16 },
       { id:'pcNg', label:'Ng', unit:'gas generator, %', min:91, max:98, step:0.1, value:96.9 },
     ];
     el.innerHTML =
@@ -1854,12 +1905,7 @@
         '<p class="form-sub">Torque-available performance check &mdash; chart data digitized from &ldquo;Eurocopter &ndash; AS350-B2 Powercheck v1.2&rdquo; &copy; 2012 Guy Fisher. For training and reference use only &mdash; not a substitute for the approved Rotorcraft Flight Manual.</p>' +
         '<div class="pc-grid">' +
           '<div>' +
-            fields.map(f=>(
-              '<div class="pc-field">' +
-                '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+pcFormatFieldVal(f, f.value)+'</span></div>' +
-                '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
-              '</div>'
-            )).join('') +
+            fields.map(f=> pcFieldHtmlWithSteppers(f, pcFormatFieldVal)).join('') +
             '<div class="pc-field">' +
               '<div class="pc-field-head"><span class="pc-field-name">Sand filter</span></div>' +
               '<div class="pc-toggle">' +
@@ -1884,6 +1930,7 @@
 
     const fEls = {};
     fields.forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
+    pcWireSteppers(el);
     const sandNoneBtn = document.getElementById('pcSandNone');
     const sandInstalledBtn = document.getElementById('pcSandInstalled');
 
@@ -1997,16 +2044,16 @@
   }
 
   function bvFormatFieldVal(f, val){
-    if (f.step < 1) return val.toFixed(1);
-    return Math.round(val).toLocaleString();
+    const d = pcStepDecimals(f.step);
+    return d > 0 ? val.toFixed(d) : Math.round(val).toLocaleString();
   }
 
   function renderBleedValve(){
     showView('BleedValve');
     const el = document.getElementById('viewBleedValve');
     const fields = [
-      { id:'bvOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-50, max:50, step:0.5, value:15 },
-      { id:'bvZp', label:'Zp', unit:'pressure altitude, ft', min:0, max:20000, step:100, value:5000 },
+      { id:'bvOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-50, max:50, step:0.1, value:15 },
+      { id:'bvZp', label:'Zp', unit:'pressure altitude, ft', min:0, max:20000, step:10, value:5000 },
       { id:'bvActOpen', label:'Actual N1 (NG)', unit:'at valve opening, %', min:80, max:102, step:0.1, value:90.0 },
       { id:'bvActClose', label:'Actual N1 (NG)', unit:'at valve closing, %', min:80, max:102, step:0.1, value:95.0 },
     ];
@@ -2017,12 +2064,7 @@
         '<p class="form-sub">Bleed valve opening/closing N1 (NG) threshold check &mdash; Task 75-31-00-750-803-A01, Safran Arriel 1D1 Maintenance Manual (Figures 1301/1302). Tolerance +2% / -1%. For negative pressure altitudes, the 0 ft line is used. For training and reference use only &mdash; always confirm against the current approved maintenance manual.</p>' +
         '<div class="pc-grid">' +
           '<div>' +
-            fields.map(f=>(
-              '<div class="pc-field">' +
-                '<div class="pc-field-head"><span class="pc-field-name">'+f.label+'<span class="pc-field-unit">'+f.unit+'</span></span><span class="pc-field-val" id="'+f.id+'Val">'+bvFormatFieldVal(f, f.value)+'</span></div>' +
-                '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
-              '</div>'
-            )).join('') +
+            fields.map(f=> pcFieldHtmlWithSteppers(f, bvFormatFieldVal)).join('') +
           '</div>' +
           '<div>' +
             '<div class="bv-check">' +
@@ -2043,6 +2085,7 @@
 
     const fEls = {};
     fields.forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
+    pcWireSteppers(el);
 
     fields.forEach(f=>{
       fEls[f.id].addEventListener('input', ()=>{
