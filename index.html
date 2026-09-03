@@ -301,6 +301,7 @@
   <div id="viewEc135pc" style="display:none;"></div>
   <div id="viewEc135Trend" style="display:none;"></div>
   <div id="viewBleedValve" style="display:none;"></div>
+  <div id="viewBleedValveTrend" style="display:none;"></div>
   <div id="viewReserved" style="display:none;"></div>
   <div id="viewMpmRevision" style="display:none;"></div>
   <div id="viewMcmRevision" style="display:none;"></div>
@@ -522,6 +523,7 @@
       case 'anticipation': return buildAnticipationHtml(rec.data);
       case 'ec135pc': return buildEc135PrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'powercheck': return buildPowercheckPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
+      case 'bleedvalve': return buildBleedValvePrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       default: return null;
     }
   }
@@ -535,6 +537,7 @@
       case 'anticipation': renderAnticipation(rec.data); break;
       case 'ec135pc': renderEc135Powercheck(rec.data); break;
       case 'powercheck': renderPowercheck(rec.data); break;
+      case 'bleedvalve': renderBleedValve(rec.data); break;
     }
   }
 
@@ -708,7 +711,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','Reserved','MpmRevision','McmRevision','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -1859,8 +1862,8 @@
         '<div class="pc-field-row">' +
           '<input type="range" id="'+f.id+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" value="'+f.value+'">' +
           '<div class="pc-stepper">' +
-            '<button type="button" class="pc-step-btn wide" data-target="'+f.id+'" data-dir="-1" aria-label="Decrease '+f.label+'">Down</button>' +
-            '<button type="button" class="pc-step-btn wide" data-target="'+f.id+'" data-dir="1" aria-label="Increase '+f.label+'">Up</button>' +
+            '<button type="button" class="pc-step-btn wide" data-target="'+f.id+'" data-dir="-1" aria-label="Decrease '+f.label+'">&minus;</button>' +
+            '<button type="button" class="pc-step-btn wide" data-target="'+f.id+'" data-dir="1" aria-label="Increase '+f.label+'">+</button>' +
           '</div>' +
         '</div>' +
       '</div>'
@@ -2255,20 +2258,29 @@
     return d > 0 ? val.toFixed(d) : Math.round(val).toLocaleString();
   }
 
-  function renderBleedValve(){
+  function renderBleedValve(prefill){
     showView('BleedValve');
     const el = document.getElementById('viewBleedValve');
+    const s = state.settings;
     const fields = [
-      { id:'bvOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-50, max:50, step:0.1, value:15 },
-      { id:'bvZp', label:'Zp', unit:'pressure altitude, ft', min:0, max:20000, step:10, value:5000 },
-      { id:'bvActOpen', label:'Actual N1 (NG)', unit:'at valve opening, %', min:80, max:102, step:0.1, value:90.0 },
-      { id:'bvActClose', label:'Actual N1 (NG)', unit:'at valve closing, %', min:80, max:102, step:0.1, value:95.0 },
+      { id:'bvOat', label:'OAT', unit:'outside air temp, \u00b0C', min:-50, max:50, step:0.1, value: prefill ? prefill.oat : 15 },
+      { id:'bvZp', label:'Zp', unit:'pressure altitude, ft', min:0, max:20000, step:10, value: prefill ? prefill.zp : 5000 },
+      { id:'bvActOpen', label:'Actual N1 (NG)', unit:'at valve opening, %', min:80, max:102, step:0.1, value: prefill ? prefill.actOpen : 90.0 },
+      { id:'bvActClose', label:'Actual N1 (NG)', unit:'at valve closing, %', min:80, max:102, step:0.1, value: prefill ? prefill.actClose : 95.0 },
     ];
+    // This test applies only to the AS350 B2, so the registration dropdown is filtered the
+    // same way the Powercheck's is.
+    const as350Aircraft = (s.aircraft||[]).filter(a => ptrainModelToType(a.model) === 'AS350B2');
     el.innerHTML =
       backButton() +
       '<div class="panel">' +
         '<h2 class="form-title">Arriel 1D1 Bleed Valve Test</h2>' +
         '<p class="form-sub">Bleed valve opening/closing N1 (NG) threshold check &mdash; Task 75-31-00-750-803-A01, Safran Arriel 1D1 Maintenance Manual (Figures 1301/1302). Tolerance +2% / -1%. For negative pressure altitudes, the 0 ft line is used. For training and reference use only &mdash; always confirm against the current approved maintenance manual.</p>' +
+        '<div class="field-grid" style="margin-bottom:16px;">' +
+          '<div class="field"><label for="bvReg">A/C registration</label><select id="bvReg">'+opts(as350Aircraft, a=>a.reg, a=>a.reg, 'Select registration')+'</select></div>' +
+          '<div class="field"><label for="bvDate">Date</label><input type="date" id="bvDate"></div>' +
+          '<div class="field"><label for="bvPilot">Pilot</label><select id="bvPilot">'+opts(s.pilots, p=>p.name, p=>p.name, 'Select pilot')+'</select></div>' +
+        '</div>' +
         '<div class="pc-grid">' +
           '<div>' +
             fields.map(f=> pcFieldHtmlWithSteppers(f, bvFormatFieldVal)).join('') +
@@ -2288,7 +2300,16 @@
             '</div>' +
           '</div>' +
         '</div>' +
+        '<div class="btn-row" style="justify-content:flex-end;">' +
+          '<button type="button" class="btn" id="bvTrendBtn">\ud83d\udcc8 Trend monitoring</button>' +
+          '<button type="button" class="btn primary" id="bvPrintBtn">\ud83d\udda8\ufe0f Print report (PDF)</button>' +
+        '</div>' +
       '</div>';
+
+    document.getElementById('bvReg').value = prefill ? (prefill.reg||'') : '';
+    document.getElementById('bvDate').value = prefill ? (prefill.date||todayISO()) : todayISO();
+    if (prefill && prefill.pilot) document.getElementById('bvPilot').value = prefill.pilot;
+    document.getElementById('bvTrendBtn').onclick = ()=> renderBleedValveTrend();
 
     const fEls = {};
     fields.forEach(f=>{ fEls[f.id] = document.getElementById(f.id); });
@@ -2324,7 +2345,200 @@
       setCheck('bvClose', closeResult);
     }
 
+    document.getElementById('bvPrintBtn').onclick = ()=>{
+      const dateISO = document.getElementById('bvDate').value;
+      const reg = document.getElementById('bvReg').value;
+      const pilot = document.getElementById('bvPilot').value;
+      const t0 = parseFloat(fEls.bvOat.value);
+      const zp = parseFloat(fEls.bvZp.value);
+      const actualOpen = parseFloat(fEls.bvActOpen.value);
+      const actualClose = parseFloat(fEls.bvActClose.value);
+      const openResult = bvCompute(BLEEDVALVE_DATA.opening, t0, zp, actualOpen);
+      const closeResult = bvCompute(BLEEDVALVE_DATA.closing, t0, zp, actualClose);
+      const recordData = {
+        date: dateISO,
+        reg: reg,
+        pilot: pilot,
+        oat: t0,
+        zp: zp,
+        actOpen: actualOpen,
+        actClose: actualClose,
+        openResult: openResult,
+        closeResult: closeResult,
+      };
+      openPrint(buildBleedValvePrintHtml(Object.assign({}, recordData, { date: fmtDateNice(dateISO) })));
+      // keep a record of every printed report (searchable in Saved Forms, and plotted in Trend
+      // monitoring) -- best-effort: saveRecord/storageSet never reject, so this never blocks or
+      // breaks the print itself.
+      const allPass = openResult.passed && closeResult.passed;
+      const desc = 'Pilot: '+(pilot||'—')+' — '+(allPass?'PASSED':'FAILED');
+      saveRecord(buildRecord('bleedvalve', 'Arriel 1D1 Bleed Valve Test', reg, dateISO, desc, recordData)).catch(()=>{});
+    };
+
     update();
+  }
+
+  // ---------- Arriel 1D1 Bleed Valve Test print report ----------
+  function buildBleedValvePrintHtml(data){
+    const checkTable = (label, r, actualVal) => (
+      '<table class="ec-pf-table">' +
+        '<tr><th colspan="2">Valve '+label+' — <span class="ec-pf-result '+(r.passed?'pass':'fail')+'">'+(r.passed?'PASSED':'FAILED')+'</span></th></tr>' +
+        ec135PrintRow('Graph value (theoretical)', r.graph.toFixed(2), '%') +
+        ec135PrintRow('Acceptable range', r.lo.toFixed(2)+'% – '+r.hi.toFixed(2), '%') +
+        ec135PrintRow('Actual reading', actualVal.toFixed(1), '%') +
+      '</table>'
+    );
+
+    return (
+      PRINT_STYLES + EC135_PRINT_STYLES +
+      '<div class="ec-pf-head">' +
+        '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
+        '<div class="pf-title-block"><h1>Arriel 1D1 Bleed Valve Test</h1><div class="pf-sub">Bleed valve opening/closing N1 (NG) threshold check — Task 75-31-00-750-803-A01, Safran Arriel 1D1 Maintenance Manual (Figures 1301/1302)</div></div>' +
+      '</div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
+          '<span class="pf-field"><b>A/C registration:</b><span class="pf-underline">'+escapeHTML(data.reg)+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:6px;"><span class="pf-field"><b>Pilot:</b><span class="pf-underline">'+escapeHTML(data.pilot||'')+'</span></span></div>' +
+        '<div class="pf-row" style="margin-top:8px;"><span class="pf-field"><b>Zp:</b><span class="pf-underline" style="min-width:70px;">'+data.zp.toLocaleString()+' ft</span></span>' +
+          '<span class="pf-field"><b>OAT:</b><span class="pf-underline" style="min-width:70px;">'+data.oat.toFixed(1)+' °C</span></span></div>' +
+      '</div>' +
+      checkTable('Opening', data.openResult, data.actOpen) +
+      checkTable('Closing', data.closeResult, data.actClose) +
+      '<div class="ec-pf-overall">Overall result: '+((data.openResult.passed && data.closeResult.passed)?'PASSED — BOTH CHECKS':'FAILED')+'</div>' +
+      '<div class="ec-pf-foot">Digitized from Safran Arriel 1D1 Maintenance Manual, Task 75-31-00-750-803-A01 (Figures 1301/1302). Tolerance +2% / -1%. For training and reference use only — always confirm against the current approved maintenance manual. Printed '+fmtDateNice(todayISO())+' from Phoenix Heli-Flight Maintenance Forms.</div>'
+    );
+  }
+
+  // ---------- Arriel 1D1 Bleed Valve Test trend monitoring (opening/closing margin history) ----------
+  let bvTrendFilter = { reg:'' };
+  let bvTrendCache = null;
+
+  function bvTrendBackHTML(){
+    return '<button class="back-btn" id="bvTrendBackBtn">‹ Back to Bleed Valve Test</button>';
+  }
+
+  async function renderBleedValveTrend(){
+    showView('BleedValveTrend');
+    const el = document.getElementById('viewBleedValveTrend');
+    el.innerHTML = bvTrendBackHTML() + '<div class="panel"><h2 class="form-title">Arriel 1D1 Bleed Valve Test — Trend Monitoring</h2><p class="form-sub">Loading…</p></div>';
+    document.getElementById('bvTrendBackBtn').onclick = ()=> renderBleedValve();
+    const all = await loadRecords();
+    bvTrendCache = all
+      .filter(r=>r.formType==='bleedvalve')
+      .sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.createdAt||'').localeCompare(b.createdAt||''));
+    renderBleedValveTrendBody();
+  }
+
+  function renderBleedValveTrendBody(){
+    const el = document.getElementById('viewBleedValveTrend');
+    if(!el) return; // user navigated away before records finished loading
+    const records = bvTrendCache || [];
+    const regs = Array.from(new Set(records.map(r=>r.reg).filter(Boolean))).sort();
+    const filtered = bvTrendFilter.reg ? records.filter(r=>r.reg===bvTrendFilter.reg) : records;
+
+    el.innerHTML =
+      bvTrendBackHTML() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Arriel 1D1 Bleed Valve Test — Trend Monitoring</h2>' +
+        '<p class="form-sub">Opening/closing margin (distance from the nearest tolerance limit, %) recorded automatically every time a report is printed. Use this to watch for gradual drift toward the tolerance limits between checks.</p>' +
+        '<div class="field-grid" style="margin-bottom:6px;">' +
+          '<div class="field"><label for="bvTrendRegFilter">Aircraft Reg</label><select id="bvTrendRegFilter"><option value="">All aircraft</option>' +
+            regs.map(r=>'<option value="'+escapeHTML(r)+'"'+(r===bvTrendFilter.reg?' selected':'')+'>'+escapeHTML(r)+'</option>').join('') +
+          '</select></div>' +
+        '</div>' +
+        (filtered.length ?
+          (
+            '<div style="margin-top:10px;">' +
+              '<div class="pc-gauge-caption" style="margin-bottom:6px;">Margin, % (dashed line = 0% margin / at tolerance limit)</div>' +
+              '<canvas id="bvTrendCanvas" width="720" height="220" style="width:100%;height:auto;display:block;"></canvas>' +
+            '</div>' +
+            '<table class="list-table" style="margin-top:20px;"><thead><tr><th>Date</th><th>Reg</th><th>Pilot</th><th>Opening margin</th><th>Closing margin</th><th>Result</th></tr></thead><tbody>' +
+              filtered.slice().reverse().map(r=>
+                '<tr><td>'+escapeHTML(fmtDateNice(r.date)||r.date||'')+'</td>' +
+                  '<td>'+escapeHTML(r.reg||'')+'</td>' +
+                  '<td>'+escapeHTML(r.data.pilot||'')+'</td>' +
+                  '<td>'+(r.data.openResult.margin>=0?'+':'−')+Math.abs(r.data.openResult.margin).toFixed(2)+'%</td>' +
+                  '<td>'+(r.data.closeResult.margin>=0?'+':'−')+Math.abs(r.data.closeResult.margin).toFixed(2)+'%</td>' +
+                  '<td>'+((r.data.openResult.passed && r.data.closeResult.passed)?'PASS':'FAIL')+'</td></tr>'
+              ).join('') +
+            '</tbody></table>'
+          ) :
+          '<p class="note" style="margin-top:16px;">No bleed valve tests recorded yet'+(bvTrendFilter.reg?' for '+escapeHTML(bvTrendFilter.reg):'')+'. A record is saved automatically every time "Print report (PDF)" is pressed.</p>'
+        ) +
+      '</div>';
+
+    document.getElementById('bvTrendBackBtn').onclick = ()=> renderBleedValve();
+    document.getElementById('bvTrendRegFilter').onchange = (e)=>{ bvTrendFilter.reg = e.target.value; renderBleedValveTrendBody(); };
+
+    if(filtered.length){
+      bvDrawTrendChart(document.getElementById('bvTrendCanvas'), filtered);
+    }
+  }
+
+  // Two-series trend chart (opening/closing margin), adapted from ec135DrawTrendChart.
+  function bvDrawTrendChart(canvas, records){
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    const padL = 48, padR = 14, padT = 20, padB = 30;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+
+    const seriesColors = { open: pcCssVar('--accent'), close: pcCssVar('--warn') };
+    const allVals = [];
+    records.forEach(r=>{ allVals.push(r.data.openResult.margin); allVals.push(r.data.closeResult.margin); });
+    if(!allVals.length) return;
+    let vMin = Math.min(0, Math.min.apply(null, allVals));
+    let vMax = Math.max.apply(null, allVals);
+    const pad = (vMax - vMin) * 0.15 || 1;
+    vMin -= pad; vMax += pad;
+
+    function xFor(i){ return padL + (records.length<=1 ? plotW/2 : plotW * i/(records.length-1)); }
+    function yFor(v){ return padT + plotH * (1 - (v - vMin)/(vMax - vMin)); }
+
+    ctx.strokeStyle = pcCssVar('--line');
+    ctx.lineWidth = 1;
+    ctx.fillStyle = pcCssVar('--grey-strong');
+    ctx.font = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    const ticks = 4;
+    for(let t=0;t<=ticks;t++){
+      const v = vMin + (vMax-vMin)*t/ticks;
+      const y = yFor(v);
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.fillText(v.toFixed(1), padL-6, y);
+    }
+    if(vMin < 0 && vMax > 0){
+      ctx.strokeStyle = pcCssVar('--bad');
+      ctx.setLineDash([4,3]);
+      const y0 = yFor(0);
+      ctx.beginPath(); ctx.moveTo(padL,y0); ctx.lineTo(W-padR,y0); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawSeries(field, color){
+      const pts = records.map((r,i)=>({ x:xFor(i), y:yFor(r.data[field].margin) }));
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+      ctx.beginPath();
+      pts.forEach((pt,i)=> i===0 ? ctx.moveTo(pt.x,pt.y) : ctx.lineTo(pt.x,pt.y));
+      ctx.stroke();
+      pts.forEach(pt=>{ ctx.beginPath(); ctx.arc(pt.x,pt.y,3,0,Math.PI*2); ctx.fill(); });
+    }
+    drawSeries('openResult', seriesColors.open);
+    drawSeries('closeResult', seriesColors.close);
+
+    ctx.fillStyle = pcCssVar('--grey-strong');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const labelIdxs = records.length>1 ? [0, Math.floor((records.length-1)/2), records.length-1] : [0];
+    labelIdxs.forEach(i=>{
+      const label = (fmtDateNice(records[i].date) || records[i].date || '').split(',')[0];
+      ctx.fillText(label, xFor(i), H-padB+8);
+    });
+
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillStyle = seriesColors.open; ctx.fillRect(padL, 2, 10, 10);
+    ctx.fillStyle = pcCssVar('--ink'); ctx.fillText('Opening', padL+14, 7);
+    ctx.fillStyle = seriesColors.close; ctx.fillRect(padL+80, 2, 10, 10);
+    ctx.fillStyle = pcCssVar('--ink'); ctx.fillText('Closing', padL+94, 7);
   }
 
 
