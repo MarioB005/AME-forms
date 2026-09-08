@@ -2489,7 +2489,7 @@
   // worked example: phase 6:40 falls between the "1" step (6:00) and the "6" step (8:00), and
   // yields 67% / 33% exactly as printed).
   const TRB_POINT_SEQ = ['4','3','2','1','6','5','4'];
-  const TRB_UNBALANCE_THRESHOLD_IPS = 0.2;
+  const TRB_UNBALANCE_THRESHOLD_IPS = 0.05;
   // g per ips, from the AMM's own worked example (1.05 ips -> 3.75 g total load weight).
   const TRB_AMP_TO_WEIGHT_SLOPE = 3.75 / 1.05;
 
@@ -2826,7 +2826,7 @@
       if(a.balanced){
         return (
           '<div class="trb-section">' +
-            '<div class="trb-banner ok">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — at or below the 0.2 IPS threshold. No correction needed.</div>' +
+            '<div class="trb-banner ok">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — at or below the 0.05 IPS threshold. No correction needed.</div>' +
             '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pend.calOffsetMin+' min'+(pend.calOffsetAuto?', calculated automatically':(pend.calOffsetMin?', entered manually':''))+').</p>' +
             '<div class="btn-row"><button type="button" class="btn primary" id="trbLogRunBtn">Log this run as final check</button></div>' +
           '</div>'
@@ -2834,7 +2834,7 @@
       }
       return (
         '<div class="trb-section">' +
-          '<div class="trb-banner warn">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — above the 0.2 IPS threshold. Suggested correction below.</div>' +
+          '<div class="trb-banner warn">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — above the 0.05 IPS threshold. Suggested correction below.</div>' +
           '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pend.calOffsetMin+' min'+(pend.calOffsetAuto?', calculated automatically':(pend.calOffsetMin?', entered manually':''))+') &nbsp;|&nbsp; Total additional weight required: <b>'+a.totalWeight.toFixed(2)+' g</b></p>' +
           a.points.map(p=>{
             const actualTotal = (pend.actual[p.point]!==undefined) ? pend.actual[p.point] : p.suggestedTotal;
