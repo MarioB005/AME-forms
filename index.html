@@ -237,6 +237,23 @@
   .mcm-publish-panel label{display:block;font-size:11px;font-weight:700;margin:6px 0 2px;}
   .mcm-publish-panel input{border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:12.5px;}
   .mcm-cert-scan img{max-width:100%;border:1px solid var(--line);border-radius:6px;margin:8px 0;}
+
+  /* ---------- EC130 Tail Rotor Balancing ---------- */
+  .trb-section{margin:18px 0;padding-top:14px;border-top:1px solid var(--line);}
+  .trb-section:first-of-type{border-top:none;padding-top:0;}
+  .trb-section h3{font-size:14px;margin:0 0 8px;}
+  .trb-note{font-size:11.5px;color:var(--grey-strong);margin:0 0 10px;line-height:1.5;}
+  .trb-banner{border-radius:8px;padding:10px 14px;font-weight:700;font-size:13px;margin-bottom:10px;}
+  .trb-banner.ok{background:rgba(40,180,100,0.12);color:#1a7a44;border:1px solid rgba(40,180,100,0.35);}
+  .trb-banner.warn{background:rgba(240,180,40,0.12);color:#8a6100;border:1px solid rgba(240,180,40,0.4);}
+  .trb-point-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;}
+  .trb-point-card h4{margin:0 0 6px;font-size:12.5px;}
+  .trb-qty-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px;}
+  .trb-qty-row label{display:flex;align-items:center;gap:4px;}
+  .trb-qty-row input[type="number"]{width:52px;border:1px solid var(--line);border-radius:6px;padding:3px 5px;}
+  .trb-phase-inputs{display:flex;gap:4px;align-items:center;}
+  .trb-phase-inputs input{width:52px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;}
+  .trb-points-table td,.trb-history-table td{font-size:11.5px;}
   /* two 4in x 2in labels, front + back */
   .ptl-label{width:4in;height:2in;box-sizing:border-box;padding:0.05in 0.09in;font-family:Calibri,Tahoma,"Segoe UI",Arial,Helvetica,sans-serif;letter-spacing:0.25px;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;color:#000;background:#fff;}
   .ptl-label, .ptl-label *{font-weight:400 !important;}   /* no bold anywhere -- bold strokes were smearing/skewing on print */
@@ -316,6 +333,7 @@
         <button class="home-btn" data-view="powercheck"><span class="hb-icon">🧮</span>AS350 B2 Powercheck</button>
         <button class="home-btn" data-view="ec135pc"><span class="hb-icon">🚁</span>EC135 T2+ Power Check</button>
         <button class="home-btn" data-view="bleedvalve"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>
+        <button class="home-btn" data-view="tailrotorbalance"><span class="hb-icon">🌀</span>EC130 Tail Rotor Balancing</button>
         <button class="home-btn" data-view="pilottraining"><span class="hb-icon">🔒</span>Reserved</button>
       </div>
     </div>
@@ -334,6 +352,7 @@
   <div id="viewEc135Trend" style="display:none;"></div>
   <div id="viewBleedValve" style="display:none;"></div>
   <div id="viewBleedValveTrend" style="display:none;"></div>
+  <div id="viewTailRotorBalance" style="display:none;"></div>
   <div id="viewReserved" style="display:none;"></div>
   <div id="viewMpmRevision" style="display:none;"></div>
   <div id="viewMcmRevision" style="display:none;"></div>
@@ -557,6 +576,7 @@
       case 'ec135pc': return buildEc135PrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'powercheck': return buildPowercheckPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'bleedvalve': return buildBleedValvePrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
+      case 'tailrotorbalance': return buildTrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       default: return null;
     }
   }
@@ -571,6 +591,7 @@
       case 'ec135pc': renderEc135Powercheck(rec.data); break;
       case 'powercheck': renderPowercheck(rec.data); break;
       case 'bleedvalve': renderBleedValve(rec.data); break;
+      case 'tailrotorbalance': renderTailRotorBalance(rec.data); break;
     }
   }
 
@@ -744,7 +765,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -774,6 +795,7 @@
       else if(v==='powercheck') renderPowercheck();
       else if(v==='ec135pc') renderEc135Powercheck();
       else if(v==='bleedvalve') renderBleedValve();
+      else if(v==='tailrotorbalance') renderTailRotorBalance();
       else if(v==='pilottraining') openReserved();
     });
   });
@@ -2440,6 +2462,390 @@
       checkTable('Closing', data.closeResult, data.actClose) +
       '<div class="ec-pf-overall">Overall result: '+((data.openResult.passed && data.closeResult.passed)?'PASSED — BOTH CHECKS':'FAILED')+'</div>' +
       '<div class="ec-pf-foot">Digitized from Safran Arriel 1D1 Maintenance Manual, Task 75-31-00-750-803-A01 (Figures 1301/1302). Tolerance +2% / -1%. For training and reference use only — always confirm against the current approved maintenance manual. Printed '+fmtDateNice(todayISO())+' from Phoenix Heli-Flight Maintenance Forms.</div>'
+    );
+  }
+
+
+  // ---------- EC130 Tail Rotor Balancing (VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER) ----------
+  // Digitizes AMM 64-21-00,5-1A "Adjustment - Balancing of the tail rotor hub". The AMM's three
+  // charts (measured phase -> the two nearest of the six balance points, measured amplitude ->
+  // total load weight, total load weight -> washer combination) are graphical; here they're
+  // rebuilt as straight-line math anchored on the AMM's own worked example (a 1.05 ips / 6:40
+  // unbalance -> 3.75 g total, split 67% at Point 1 / 33% at Point 6) plus the exact washer part
+  // weights from the Routine Replacement Parts table. This is a maintenance aid, not a substitute
+  // for the approved AMM procedure -- always follow the current AMM for the actual job.
+  const TRB_POINTS = ['1','2','3','4','5','6'];
+  // Six balance points sit 60° (2 clock-hours) apart. Walking the AMM's Chart N°1 phase axis from
+  // 0:00 to 12:00 in 2-hour steps visits the points in this order (confirmed against the AMM's
+  // worked example: phase 6:40 falls between the "1" step (6:00) and the "6" step (8:00), and
+  // yields 67% / 33% exactly as printed).
+  const TRB_POINT_SEQ = ['4','3','2','1','6','5','4'];
+  // Balance washers that can be stacked on a screw (max 3 per screw, per the AMM caution). The
+  // special aluminum washer (item 16, 0.26 g) always sits against the hub body on every loaded
+  // screw but isn't a tunable balance element, so it's tracked as a note only, not in the math.
+  const TRB_WASHERS = [
+    { id:13, g:0.77, pn:'23111AG060LE' },
+    { id:14, g:2.06, pn:'23116AG060LE' },
+    { id:15, g:0.45, pn:'23134AG060LE' },
+  ];
+  const TRB_SPECIAL_WASHER = { id:16, g:0.26, pn:'365A33-2166-20' };
+  const TRB_UNBALANCE_THRESHOLD_IPS = 0.2;
+  // g per ips, from the AMM's own worked example (1.05 ips -> 3.75 g total load weight).
+  const TRB_AMP_TO_WEIGHT_SLOPE = 3.75 / 1.05;
+
+  function trbBlankPoints(){
+    const pts = {};
+    TRB_POINTS.forEach(p=>{ pts[p] = { existingG: 0, addedWashers: {13:0,14:0,15:0} }; });
+    return pts;
+  }
+  function trbNewJob(){
+    return { reg:'', date: todayISO(), ame:'', points: trbBlankPoints(), runs: [] };
+  }
+  function trbPointAddedG(pt){
+    return TRB_WASHERS.reduce((sum,w)=> sum + (pt.addedWashers[w.id]||0)*w.g, 0);
+  }
+  function trbPointTotalG(pt){
+    return (pt.existingG||0) + trbPointAddedG(pt);
+  }
+  function trbFormatWashers(qty){
+    const parts = TRB_WASHERS.filter(w=> (qty[w.id]||0) > 0).map(w=> (qty[w.id]+'×'+w.g.toFixed(2)+'g'));
+    return parts.length ? parts.join(' + ') : '—';
+  }
+
+  // Phase parsing: accepts hour (0-12) + minute (0-59) as read directly off the analyzer, exactly
+  // as printed on the AMM's Chart N°1 axis (e.g. "6:40").
+  function trbPhaseToMinutes(hour, minute){
+    hour = ((hour%12)+12)%12; // 12 folds to 0 -- both ends of the chart are the same physical point
+    minute = ((minute%60)+60)%60;
+    return hour*60 + minute;
+  }
+  function trbApplyCalOffset(rawMin, offsetMin){
+    return ((rawMin + (offsetMin||0)) % 720 + 720) % 720;
+  }
+  function trbMinutesToClockStr(min){
+    min = ((min%720)+720)%720;
+    const h = Math.floor(min/60), m = Math.round(min%60);
+    return h+':'+String(m).padStart(2,'0');
+  }
+  function trbBracket(min){
+    let k = Math.floor(min/120);
+    if(k>5) k = 5;
+    if(k<0) k = 0;
+    const r = min - k*120;
+    return {
+      lowerPoint: TRB_POINT_SEQ[k],
+      upperPoint: TRB_POINT_SEQ[k+1],
+      lowerPct: (120-r)/120*100,
+      upperPct: r/120*100,
+    };
+  }
+  function trbNearestCombo(targetG, maxCount){
+    maxCount = maxCount || 3;
+    let best = null;
+    for(let a=0;a<=maxCount;a++){
+      for(let b=0;a+b<=maxCount;b++){
+        for(let c=0;a+b+c<=maxCount;c++){
+          const total = a*TRB_WASHERS[0].g + b*TRB_WASHERS[1].g + c*TRB_WASHERS[2].g;
+          const diff = Math.abs(total-targetG);
+          const count = a+b+c;
+          if(best===null || diff < best.diff - 1e-9 || (Math.abs(diff-best.diff)<1e-9 && count < best.count)){
+            best = { qty:{13:a,14:b,15:c}, total, diff, count };
+          }
+        }
+      }
+    }
+    return best;
+  }
+  function trbAnalyze(ampIps, rawPhaseMin, calOffsetMin){
+    const correctedMin = trbApplyCalOffset(rawPhaseMin, calOffsetMin);
+    if(ampIps <= TRB_UNBALANCE_THRESHOLD_IPS){
+      return { balanced:true, correctedMin: correctedMin };
+    }
+    const totalWeight = ampIps * TRB_AMP_TO_WEIGHT_SLOPE;
+    const br = trbBracket(correctedMin);
+    const cand = [
+      { point: br.lowerPoint, pct: br.lowerPct },
+      { point: br.upperPoint, pct: br.upperPct },
+    ].filter(c=> c.pct >= 0.5);
+    const points = cand.map(c=>{
+      const grams = totalWeight * c.pct/100;
+      const combo = trbNearestCombo(grams);
+      return { point: c.point, pct: c.pct, grams: grams, combo: combo };
+    });
+    return { balanced:false, correctedMin: correctedMin, totalWeight: totalWeight, points: points };
+  }
+
+  // ---------- UI ----------
+  function renderTailRotorBalance(prefill){
+    showView('TailRotorBalance');
+    const el = document.getElementById('viewTailRotorBalance');
+    const s = state.settings;
+    let job = prefill ? JSON.parse(JSON.stringify(prefill)) : trbNewJob();
+    // Older/incomplete saved jobs, or a fresh default, might be missing a point -- never let a
+    // missing key blow up the render.
+    TRB_POINTS.forEach(p=>{ if(!job.points[p]) job.points[p] = { existingG:0, addedWashers:{13:0,14:0,15:0} }; });
+    let pending = null; // { ampIps, rawPhaseMin, calOffsetMin, analysis, actual: {point: {13,14,15}} }
+    const h130Aircraft = (s.aircraft||[]).filter(a => ptrainModelToType(a.model) === 'H130');
+
+    function paint(){
+      const nextRunNumber = job.runs.length + 1;
+      el.innerHTML =
+        backButton() +
+        '<div class="panel">' +
+          '<h2 class="form-title">EC130 Tail Rotor Balancing</h2>' +
+          '<p class="form-sub">Digitized AMM 64-21-00,5-1A charts (VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER). Enter measured amplitude (IPS) and phase (clock position) to get a suggested weight/location correction, then log what was actually installed. For training and reference use only — always follow the current approved AMM.</p>' +
+
+          '<div class="trb-section">' +
+            '<h3>Job</h3>' +
+            '<div class="field-grid">' +
+              '<div class="field"><label for="trbReg">A/C registration</label><select id="trbReg">'+opts(h130Aircraft, a=>a.reg, a=>a.reg, 'Select registration')+'</select></div>' +
+              '<div class="field"><label for="trbDate">Date</label><input type="date" id="trbDate" value="'+(job.date||todayISO())+'"></div>' +
+              '<div class="field"><label for="trbAme">AME</label><select id="trbAme">'+opts(s.ames, a=>a.name, a=>a.name, 'Select AME')+'</select></div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="trb-section">' +
+            '<h3>Current weight per point</h3>' +
+            '<p class="trb-note">Enter what’s already installed at each of the 6 hub positions before this job starts. As corrections are logged below, the "Added this job" and "Total now" columns update automatically.</p>' +
+            '<div style="overflow-x:auto;">' +
+            '<table class="pt-table trb-points-table">' +
+              '<thead><tr><th>Point</th><th>Existing (g)</th><th>Added this job</th><th>Total now (g)</th></tr></thead>' +
+              '<tbody>' +
+                TRB_POINTS.map(p=>{
+                  const pt = job.points[p];
+                  return '<tr>' +
+                    '<td><b>N°'+p+'</b></td>' +
+                    '<td><input type="number" step="0.01" min="0" class="trb-existing-input" data-point="'+p+'" value="'+(pt.existingG||0)+'" style="width:80px;"></td>' +
+                    '<td>'+trbFormatWashers(pt.addedWashers)+(trbPointAddedG(pt)>0 ? ' ('+trbPointAddedG(pt).toFixed(2)+' g)' : '')+'</td>' +
+                    '<td><b>'+trbPointTotalG(pt).toFixed(2)+'</b></td>' +
+                  '</tr>';
+                }).join('') +
+              '</tbody>' +
+            '</table>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="trb-section">' +
+            '<h3>Run '+nextRunNumber+' — new measurement</h3>' +
+            '<p class="trb-note">The clock-angle calibration offset compensates for the accelerometer/target/photoelectric-cell installation shifting slightly between runs (e.g. after removal and reinstallation) — leave at 0 unless you have a known offset.</p>' +
+            '<div class="field-grid">' +
+              '<div class="field"><label for="trbAmp">Measured amplitude (IPS)</label><input type="number" step="0.01" min="0" id="trbAmp" value="'+(pending?pending.ampIps:'')+'"></div>' +
+              '<div class="field"><label>Measured phase (clock position)</label><div class="trb-phase-inputs"><input type="number" min="0" max="12" id="trbPhaseHour" value="'+(pending?Math.floor(pending.rawPhaseMin/60):'')+'" placeholder="H">:<input type="number" min="0" max="59" id="trbPhaseMin" value="'+(pending?String(pending.rawPhaseMin%60).padStart(2,'0'):'')+'" placeholder="MM"></div></div>' +
+              '<div class="field"><label for="trbCalOffset">Clock angle calibration offset (min)</label><input type="number" step="1" id="trbCalOffset" value="'+(pending?pending.calOffsetMin:0)+'"></div>' +
+            '</div>' +
+            '<div class="btn-row"><button type="button" class="btn primary" id="trbAnalyzeBtn">Analyze</button></div>' +
+          '</div>' +
+
+          (pending && pending.analysis ? trbAnalysisSectionHtml(pending) : '') +
+
+          '<div class="trb-section">' +
+            '<h3>Run history</h3>' +
+            (job.runs.length ? (
+              '<div style="overflow-x:auto;">' +
+              '<table class="pt-table trb-history-table">' +
+                '<thead><tr><th>Run</th><th>Amplitude</th><th>Raw phase</th><th>Cal. offset</th><th>Corrected phase</th><th>Result</th><th>Suggested</th><th>Actually installed</th></tr></thead>' +
+                '<tbody>' +
+                  job.runs.map(r=>{
+                    const suggested = r.balanced ? '—' : r.points.map(p=>'N°'+p.point+': '+trbFormatWashers(p.combo.qty)).join('; ');
+                    const actual = r.balanced ? '—' : (r.actual||[]).map(a=>'N°'+a.point+': '+trbFormatWashers(a.qty)).join('; ') || '(none logged)';
+                    return '<tr>' +
+                      '<td>'+r.runNumber+'</td>' +
+                      '<td>'+r.ampIps.toFixed(2)+' ips</td>' +
+                      '<td>'+trbMinutesToClockStr(r.rawPhaseMin)+'</td>' +
+                      '<td>'+(r.calOffsetMin||0)+' min</td>' +
+                      '<td>'+trbMinutesToClockStr(r.correctedMin)+'</td>' +
+                      '<td>'+(r.balanced ? '<span style="color:var(--good);font-weight:800;">BALANCED</span>' : '<span style="color:var(--warn);font-weight:800;">CORRECTION</span>')+'</td>' +
+                      '<td>'+suggested+'</td>' +
+                      '<td>'+actual+'</td>' +
+                    '</tr>';
+                  }).join('') +
+                '</tbody>' +
+              '</table>' +
+              '</div>'
+            ) : '<p class="trb-note">No runs logged yet.</p>') +
+          '</div>' +
+
+          '<div class="btn-row" style="justify-content:flex-end;margin-top:16px;">' +
+            '<button type="button" class="btn" id="trbNewJobBtn">✖ New job</button>' +
+            '<button type="button" class="btn" id="trbPrintBtn">🖨️ Print report</button>' +
+            '<button type="button" class="btn primary" id="trbSaveBtn">💾 Save job</button>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('trbReg').value = job.reg||'';
+      if(job.ame) document.getElementById('trbAme').value = job.ame;
+      document.getElementById('trbReg').onchange = (e)=>{ job.reg = e.target.value; };
+      document.getElementById('trbDate').onchange = (e)=>{ job.date = e.target.value; };
+      document.getElementById('trbAme').onchange = (e)=>{ job.ame = e.target.value; };
+
+      el.querySelectorAll('.trb-existing-input').forEach(inp=>{
+        inp.addEventListener('change', ()=>{
+          const p = inp.dataset.point;
+          job.points[p].existingG = parseFloat(inp.value)||0;
+          paint();
+        });
+      });
+
+      document.getElementById('trbAnalyzeBtn').onclick = ()=>{
+        const ampIps = parseFloat(document.getElementById('trbAmp').value);
+        const hour = parseInt(document.getElementById('trbPhaseHour').value,10);
+        const minute = parseInt(document.getElementById('trbPhaseMin').value,10);
+        const calOffsetMin = parseFloat(document.getElementById('trbCalOffset').value)||0;
+        if(isNaN(ampIps) || ampIps < 0){ alert('Please enter a valid measured amplitude (IPS).'); return; }
+        if(isNaN(hour) || isNaN(minute)){ alert('Please enter a valid measured phase (hour and minute).'); return; }
+        const rawPhaseMin = trbPhaseToMinutes(hour, minute);
+        const analysis = trbAnalyze(ampIps, rawPhaseMin, calOffsetMin);
+        pending = { ampIps: ampIps, rawPhaseMin: rawPhaseMin, calOffsetMin: calOffsetMin, analysis: analysis, actual: {} };
+        if(!analysis.balanced){
+          analysis.points.forEach(p=>{ pending.actual[p.point] = Object.assign({}, p.combo.qty); });
+        }
+        paint();
+      };
+
+      if(pending && pending.analysis){
+        wireAnalysisSection();
+      }
+
+      document.getElementById('trbNewJobBtn').onclick = ()=>{
+        if(!confirm('Start a new job? This clears the current points, run history and job header (any unsaved data is lost — saved jobs remain in Saved Forms).')) return;
+        job = trbNewJob();
+        pending = null;
+        paint();
+      };
+
+      document.getElementById('trbPrintBtn').onclick = ()=>{
+        openPrint(buildTrbPrintHtml(Object.assign({}, job, { date: fmtDateNice(job.date) })));
+      };
+
+      document.getElementById('trbSaveBtn').onclick = ()=>{
+        const desc = 'AME: '+(job.ame||'—')+' — '+job.runs.length+' run(s) logged'+(job.runs.length && job.runs[job.runs.length-1].balanced ? ', balanced' : '');
+        saveRecord(buildRecord('tailrotorbalance', 'EC130 Tail Rotor Balancing', job.reg, job.date, desc, job)).then(()=>{
+          alert('Job saved. You can reopen and continue it later from Saved Forms.');
+        }).catch(()=>{ alert('Could not save the job right now, but you can keep working — try Save again in a moment.'); });
+      };
+    }
+
+    function trbAnalysisSectionHtml(pend){
+      const a = pend.analysis;
+      if(a.balanced){
+        return (
+          '<div class="trb-section">' +
+            '<div class="trb-banner ok">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — at or below the 0.2 IPS threshold. No correction needed.</div>' +
+            '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+'.</p>' +
+            '<div class="btn-row"><button type="button" class="btn primary" id="trbLogRunBtn">Log this run as final check</button></div>' +
+          '</div>'
+        );
+      }
+      return (
+        '<div class="trb-section">' +
+          '<div class="trb-banner warn">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — above the 0.2 IPS threshold. Suggested correction below.</div>' +
+          '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' &nbsp;|&nbsp; Total load weight required: <b>'+a.totalWeight.toFixed(2)+' g</b></p>' +
+          a.points.map(p=>{
+            const actualQty = pend.actual[p.point] || {13:0,14:0,15:0};
+            const actualTotal = TRB_WASHERS.reduce((sum,w)=> sum+(actualQty[w.id]||0)*w.g, 0);
+            return (
+              '<div class="trb-point-card">' +
+                '<h4>Point N°'+p.point+' — '+p.pct.toFixed(0)+'% of total = '+p.grams.toFixed(2)+' g target</h4>' +
+                '<p class="trb-note">Suggested: '+trbFormatWashers(p.combo.qty)+' = '+p.combo.total.toFixed(2)+' g (Δ'+p.combo.diff.toFixed(2)+' g from target). Special washer (item 16, 0.26 g) always sits against the hub body underneath — not counted above. Maximum 3 balance washers per screw.</p>' +
+                '<div class="trb-qty-row">' +
+                  '<span>Actually installing:</span>' +
+                  TRB_WASHERS.map(w=> '<label>'+w.g.toFixed(2)+'g <input type="number" min="0" max="3" class="trb-actual-qty" data-point="'+p.point+'" data-washer="'+w.id+'" value="'+(actualQty[w.id]||0)+'"></label>').join('') +
+                  '<span><b>= '+actualTotal.toFixed(2)+' g</b></span>' +
+                '</div>' +
+              '</div>'
+            );
+          }).join('') +
+          '<div class="btn-row"><button type="button" class="btn primary" id="trbConfirmRunBtn">Confirm &amp; log this correction</button></div>' +
+        '</div>'
+      );
+    }
+
+    function wireAnalysisSection(){
+      const logBtn = document.getElementById('trbLogRunBtn');
+      if(logBtn){
+        logBtn.onclick = ()=>{
+          job.runs.push({
+            runNumber: job.runs.length+1,
+            ampIps: pending.ampIps,
+            rawPhaseMin: pending.rawPhaseMin,
+            calOffsetMin: pending.calOffsetMin,
+            correctedMin: pending.analysis.correctedMin,
+            balanced: true,
+            timestamp: new Date().toISOString(),
+          });
+          pending = null;
+          paint();
+        };
+      }
+      el.querySelectorAll('.trb-actual-qty').forEach(inp=>{
+        inp.addEventListener('change', ()=>{
+          const p = inp.dataset.point, w = inp.dataset.washer;
+          if(!pending.actual[p]) pending.actual[p] = {13:0,14:0,15:0};
+          pending.actual[p][w] = Math.max(0, parseInt(inp.value,10)||0);
+          paint();
+        });
+      });
+      const confirmBtn = document.getElementById('trbConfirmRunBtn');
+      if(confirmBtn){
+        confirmBtn.onclick = ()=>{
+          const actualList = pending.analysis.points.map(p=>{
+            const qty = pending.actual[p.point] || {13:0,14:0,15:0};
+            job.points[p.point].addedWashers[13] = (job.points[p.point].addedWashers[13]||0) + (qty[13]||0);
+            job.points[p.point].addedWashers[14] = (job.points[p.point].addedWashers[14]||0) + (qty[14]||0);
+            job.points[p.point].addedWashers[15] = (job.points[p.point].addedWashers[15]||0) + (qty[15]||0);
+            return { point: p.point, qty: qty };
+          });
+          job.runs.push({
+            runNumber: job.runs.length+1,
+            ampIps: pending.ampIps,
+            rawPhaseMin: pending.rawPhaseMin,
+            calOffsetMin: pending.calOffsetMin,
+            correctedMin: pending.analysis.correctedMin,
+            balanced: false,
+            totalWeight: pending.analysis.totalWeight,
+            points: pending.analysis.points,
+            actual: actualList,
+            timestamp: new Date().toISOString(),
+          });
+          pending = null;
+          paint();
+        };
+      }
+    }
+
+    paint();
+  }
+
+  // ---------- print report ----------
+  function buildTrbPrintHtml(job){
+    const pointsRows = TRB_POINTS.map(p=>{
+      const pt = job.points[p];
+      return '<tr><td>N°'+p+'</td><td>'+(pt.existingG||0).toFixed(2)+'</td><td>'+trbFormatWashers(pt.addedWashers)+'</td><td>'+trbPointTotalG(pt).toFixed(2)+'</td></tr>';
+    }).join('');
+    const runRows = (job.runs||[]).map(r=>{
+      const suggested = r.balanced ? '—' : r.points.map(p=>'N°'+p.point+': '+trbFormatWashers(p.combo.qty)).join('; ');
+      const actual = r.balanced ? '—' : (r.actual||[]).map(a=>'N°'+a.point+': '+trbFormatWashers(a.qty)).join('; ') || '(none logged)';
+      return '<tr>' +
+        '<td>'+r.runNumber+'</td>' +
+        '<td>'+r.ampIps.toFixed(2)+'</td>' +
+        '<td>'+trbMinutesToClockStr(r.rawPhaseMin)+'</td>' +
+        '<td>'+(r.calOffsetMin||0)+'</td>' +
+        '<td>'+trbMinutesToClockStr(r.correctedMin)+'</td>' +
+        '<td>'+(r.balanced?'Balanced':'Correction')+'</td>' +
+        '<td>'+suggested+'</td>' +
+        '<td>'+actual+'</td>' +
+      '</tr>';
+    }).join('');
+    return (
+      PRINT_STYLES +
+      '<div class="pf-head"><img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'"><div class="pf-title-block"><h1>EC130 Tail Rotor Balancing</h1><div class="pf-sub">AMM 64-21-00,5-1A — VIBREX 2000 tuning equipment</div></div></div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>A/C registration:</b> '+escapeHTML(job.reg||'—')+'</span><span class="pf-field"><b>Date:</b> '+escapeHTML(job.date||'—')+'</span><span class="pf-field"><b>AME:</b> '+escapeHTML(job.ame||'—')+'</span></div>' +
+      '</div>' +
+      '<h3 style="margin-top:16px;">Weight per point</h3>' +
+      '<table class="mcm-table"><thead><tr><th>Point</th><th>Existing (g)</th><th>Added this job</th><th>Total now (g)</th></tr></thead><tbody>'+pointsRows+'</tbody></table>' +
+      '<h3 style="margin-top:16px;">Run history</h3>' +
+      (runRows ? ('<table class="mcm-table"><thead><tr><th>Run</th><th>Amplitude (ips)</th><th>Raw phase</th><th>Cal. offset (min)</th><th>Corrected phase</th><th>Result</th><th>Suggested</th><th>Actually installed</th></tr></thead><tbody>'+runRows+'</tbody></table>') : '<p>No runs logged.</p>')
     );
   }
 
