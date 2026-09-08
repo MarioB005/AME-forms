@@ -334,6 +334,7 @@
         <button class="home-btn" data-view="ec135pc"><span class="hb-icon">🚁</span>EC135 T2+ Power Check</button>
         <button class="home-btn" data-view="bleedvalve"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>
         <button class="home-btn" data-view="tailrotorbalance"><span class="hb-icon">🌀</span>EC130 Tail Rotor Balancing</button>
+        <button class="home-btn" data-view="ec120tailrotorbalance"><span class="hb-icon">🌀</span>EC120 Tail Rotor Balancing</button>
         <button class="home-btn" data-view="pilottraining"><span class="hb-icon">🔒</span>Reserved</button>
       </div>
     </div>
@@ -353,6 +354,7 @@
   <div id="viewBleedValve" style="display:none;"></div>
   <div id="viewBleedValveTrend" style="display:none;"></div>
   <div id="viewTailRotorBalance" style="display:none;"></div>
+  <div id="viewEc120TailRotorBalance" style="display:none;"></div>
   <div id="viewReserved" style="display:none;"></div>
   <div id="viewMpmRevision" style="display:none;"></div>
   <div id="viewMcmRevision" style="display:none;"></div>
@@ -577,6 +579,7 @@
       case 'powercheck': return buildPowercheckPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'bleedvalve': return buildBleedValvePrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'tailrotorbalance': return buildTrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
+      case 'ec120tailrotorbalance': return buildEc120TrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       default: return null;
     }
   }
@@ -592,6 +595,7 @@
       case 'powercheck': renderPowercheck(rec.data); break;
       case 'bleedvalve': renderBleedValve(rec.data); break;
       case 'tailrotorbalance': renderTailRotorBalance(rec.data); break;
+      case 'ec120tailrotorbalance': renderEc120TailRotorBalance(rec.data); break;
     }
   }
 
@@ -765,7 +769,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -796,6 +800,7 @@
       else if(v==='ec135pc') renderEc135Powercheck();
       else if(v==='bleedvalve') renderBleedValve();
       else if(v==='tailrotorbalance') renderTailRotorBalance();
+      else if(v==='ec120tailrotorbalance') renderEc120TailRotorBalance();
       else if(v==='pilottraining') openReserved();
     });
   });
@@ -2632,6 +2637,7 @@
     // An AME who wants to enter a known offset instead can flip this switch.
     let calOffsetOverridden = false;
     let manualCalOffsetMin = 0;
+    let calOffsetAutoFailed = false;
 
     function paint(){
       const nextRunNumber = job.runs.length + 1;
@@ -2644,7 +2650,9 @@
         calOffsetNoteHtml = 'Compensates for the accelerometer/target/photoelectric-cell installation shifting slightly between runs — leave at 0 unless you have a known offset. Once a correction from a run is logged below, this will be calculated automatically for the next run.';
       } else if(calOffsetOverridden){
         calOffsetFieldHtml = '<input type="number" step="1" id="trbCalOffset" value="'+(pending?pending.calOffsetMin:manualCalOffsetMin)+'"> <button type="button" class="btn" id="trbCalAutoBtn" style="margin-left:8px;">Use automatic calculation</button>';
-        calOffsetNoteHtml = 'Manually overridden — enter a known calibration offset.';
+        calOffsetNoteHtml = calOffsetAutoFailed ?
+          ('Could not calculate automatically from Run '+lastRun.runNumber+' (its reading and this one\'s were the same, so no rotation could be measured) — defaulted to 0 min. Enter a known offset if you have one, or leave at 0.') :
+          'Manually overridden — enter a known calibration offset.';
       } else {
         calOffsetFieldHtml = '<input type="number" id="trbCalOffset" value="'+(pending?pending.calOffsetMin:'')+'" placeholder="auto" disabled> <button type="button" class="btn" id="trbCalOverrideBtn" style="margin-left:8px;">Override manually</button>';
         calOffsetNoteHtml = pending ?
@@ -2761,6 +2769,7 @@
         trbCalOverrideBtn.onclick = ()=>{
           calOffsetOverridden = true;
           manualCalOffsetMin = 0;
+          calOffsetAutoFailed = false;
           paint();
         };
       }
@@ -2768,6 +2777,7 @@
       if(trbCalAutoBtn){
         trbCalAutoBtn.onclick = ()=>{
           calOffsetOverridden = false;
+          calOffsetAutoFailed = false;
           paint();
         };
       }
@@ -2784,6 +2794,7 @@
           const auto = trbAutoCalOffset(lastRun, ampIps, rawPhaseMin);
           calOffsetMin = (auto!=null) ? Math.round(auto) : 0;
           calOffsetAuto = (auto!=null);
+          if(auto==null){ calOffsetOverridden = true; manualCalOffsetMin = 0; calOffsetAutoFailed = true; }
         } else {
           calOffsetMin = parseFloat(document.getElementById('trbCalOffset').value)||0;
           calOffsetAuto = false;
@@ -2806,6 +2817,7 @@
         pending = null;
         calOffsetOverridden = false;
         manualCalOffsetMin = 0;
+        calOffsetAutoFailed = false;
         paint();
       };
 
@@ -2874,6 +2886,7 @@
           pending = null;
           calOffsetOverridden = false;
           manualCalOffsetMin = 0;
+          calOffsetAutoFailed = false;
           paint();
         };
       }
@@ -2908,6 +2921,7 @@
           pending = null;
           calOffsetOverridden = false;
           manualCalOffsetMin = 0;
+          calOffsetAutoFailed = false;
           paint();
         };
       }
@@ -2950,6 +2964,481 @@
       (runRows ? ('<table class="mcm-table"><thead><tr><th>Run</th><th>Amplitude (ips)</th><th>Raw phase</th><th>Cal. offset (min)</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead><tbody>'+runRows+'</tbody></table>') : '<p>No runs logged.</p>')
     );
   }
+
+  // ---------- EC120 Tail Rotor Balancing (VIBREX 177 M6 / ROTORTUNER / VIBREX 2000 / CHADWICK 8500C+) ----------
+  // Digitizes AMM 64-21-00,5-1 "Balancing - Tail Rotor Hub" (EC120). Unlike the EC130 procedure, the
+  // EC120 hub has 8 balance points 45 deg apart, and the AMM's own method is a discretized sector
+  // chart rather than a continuous phase interpolation: each 45 deg gap between two adjacent points is
+  // split into exact thirds, and depending on where the measured (corrected) phase falls, the
+  // correction is applied as a single point, as two points each independently loaded with the same
+  // charted weight ("2 symmetrical points"), or as two points loaded 2:1 ("3 asymmetrical points" --
+  // the AMM's own name for this refers to the three-digit sector label, e.g. "3/4/4", not to three
+  // distinct points). Landing exactly on a point's own position is the single-point case.
+  //
+  // The three amplitude -> weight lines on the AMM's chart (Figure 1 Sheet 3) are rebuilt as three
+  // separately-calibrated straight lines anchored on the AMM's own three worked examples:
+  //   1 point:            0.5 ips  -> 1.2 g
+  //   2 symmetrical:      0.65 ips -> 0.75 g (installed at EACH of the two points independently)
+  //   3 asymmetrical:     0.5 ips  -> 0.4 g "unit" (the doubled point gets 2x this)
+  // As with the EC130 tool, the weight -> washer-part-number step is left to the AME: washers can be
+  // trimmed by grinding in 0.01 g steps, so this tool states the exact target weight per point and
+  // lets the AME enter the actual total left installed there (which can be lower than the current
+  // total if material is removed rather than added). This is a maintenance aid, not a substitute for
+  // the approved AMM procedure -- always follow the current AMM for the actual job.
+  const ECTRB120_POINTS = ['1','2','3','4','5','6','7','8'];
+  // Walking order around the hub, 45 deg (90 min) apart. Anchored on the AMM's own example (Point 4
+  // sits exactly at phase 12h45 = 45 min with a calibration offset of 0); the rest follow from "from
+  // Point 1, clockwise, other points numbered 2 to 8" at even 90-minute spacing. Confirmed against
+  // the AMM's other two examples (Point 3 / Point 4 symmetric boundary at exactly 12h00, and the
+  // stated opposite pairs 3<->7 and 4<->8, both exactly 360 min apart with this mapping).
+  const ECTRB120_POINT_SEQ = ['1','2','3','4','5','6','7','8','1'];
+  const ECTRB120_POINT_POS_MIN = { '1':495, '2':585, '3':675, '4':45, '5':135, '6':225, '7':315, '8':405 };
+  const ECTRB120_UNBALANCE_THRESHOLD_IPS = 0.05;
+  // g per ips, from the AMM's own three worked examples.
+  const ECTRB120_PURE_SLOPE = 1.2 / 0.5;      // 1-point line
+  const ECTRB120_SYM_SLOPE = 0.75 / 0.65;     // 2-symmetrical-points line (per point)
+  const ECTRB120_ASYM_UNIT_SLOPE = 0.4 / 0.5; // 3-asymmetrical-points line ("unit"; doubled point = 2x)
+
+  function ectrb120BlankPoints(){
+    const pts = {};
+    ECTRB120_POINTS.forEach(p=>{ pts[p] = { currentG: 0 }; });
+    return pts;
+  }
+  function ectrb120NewJob(){
+    return { reg:'', date: todayISO(), ame:'', points: ectrb120BlankPoints(), runs: [] };
+  }
+  function ectrb120NormalizePoint(pt){
+    if(!pt) return { currentG: 0 };
+    if(typeof pt.currentG === 'number') return pt;
+    return { currentG: trbRound2(pt.existingG||0) };
+  }
+  function ectrb120PointTotalG(pt){ return trbRound2(pt.currentG||0); }
+
+  // Splits the 45 deg gap between two adjacent points into exact thirds: the outer thirds go to the
+  // nearer point at double weight ("3 asymmetrical points"), the middle third is the "2 symmetrical
+  // points" case, and landing exactly on a point (f essentially 0) is the single-point case.
+  function ectrb120Bracket(correctedMin){
+    const shifted = ((correctedMin - 495) % 720 + 720) % 720;
+    let k = Math.floor(shifted / 90);
+    if(k > 7) k = 7;
+    if(k < 0) k = 0;
+    const r = shifted - k*90;
+    return { lowerPoint: ECTRB120_POINT_SEQ[k], upperPoint: ECTRB120_POINT_SEQ[k+1], f: r/90 };
+  }
+  function ectrb120Analyze(ampIps, rawPhaseMin, calOffsetMin, job){
+    const correctedMin = trbApplyCalOffset(rawPhaseMin, calOffsetMin);
+    if(ampIps <= ECTRB120_UNBALANCE_THRESHOLD_IPS){
+      return { balanced:true, correctedMin: correctedMin };
+    }
+    const br = ectrb120Bracket(correctedMin);
+    let regime, targets; // targets: [{point, targetAddG}]
+    if(br.f < 1e-6){
+      regime = 'pure';
+      targets = [ { point: br.lowerPoint, targetAddG: trbRound2(ampIps * ECTRB120_PURE_SLOPE) } ];
+    } else if(br.f < 1/3){
+      regime = 'asym';
+      targets = [
+        { point: br.lowerPoint, targetAddG: trbRound2(2 * ampIps * ECTRB120_ASYM_UNIT_SLOPE) },
+        { point: br.upperPoint, targetAddG: trbRound2(1 * ampIps * ECTRB120_ASYM_UNIT_SLOPE) },
+      ];
+    } else if(br.f <= 2/3){
+      regime = 'sym';
+      const g = trbRound2(ampIps * ECTRB120_SYM_SLOPE);
+      targets = [ { point: br.lowerPoint, targetAddG: g }, { point: br.upperPoint, targetAddG: g } ];
+    } else {
+      regime = 'asym';
+      targets = [
+        { point: br.upperPoint, targetAddG: trbRound2(2 * ampIps * ECTRB120_ASYM_UNIT_SLOPE) },
+        { point: br.lowerPoint, targetAddG: trbRound2(1 * ampIps * ECTRB120_ASYM_UNIT_SLOPE) },
+      ];
+    }
+    const points = targets.map(t=>{
+      const currentTotal = trbRound2((job.points[t.point]||{}).currentG||0);
+      const suggestedTotal = trbRound2(currentTotal + t.targetAddG);
+      return { point: t.point, targetAddG: t.targetAddG, currentTotal: currentTotal, suggestedTotal: suggestedTotal };
+    });
+    return { balanced:false, correctedMin: correctedMin, regime: regime, points: points };
+  }
+  function ectrb120RegimeLabel(a){
+    if(a.regime==='pure') return 'Single point';
+    if(a.regime==='sym') return '2 symmetrical points';
+    if(a.regime==='asym') return '3 asymmetrical points (Point '+a.points[0].point+' doubled)';
+    return '';
+  }
+
+  // ---------- automatic clock-angle calibration ----------
+  // Same method as the EC130 tool (see trbAutoCalOffset): the offset needed to rotate two raw
+  // readings into the hub's own reference frame is solved for from angles alone, independent of any
+  // amplitude mismatch. Because EC120's suggested corrections can be sized off three different
+  // calibration lines (pure/symmetrical/asymmetrical) depending on how the load is split, but a gram
+  // of tuning washer at a given point has one single physical effect regardless of which line was
+  // used to decide to put it there, the correction vector for this calibration step always uses the
+  // 1-point line's gram<->ips relationship as the common physical reference -- an approximation where
+  // the three lines don't already agree exactly, but the most direct one available from the AMM.
+  function ectrb120CorrectionVectorXY(points){
+    let x = 0, y = 0;
+    (points||[]).forEach(p=>{
+      const delta = (p.actualTotal||0) - (p.previousTotal||0);
+      if(!delta) return;
+      const v = trbPolarToXY(delta/ECTRB120_PURE_SLOPE, ECTRB120_POINT_POS_MIN[p.point]);
+      x += v.x; y += v.y;
+    });
+    return { x: x, y: y };
+  }
+  function ectrb120AutoCalOffset(prevRun, newAmpIps, newRawPhaseMin){
+    if(!prevRun || !prevRun.points || !prevRun.points.length) return null;
+    if(newAmpIps==null || isNaN(newAmpIps) || newRawPhaseMin==null || isNaN(newRawPhaseMin)) return null;
+    const before = trbPolarToXY(prevRun.ampIps, prevRun.rawPhaseMin);
+    const after = trbPolarToXY(newAmpIps, newRawPhaseMin);
+    const diff = { x: before.x - after.x, y: before.y - after.y };
+    const angleDiff = trbXYToAngleMin(diff.x, diff.y);
+    if(angleDiff === null) return null;
+    const c = ectrb120CorrectionVectorXY(prevRun.points);
+    const angleC = trbXYToAngleMin(c.x, c.y);
+    if(angleC === null) return null;
+    return ((angleC - angleDiff) % 720 + 720) % 720;
+  }
+
+  // ---------- UI ----------
+  function renderEc120TailRotorBalance(prefill){
+    showView('Ec120TailRotorBalance');
+    const el = document.getElementById('viewEc120TailRotorBalance');
+    const s = state.settings;
+    let job = prefill ? JSON.parse(JSON.stringify(prefill)) : ectrb120NewJob();
+    ECTRB120_POINTS.forEach(p=>{ job.points[p] = ectrb120NormalizePoint(job.points[p]); });
+    let pending = null; // { ampIps, rawPhaseMin, calOffsetMin, calOffsetAuto, analysis, actual: {point: newTotalG} }
+    const ec120Aircraft = (s.aircraft||[]).filter(a => ptrainModelToType(a.model) === 'EC120');
+    let calOffsetOverridden = false;
+    let manualCalOffsetMin = 0;
+    let calOffsetAutoFailed = false;
+
+    function paint(){
+      const nextRunNumber = job.runs.length + 1;
+      const lastRun = job.runs.length ? job.runs[job.runs.length-1] : null;
+      const canAutoCalibrate = !!(lastRun && lastRun.points && lastRun.points.length);
+
+      let calOffsetFieldHtml, calOffsetNoteHtml;
+      if(!canAutoCalibrate){
+        calOffsetFieldHtml = '<input type="number" step="1" id="ec120CalOffset" value="'+(pending?pending.calOffsetMin:manualCalOffsetMin)+'">';
+        calOffsetNoteHtml = 'Compensates for the accelerometer/target/photoelectric-cell installation shifting slightly between runs — leave at 0 unless you have a known offset. Once a correction from a run is logged below, this will be calculated automatically for the next run.';
+      } else if(calOffsetOverridden){
+        calOffsetFieldHtml = '<input type="number" step="1" id="ec120CalOffset" value="'+(pending?pending.calOffsetMin:manualCalOffsetMin)+'"> <button type="button" class="btn" id="ec120CalAutoBtn" style="margin-left:8px;">Use automatic calculation</button>';
+        calOffsetNoteHtml = calOffsetAutoFailed ?
+          ('Could not calculate automatically from Run '+lastRun.runNumber+' (its reading and this one\'s were the same, so no rotation could be measured) — defaulted to 0 min. Enter a known offset if you have one, or leave at 0.') :
+          'Manually overridden — enter a known calibration offset.';
+      } else {
+        calOffsetFieldHtml = '<input type="number" id="ec120CalOffset" value="'+(pending?pending.calOffsetMin:'')+'" placeholder="auto" disabled> <button type="button" class="btn" id="ec120CalOverrideBtn" style="margin-left:8px;">Override manually</button>';
+        calOffsetNoteHtml = pending ?
+          ('Calculated automatically from Run '+lastRun.runNumber+'\'s confirmed correction: '+pending.calOffsetMin+' min.') :
+          ('Calculated automatically from Run '+lastRun.runNumber+'\'s confirmed correction and this run\'s reading, once you click Analyze.');
+      }
+
+      el.innerHTML =
+        backButton() +
+        '<div class="panel">' +
+          '<h2 class="form-title">EC120 Tail Rotor Balancing</h2>' +
+          '<p class="form-sub">Digitized AMM 64-21-00,5-1 charts (VIBREX 177 M6 / ROTORTUNER / VIBREX 2000 / CHADWICK 8500C+). 8 balance points, 45° apart. Enter measured amplitude (IPS) and phase (clock position) to get a suggested weight/location correction, then log the exact weight actually left installed. Starting with the run after a logged correction, the clock-angle calibration offset is calculated automatically from that correction and the new reading (still overridable). For training and reference use only — always follow the current approved AMM.</p>' +
+
+          '<div class="trb-section">' +
+            '<h3>Job</h3>' +
+            '<div class="field-grid">' +
+              '<div class="field"><label for="ec120Reg">A/C registration</label><select id="ec120Reg">'+opts(ec120Aircraft, a=>a.reg, a=>a.reg, 'Select registration')+'</select></div>' +
+              '<div class="field"><label for="ec120Date">Date</label><input type="date" id="ec120Date" value="'+(job.date||todayISO())+'"></div>' +
+              '<div class="field"><label for="ec120Ame">AME</label><select id="ec120Ame">'+opts(s.ames, a=>a.name, a=>a.name, 'Select AME')+'</select></div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="trb-section">' +
+            '<h3>Current weight per point</h3>' +
+            '<p class="trb-note">Enter what’s already installed (tuning washer weight only) at each of the 8 hub positions before this job starts, in grams. Washers can be trimmed by grinding/removing material in 0.01 g steps — this figure updates automatically once a run\'s correction is logged below.</p>' +
+            '<div style="overflow-x:auto;">' +
+            '<table class="pt-table trb-points-table">' +
+              '<thead><tr><th>Point</th><th>Current weight (g)</th></tr></thead>' +
+              '<tbody>' +
+                ECTRB120_POINTS.map(p=>{
+                  const pt = job.points[p];
+                  return '<tr>' +
+                    '<td><b>N°'+p+'</b></td>' +
+                    '<td><input type="number" step="0.01" min="0" class="ec120-existing-input" data-point="'+p+'" value="'+ectrb120PointTotalG(pt).toFixed(2)+'" style="width:90px;"> g</td>' +
+                  '</tr>';
+                }).join('') +
+              '</tbody>' +
+            '</table>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="trb-section">' +
+            '<h3>Run '+nextRunNumber+' — new measurement</h3>' +
+            '<div class="field-grid">' +
+              '<div class="field"><label for="ec120Amp">Measured amplitude (IPS)</label><input type="number" step="0.01" min="0" id="ec120Amp" value="'+(pending?pending.ampIps:'')+'"></div>' +
+              '<div class="field"><label>Measured phase (clock position)</label><div class="trb-phase-inputs"><input type="number" min="0" max="12" id="ec120PhaseHour" value="'+(pending?Math.floor(pending.rawPhaseMin/60):'')+'" placeholder="H">:<input type="number" min="0" max="59" id="ec120PhaseMin" value="'+(pending?String(pending.rawPhaseMin%60).padStart(2,'0'):'')+'" placeholder="MM"></div></div>' +
+              '<div class="field"><label for="ec120CalOffset">Clock angle calibration offset (min)</label>'+calOffsetFieldHtml+'</div>' +
+            '</div>' +
+            '<p class="trb-note">'+calOffsetNoteHtml+'</p>' +
+            '<div class="btn-row"><button type="button" class="btn primary" id="ec120AnalyzeBtn">Analyze</button></div>' +
+          '</div>' +
+
+          (pending && pending.analysis ? ec120AnalysisSectionHtml(pending) : '') +
+
+          '<div class="trb-section">' +
+            '<h3>Run history</h3>' +
+            (job.runs.length ? (
+              '<div style="overflow-x:auto;">' +
+              '<table class="pt-table trb-history-table">' +
+                '<thead><tr><th>Run</th><th>Amplitude</th><th>Raw phase</th><th>Cal. offset</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead>' +
+                '<tbody>' +
+                  job.runs.map(r=>{
+                    const adj = r.balanced ? '—' : (r.points||[]).map(p=>{
+                      const delta = trbRound2(p.actualTotal - p.previousTotal);
+                      const dir = delta > 0 ? ('+'+delta.toFixed(2)+' g added') : (delta < 0 ? (delta.toFixed(2)+' g removed') : 'no change');
+                      return 'N°'+p.point+': '+p.previousTotal.toFixed(2)+' → '+p.actualTotal.toFixed(2)+' g ('+dir+')';
+                    }).join('; ');
+                    return '<tr>' +
+                      '<td>'+r.runNumber+'</td>' +
+                      '<td>'+r.ampIps.toFixed(2)+' ips</td>' +
+                      '<td>'+trbMinutesToClockStr(r.rawPhaseMin)+'</td>' +
+                      '<td>'+(r.calOffsetMin||0)+' min'+(r.calOffsetAuto?' <i>(auto)</i>':'')+'</td>' +
+                      '<td>'+trbMinutesToClockStr(r.correctedMin)+'</td>' +
+                      '<td>'+(r.balanced ? '<span style="color:var(--good);font-weight:800;">BALANCED</span>' : '<span style="color:var(--warn);font-weight:800;">CORRECTION</span>')+'</td>' +
+                      '<td>'+adj+'</td>' +
+                    '</tr>';
+                  }).join('') +
+                '</tbody>' +
+              '</table>' +
+              '</div>'
+            ) : '<p class="trb-note">No runs logged yet.</p>') +
+          '</div>' +
+
+          '<div class="btn-row" style="justify-content:flex-end;margin-top:16px;">' +
+            '<button type="button" class="btn" id="ec120NewJobBtn">✖ New job</button>' +
+            '<button type="button" class="btn" id="ec120PrintBtn">🖨️ Print report</button>' +
+            '<button type="button" class="btn primary" id="ec120SaveBtn">💾 Save job</button>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('ec120Reg').value = job.reg||'';
+      if(job.ame) document.getElementById('ec120Ame').value = job.ame;
+      document.getElementById('ec120Reg').onchange = (e)=>{ job.reg = e.target.value; };
+      document.getElementById('ec120Date').onchange = (e)=>{ job.date = e.target.value; };
+      document.getElementById('ec120Ame').onchange = (e)=>{ job.ame = e.target.value; };
+
+      el.querySelectorAll('.ec120-existing-input').forEach(inp=>{
+        inp.addEventListener('change', ()=>{
+          const p = inp.dataset.point;
+          job.points[p].currentG = Math.max(0, parseFloat(inp.value)||0);
+          paint();
+        });
+      });
+
+      const ec120CalOffsetInput = document.getElementById('ec120CalOffset');
+      if(ec120CalOffsetInput){
+        ec120CalOffsetInput.addEventListener('change', ()=>{
+          const v = parseFloat(ec120CalOffsetInput.value);
+          manualCalOffsetMin = isNaN(v) ? 0 : v;
+        });
+      }
+      const ec120CalOverrideBtn = document.getElementById('ec120CalOverrideBtn');
+      if(ec120CalOverrideBtn){
+        ec120CalOverrideBtn.onclick = ()=>{
+          calOffsetOverridden = true;
+          manualCalOffsetMin = 0;
+          calOffsetAutoFailed = false;
+          paint();
+        };
+      }
+      const ec120CalAutoBtn = document.getElementById('ec120CalAutoBtn');
+      if(ec120CalAutoBtn){
+        ec120CalAutoBtn.onclick = ()=>{
+          calOffsetOverridden = false;
+          calOffsetAutoFailed = false;
+          paint();
+        };
+      }
+
+      document.getElementById('ec120AnalyzeBtn').onclick = ()=>{
+        const ampIps = parseFloat(document.getElementById('ec120Amp').value);
+        const hour = parseInt(document.getElementById('ec120PhaseHour').value,10);
+        const minute = parseInt(document.getElementById('ec120PhaseMin').value,10);
+        if(isNaN(ampIps) || ampIps < 0){ alert('Please enter a valid measured amplitude (IPS).'); return; }
+        if(isNaN(hour) || isNaN(minute)){ alert('Please enter a valid measured phase (hour and minute).'); return; }
+        const rawPhaseMin = trbPhaseToMinutes(hour, minute);
+        let calOffsetMin, calOffsetAuto;
+        if(canAutoCalibrate && !calOffsetOverridden){
+          const auto = ectrb120AutoCalOffset(lastRun, ampIps, rawPhaseMin);
+          calOffsetMin = (auto!=null) ? Math.round(auto) : 0;
+          calOffsetAuto = (auto!=null);
+          if(auto==null){ calOffsetOverridden = true; manualCalOffsetMin = 0; calOffsetAutoFailed = true; }
+        } else {
+          calOffsetMin = parseFloat(document.getElementById('ec120CalOffset').value)||0;
+          calOffsetAuto = false;
+        }
+        const analysis = ectrb120Analyze(ampIps, rawPhaseMin, calOffsetMin, job);
+        pending = { ampIps: ampIps, rawPhaseMin: rawPhaseMin, calOffsetMin: calOffsetMin, calOffsetAuto: calOffsetAuto, analysis: analysis, actual: {} };
+        if(!analysis.balanced){
+          analysis.points.forEach(p=>{ pending.actual[p.point] = p.suggestedTotal; });
+        }
+        paint();
+      };
+
+      if(pending && pending.analysis){
+        wireEc120AnalysisSection();
+      }
+
+      document.getElementById('ec120NewJobBtn').onclick = ()=>{
+        if(!confirm('Start a new job? This clears the current points, run history and job header (any unsaved data is lost — saved jobs remain in Saved Forms).')) return;
+        job = ectrb120NewJob();
+        pending = null;
+        calOffsetOverridden = false;
+        manualCalOffsetMin = 0;
+        calOffsetAutoFailed = false;
+        paint();
+      };
+
+      document.getElementById('ec120PrintBtn').onclick = ()=>{
+        openPrint(buildEc120TrbPrintHtml(Object.assign({}, job, { date: fmtDateNice(job.date) })));
+      };
+
+      document.getElementById('ec120SaveBtn').onclick = ()=>{
+        const desc = 'AME: '+(job.ame||'—')+' — '+job.runs.length+' run(s) logged'+(job.runs.length && job.runs[job.runs.length-1].balanced ? ', balanced' : '');
+        saveRecord(buildRecord('ec120tailrotorbalance', 'EC120 Tail Rotor Balancing', job.reg, job.date, desc, job)).then(()=>{
+          alert('Job saved. You can reopen and continue it later from Saved Forms.');
+        }).catch(()=>{ alert('Could not save the job right now, but you can keep working — try Save again in a moment.'); });
+      };
+    }
+
+    function ec120AnalysisSectionHtml(pend){
+      const a = pend.analysis;
+      if(a.balanced){
+        return (
+          '<div class="trb-section">' +
+            '<div class="trb-banner ok">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — at or below the 0.05 IPS threshold. No correction needed.</div>' +
+            '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pend.calOffsetMin+' min'+(pend.calOffsetAuto?', calculated automatically':(pend.calOffsetMin?', entered manually':''))+').</p>' +
+            '<div class="btn-row"><button type="button" class="btn primary" id="ec120LogRunBtn">Log this run as final check</button></div>' +
+          '</div>'
+        );
+      }
+      return (
+        '<div class="trb-section">' +
+          '<div class="trb-banner warn">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — above the 0.05 IPS threshold. Suggested correction below.</div>' +
+          '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pend.calOffsetMin+' min'+(pend.calOffsetAuto?', calculated automatically':(pend.calOffsetMin?', entered manually':''))+') &nbsp;|&nbsp; Regime: <b>'+ectrb120RegimeLabel(a)+'</b></p>' +
+          a.points.map(p=>{
+            const actualTotal = (pend.actual[p.point]!==undefined) ? pend.actual[p.point] : p.suggestedTotal;
+            const delta = trbRound2(actualTotal - p.currentTotal);
+            const dirText = delta > 0 ? ('<span style="color:var(--warn);">+'+delta.toFixed(2)+' g to add</span>') :
+                            (delta < 0 ? ('<span style="color:var(--good);">'+delta.toFixed(2)+' g to remove</span>') : '<span>no change</span>');
+            return (
+              '<div class="trb-point-card">' +
+                '<h4>Point N°'+p.point+' — '+p.targetAddG.toFixed(2)+' g additional weight needed</h4>' +
+                '<p class="trb-note">Current weight at this point: '+p.currentTotal.toFixed(2)+' g. Suggested new total: <b>'+p.suggestedTotal.toFixed(2)+' g</b>. Washers can be trimmed by grinding/removing material in 0.01 g steps — enter the exact total weight you actually leave installed here. This can be lower than the current total if you remove material instead of adding.</p>' +
+                '<div class="trb-qty-row">' +
+                  '<label>Actual total weight left installed: <input type="number" step="0.01" min="0" class="ec120-actual-total" data-point="'+p.point+'" value="'+actualTotal.toFixed(2)+'" style="width:90px;"> g</label>' +
+                  '<span>('+dirText+' vs. current)</span>' +
+                '</div>' +
+              '</div>'
+            );
+          }).join('') +
+          '<div class="btn-row"><button type="button" class="btn primary" id="ec120ConfirmRunBtn">Confirm &amp; log this correction</button></div>' +
+        '</div>'
+      );
+    }
+
+    function wireEc120AnalysisSection(){
+      const logBtn = document.getElementById('ec120LogRunBtn');
+      if(logBtn){
+        logBtn.onclick = ()=>{
+          job.runs.push({
+            runNumber: job.runs.length+1,
+            ampIps: pending.ampIps,
+            rawPhaseMin: pending.rawPhaseMin,
+            calOffsetMin: pending.calOffsetMin,
+            calOffsetAuto: pending.calOffsetAuto,
+            correctedMin: pending.analysis.correctedMin,
+            balanced: true,
+            timestamp: new Date().toISOString(),
+          });
+          pending = null;
+          calOffsetOverridden = false;
+          manualCalOffsetMin = 0;
+          calOffsetAutoFailed = false;
+          paint();
+        };
+      }
+      el.querySelectorAll('.ec120-actual-total').forEach(inp=>{
+        inp.addEventListener('change', ()=>{
+          const p = inp.dataset.point;
+          pending.actual[p] = Math.max(0, parseFloat(inp.value)||0);
+          paint();
+        });
+      });
+      const confirmBtn = document.getElementById('ec120ConfirmRunBtn');
+      if(confirmBtn){
+        confirmBtn.onclick = ()=>{
+          const pointResults = pending.analysis.points.map(p=>{
+            const actualTotal = trbRound2(pending.actual[p.point]!==undefined ? pending.actual[p.point] : p.suggestedTotal);
+            const previousTotal = p.currentTotal;
+            job.points[p.point].currentG = actualTotal;
+            return { point: p.point, previousTotal: previousTotal, targetAddG: p.targetAddG, suggestedTotal: p.suggestedTotal, actualTotal: actualTotal };
+          });
+          job.runs.push({
+            runNumber: job.runs.length+1,
+            ampIps: pending.ampIps,
+            rawPhaseMin: pending.rawPhaseMin,
+            calOffsetMin: pending.calOffsetMin,
+            calOffsetAuto: pending.calOffsetAuto,
+            correctedMin: pending.analysis.correctedMin,
+            balanced: false,
+            regime: pending.analysis.regime,
+            points: pointResults,
+            timestamp: new Date().toISOString(),
+          });
+          pending = null;
+          calOffsetOverridden = false;
+          manualCalOffsetMin = 0;
+          calOffsetAutoFailed = false;
+          paint();
+        };
+      }
+    }
+
+    paint();
+  }
+
+  // ---------- print report ----------
+  function buildEc120TrbPrintHtml(job){
+    const pointsRows = ECTRB120_POINTS.map(p=>{
+      const pt = job.points[p];
+      return '<tr><td>N°'+p+'</td><td>'+ectrb120PointTotalG(pt).toFixed(2)+'</td></tr>';
+    }).join('');
+    const runRows = (job.runs||[]).map(r=>{
+      const adj = r.balanced ? '—' : (r.points||[]).map(p=>{
+        const delta = trbRound2(p.actualTotal - p.previousTotal);
+        const dir = delta > 0 ? ('+'+delta.toFixed(2)+' g added') : (delta < 0 ? (delta.toFixed(2)+' g removed') : 'no change');
+        return 'N°'+p.point+': '+p.previousTotal.toFixed(2)+' → '+p.actualTotal.toFixed(2)+' g ('+dir+')';
+      }).join('; ');
+      return '<tr>' +
+        '<td>'+r.runNumber+'</td>' +
+        '<td>'+r.ampIps.toFixed(2)+'</td>' +
+        '<td>'+trbMinutesToClockStr(r.rawPhaseMin)+'</td>' +
+        '<td>'+(r.calOffsetMin||0)+(r.calOffsetAuto?' (auto)':'')+'</td>' +
+        '<td>'+trbMinutesToClockStr(r.correctedMin)+'</td>' +
+        '<td>'+(r.balanced?'Balanced':'Correction')+'</td>' +
+        '<td>'+adj+'</td>' +
+      '</tr>';
+    }).join('');
+    return (
+      PRINT_STYLES +
+      '<div class="pf-head"><img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'"><div class="pf-title-block"><h1>EC120 Tail Rotor Balancing</h1><div class="pf-sub">AMM 64-21-00,5-1 — VIBREX 177 M6 / ROTORTUNER / VIBREX 2000 / CHADWICK 8500C+ tuning equipment</div></div></div>' +
+      '<div class="pf-box">' +
+        '<div class="pf-row"><span class="pf-field"><b>A/C registration:</b> '+escapeHTML(job.reg||'—')+'</span><span class="pf-field"><b>Date:</b> '+escapeHTML(job.date||'—')+'</span><span class="pf-field"><b>AME:</b> '+escapeHTML(job.ame||'—')+'</span></div>' +
+      '</div>' +
+      '<h3 style="margin-top:16px;">Weight per point</h3>' +
+      '<table class="mcm-table"><thead><tr><th>Point</th><th>Current weight (g)</th></tr></thead><tbody>'+pointsRows+'</tbody></table>' +
+      '<h3 style="margin-top:16px;">Run history</h3>' +
+      (runRows ? ('<table class="mcm-table"><thead><tr><th>Run</th><th>Amplitude (ips)</th><th>Raw phase</th><th>Cal. offset (min)</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead><tbody>'+runRows+'</tbody></table>') : '<p>No runs logged.</p>')
+    );
+  }
+
+
 
 
   // ---------- Arriel 1D1 Bleed Valve Test trend monitoring (opening/closing margin history) ----------
