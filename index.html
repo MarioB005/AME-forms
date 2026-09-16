@@ -325,17 +325,10 @@
     <div class="panel">
       <p class="note" style="margin-bottom:14px;">Choose a form below. Dropdowns (aircraft, AMEs, pilots) are managed from Settings and shared with every station.</p>
       <div class="home-grid">
-        <button class="home-btn" data-view="trackbalance"><span class="hb-icon">🎯</span>MR Track &amp; Balance Check List</button>
-        <button class="home-btn" data-view="majormod"><span class="hb-icon">🛠️</span>Major Modifications</button>
-        <button class="home-btn" data-view="minormod"><span class="hb-icon">🔧</span>Minor Modifications</button>
-        <button class="home-btn" data-view="tolerance"><span class="hb-icon">⏳</span>Tolerance</button>
-        <button class="home-btn" data-view="anticipation"><span class="hb-icon">✈️</span>Anticipation of Aircraft Behaviour after Maintenance</button>
-        <button class="home-btn" data-view="powercheck"><span class="hb-icon">🧮</span>AS350 B2 Powercheck</button>
-        <button class="home-btn" data-view="ec135pc"><span class="hb-icon">🚁</span>EC135 T2+ Power Check</button>
-        <button class="home-btn" data-view="bleedvalve"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>
-        <button class="home-btn" data-view="tailrotorbalance"><span class="hb-icon">🌀</span>EC130 Tail Rotor Balancing</button>
-        <button class="home-btn" data-view="ec120tailrotorbalance"><span class="hb-icon">🌀</span>EC120 Tail Rotor Balancing</button>
-        <button class="home-btn" data-view="ec135tailrotorbalance"><span class="hb-icon">🌀</span>EC135 Tail Rotor Balancing</button>
+        <button class="home-btn" data-view="fleetforecast"><span class="hb-icon">📊</span>Fleet Forecast Board</button>
+        <button class="home-btn" data-view="forms"><span class="hb-icon">📁</span>Forms</button>
+        <button class="home-btn" data-view="checks"><span class="hb-icon">📁</span>Checks</button>
+        <button class="home-btn" data-view="balancing"><span class="hb-icon">📁</span>Balancing</button>
         <button class="home-btn" data-view="pilottraining"><span class="hb-icon">🔒</span>Reserved</button>
       </div>
     </div>
@@ -343,6 +336,10 @@
 
   <div id="viewSettings" style="display:none;"></div>
   <div id="viewSavedForms" style="display:none;"></div>
+  <div id="viewFleetForecast" style="display:none;"></div>
+  <div id="viewForms" style="display:none;"></div>
+  <div id="viewChecks" style="display:none;"></div>
+  <div id="viewBalancing" style="display:none;"></div>
   <div id="viewTolerance" style="display:none;"></div>
   <div id="viewTrackBalance" style="display:none;"></div>
   <div id="viewMajorMod" style="display:none;"></div>
@@ -773,7 +770,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -795,20 +792,79 @@
   document.querySelectorAll('.home-btn').forEach(b=>{
     b.addEventListener('click', ()=>{
       const v = b.dataset.view;
-      if(v==='tolerance') renderTolerance();
-      else if(v==='trackbalance') renderTrackBalance();
-      else if(v==='majormod') renderModForm('MajorMod', 'Major');
-      else if(v==='minormod') renderModForm('MinorMod', 'Minor');
-      else if(v==='anticipation') renderAnticipation();
-      else if(v==='powercheck') renderPowercheck();
-      else if(v==='ec135pc') renderEc135Powercheck();
-      else if(v==='bleedvalve') renderBleedValve();
-      else if(v==='tailrotorbalance') renderTailRotorBalance();
-      else if(v==='ec120tailrotorbalance') renderEc120TailRotorBalance();
-      else if(v==='ec135tailrotorbalance') renderEc135TailRotorBalance();
+      if(v==='fleetforecast') renderFleetForecast();
+      else if(v==='forms') renderFormsFolder();
+      else if(v==='checks') renderChecksFolder();
+      else if(v==='balancing') renderBalancingFolder();
       else if(v==='pilottraining') openReserved();
     });
   });
+
+  // ---------- top-level folders (Forms / Checks / Balancing) and the embedded Fleet Forecast Board ----------
+  function renderFleetForecast(){
+    showView('FleetForecast');
+    const el = document.getElementById('viewFleetForecast');
+    el.innerHTML =
+      backButton() +
+      '<div class="panel" style="padding:0;overflow:hidden;">' +
+        '<iframe src="./fleet-forecast-board_25.html" title="Fleet Forecast Board" style="width:100%;height:88vh;border:0;display:block;"></iframe>' +
+      '</div>';
+  }
+  function renderFormsFolder(){
+    showView('Forms');
+    const el = document.getElementById('viewForms');
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Forms</h2>' +
+        '<div class="home-grid">' +
+          '<button class="home-btn" id="formsAnticipationBtn"><span class="hb-icon">✈️</span>Anticipation of Aircraft Behaviour after Maintenance</button>' +
+          '<button class="home-btn" id="formsToleranceBtn"><span class="hb-icon">⏳</span>Tolerance</button>' +
+          '<button class="home-btn" id="formsTrackBalanceBtn"><span class="hb-icon">🎯</span>MR Track &amp; Balance Check List</button>' +
+          '<button class="home-btn" id="formsMinorModBtn"><span class="hb-icon">🔧</span>Minor Modifications</button>' +
+          '<button class="home-btn" id="formsMajorModBtn"><span class="hb-icon">🛠️</span>Major Modifications</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('formsAnticipationBtn').onclick = ()=> renderAnticipation();
+    document.getElementById('formsToleranceBtn').onclick = ()=> renderTolerance();
+    document.getElementById('formsTrackBalanceBtn').onclick = ()=> renderTrackBalance();
+    document.getElementById('formsMinorModBtn').onclick = ()=> renderModForm('MinorMod', 'Minor');
+    document.getElementById('formsMajorModBtn').onclick = ()=> renderModForm('MajorMod', 'Major');
+  }
+  function renderChecksFolder(){
+    showView('Checks');
+    const el = document.getElementById('viewChecks');
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Checks</h2>' +
+        '<div class="home-grid">' +
+          '<button class="home-btn" id="checksPowercheckBtn"><span class="hb-icon">🧮</span>AS350B2 Power Check</button>' +
+          '<button class="home-btn" id="checksBleedValveBtn"><span class="hb-icon">🌡️</span>Arriel 1D1 Bleed Valve Test</button>' +
+          '<button class="home-btn" id="checksEc135pcBtn"><span class="hb-icon">🚁</span>EC135 T2+ Power Check</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('checksPowercheckBtn').onclick = ()=> renderPowercheck();
+    document.getElementById('checksBleedValveBtn').onclick = ()=> renderBleedValve();
+    document.getElementById('checksEc135pcBtn').onclick = ()=> renderEc135Powercheck();
+  }
+  function renderBalancingFolder(){
+    showView('Balancing');
+    const el = document.getElementById('viewBalancing');
+    el.innerHTML =
+      backButton() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Balancing</h2>' +
+        '<div class="home-grid">' +
+          '<button class="home-btn" id="balTailRotorBtn"><span class="hb-icon">🌀</span>EC130 Tail Rotor Balancing</button>' +
+          '<button class="home-btn" id="balEc120TailRotorBtn"><span class="hb-icon">🌀</span>EC120 Tail Rotor Balancing</button>' +
+          '<button class="home-btn" id="balEc135TailRotorBtn"><span class="hb-icon">🌀</span>EC135 Tail Rotor Balancing</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('balTailRotorBtn').onclick = ()=> renderTailRotorBalance();
+    document.getElementById('balEc120TailRotorBtn').onclick = ()=> renderEc120TailRotorBalance();
+    document.getElementById('balEc135TailRotorBtn').onclick = ()=> renderEc135TailRotorBalance();
+  }
   document.getElementById('settingsBtn').onclick = renderSettings;
   document.getElementById('savedFormsBtn').onclick = renderSavedForms;
 
@@ -1979,7 +2035,7 @@
     el.innerHTML =
       backButton() +
       '<div class="panel">' +
-        '<h2 class="form-title">AS350 B2 Powercheck</h2>' +
+        '<h2 class="form-title">AS350B2 Power Check</h2>' +
         '<p class="form-sub">Torque-available performance check &mdash; chart data digitized from &ldquo;Eurocopter &ndash; AS350-B2 Powercheck v1.2&rdquo; &copy; 2012 Guy Fisher. For training and reference use only &mdash; not a substitute for the approved Rotorcraft Flight Manual.</p>' +
         '<div class="field-grid" style="margin-bottom:16px;">' +
           '<div class="field"><label for="pcReg">A/C registration</label><select id="pcReg">'+opts(as350Aircraft, a=>a.reg, a=>a.reg, 'Select registration')+'</select></div>' +
@@ -2107,7 +2163,7 @@
       // monitoring) -- best-effort: saveRecord/storageSet never reject, so this never blocks or
       // breaks the print itself.
       const desc = 'Pilot: '+(pilot||'—')+' — '+(out.passed?'PASSED':'FAILED');
-      saveRecord(buildRecord('powercheck', 'AS350 B2 Powercheck', reg, dateISO, desc, recordData)).catch(()=>{});
+      saveRecord(buildRecord('powercheck', 'AS350B2 Power Check', reg, dateISO, desc, recordData)).catch(()=>{});
     };
 
     syncSand();
@@ -2137,7 +2193,7 @@
       PRINT_STYLES + EC135_PRINT_STYLES +
       '<div class="ec-pf-head">' +
         '<img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'" alt="Phoenix Heli-Flight">' +
-        '<div class="pf-title-block"><h1>AS350 B2 Powercheck</h1><div class="pf-sub">Torque-available performance check — chart data digitized from &ldquo;Eurocopter &ndash; AS350-B2 Powercheck v1.2&rdquo; &copy; 2012 Guy Fisher</div></div>' +
+        '<div class="pf-title-block"><h1>AS350B2 Power Check</h1><div class="pf-sub">Torque-available performance check — chart data digitized from &ldquo;Eurocopter &ndash; AS350-B2 Powercheck v1.2&rdquo; &copy; 2012 Guy Fisher</div></div>' +
       '</div>' +
       '<div class="pf-box">' +
         '<div class="pf-row"><span class="pf-field"><b>Date:</b><span class="pf-underline">'+escapeHTML(data.date)+'</span></span>' +
@@ -2161,7 +2217,7 @@
   async function renderPowercheckTrend(){
     showView('PowercheckTrend');
     const el = document.getElementById('viewPowercheckTrend');
-    el.innerHTML = pcTrendBackHTML() + '<div class="panel"><h2 class="form-title">AS350 B2 Powercheck — Trend Monitoring</h2><p class="form-sub">Loading…</p></div>';
+    el.innerHTML = pcTrendBackHTML() + '<div class="panel"><h2 class="form-title">AS350B2 Power Check — Trend Monitoring</h2><p class="form-sub">Loading…</p></div>';
     document.getElementById('pcTrendBackBtn').onclick = ()=> renderPowercheck();
     const all = await loadRecords();
     pcTrendCache = all
@@ -2180,7 +2236,7 @@
     el.innerHTML =
       pcTrendBackHTML() +
       '<div class="panel">' +
-        '<h2 class="form-title">AS350 B2 Powercheck — Trend Monitoring</h2>' +
+        '<h2 class="form-title">AS350B2 Power Check — Trend Monitoring</h2>' +
         '<p class="form-sub">Torque margin recorded automatically every time a report is printed, plotted by the date/time the check was performed. Use this to watch for gradual power-margin decay between checks.</p>' +
         '<div class="field-grid" style="margin-bottom:6px;">' +
           '<div class="field"><label for="pcTrendRegFilter">Aircraft Reg</label><select id="pcTrendRegFilter"><option value="">All aircraft</option>' +
