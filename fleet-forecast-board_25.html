@@ -602,6 +602,28 @@
     if (f && f.total && f.total.airTime != null) return f.total.airTime;
     return currentReading(reg, 'hours');
   }
+  // Hours actually flown within the Flying report's own date range (its "Period" row), as opposed
+  // to ttafFor's cumulative total — shown alongside TTAF so it's visible how active each aircraft
+  // has been recently, not just where its total time sits.
+  function periodAirTimeFor(reg){
+    var f = state.flying[reg];
+    return (f && f.period && f.period.airTime != null) ? f.period.airTime : null;
+  }
+  // Days spanned by the Flying report itself, read straight from its own title — e.g. "ALL 12 A/C
+  // (Sep 16, 2026 To Sep 18, 2026)" -> 2. Recomputed from settings.flyingReportLabel every time it's
+  // needed (rather than stored separately) so editing that field by hand keeps this in sync too.
+  function reportRangeDays(){
+    var label = settings.flyingReportLabel || '';
+    var m = label.match(/\(\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s*(?:To|-|–|—)\s*([A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4})\s*\)/i);
+    if (!m) return null;
+    var start = parseDateLoose(m[1]), end = parseDateLoose(m[2]);
+    if (start == null || end == null) return null;
+    return daysBetween(end, start);
+  }
+  function flightDaysSuffix(){
+    var days = reportRangeDays();
+    return days != null ? (' for the last ' + days + ' Day' + (days===1?'':'s') + ' of flight.') : '';
+  }
   // Builds the "Created from the following values" box for the print header — only when exactly
   // one aircraft is on the page and a Flying report has been pasted in for it.
   function flyingValuesTable(reg){
@@ -1407,7 +1429,9 @@
     // so only TTAF (hours) is shown up top now.
     var chipsHTML = shownRegs.map(function(reg){
       var ttaf = ttafFor(reg);
-      var bitsText = ttaf != null ? ('<b>TTAF</b> ' + fmtNum(ttaf,1)) : 'n/a';
+      var periodAirTimeC = periodAirTimeFor(reg);
+      var bitsText = (ttaf != null ? ('<b>TTAF</b> ' + fmtNum(ttaf,1)) : 'n/a') +
+        (periodAirTimeC != null ? ('  /  ' + fmtNum(periodAirTimeC,1) + flightDaysSuffix()) : '');
       var prefix = shownRegs.length > 1 ? '<b>'+ escapeHTML(reg) +'</b> — ' : '';
       var mainChip = '<div class="ph-chip">'+ prefix + bitsText +'</div>';
       var f = state.flying[reg];
@@ -1441,7 +1465,11 @@
     // spreadsheet uses) is shown underneath that aircraft's TTAF.
     document.getElementById('ttafSummary').innerHTML = shownRegs.map(function(reg){
       var ttaf = ttafFor(reg);
-      var mainLine = '<span class="ts-main"><b>'+ escapeHTML(reg) +'</b>'+ (ttaf != null ? (' TTAF ' + fmtNum(ttaf,1)) : ' TTAF n/a') +'</span>';
+      var periodAirTime = periodAirTimeFor(reg);
+      var mainLine = '<span class="ts-main"><b>'+ escapeHTML(reg) +'</b>'+
+        (ttaf != null ? (' TTAF ' + fmtNum(ttaf,1)) : ' TTAF n/a') +
+        (periodAirTime != null ? ('  /  ' + fmtNum(periodAirTime,1) + flightDaysSuffix()) : '') +
+        '</span>';
       var f = state.flying[reg];
       var subLine = (f && f.lastFlightMs != null)
         ? '<span class="ts-sub">'+ escapeHTML(reg) +' - Last flight : '+ escapeHTML(fmtDateFull(f.lastFlightMs)) +'</span>'
