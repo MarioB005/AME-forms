@@ -632,9 +632,24 @@
   }
   function cleanCycleName(text){
     if (!text) return { name:'', cycleName:'' };
-    var cn = text.match(/Cycle\s*Name\s*:\s*(.*)$/i);
-    var name = text.replace(/Cycle\s*Name\s*:.*$/i,'').replace(/\s+/g,' ').trim();
+    var cn = text.match(/\(?\s*Cycle\s*Name\s*:\s*(.*?)\)?\s*$/i);
+    var name = text.replace(/\(?\s*Cycle\s*Name\s*:.*$/i,'').replace(/\s+/g,' ').trim();
     return { name:name, cycleName: cn ? cn[1].replace(/\s+/g,' ').trim() : '' };
+  }
+  // WinAir bakes a "Tolerance ±X%" note straight onto the end of a task/component name in both the
+  // old per-type Forecast List (Components/Tasks/etc.) and the newer per-category one (Hours/
+  // Calendar/Cycles) — reading it directly is simpler and more reliable than the Perf.+Limit-vs-Due
+  // back-calculation below, which is kept only as a fallback for rows that don't carry this note.
+  function extractPctTolerance(text){
+    if (!text) return { name:text||'', pct:null };
+    var m = text.match(/\s*Tolerance\s*±?\s*(\d+(?:\.\d+)?)\s*%\.?/i);
+    if (!m) return { name:text, pct:null };
+    return { name: (text.slice(0,m.index) + text.slice(m.index+m[0].length)).replace(/\s+/g,' ').trim(), pct: parseFloat(m[1]) };
+  }
+  // Strips report annotations (e.g. "* MND") that ride along after a number or date so parseNum/
+  // parseDateLoose see a clean value. Meaning of "MND" isn't documented in the report itself.
+  function stripAnnotations(text){
+    return (text||'').replace(/\*\s*MND/gi,'').trim();
   }
   // find first "<number><letter>" token for a given unit letter anywhere in a flattened string
   function extractUnit(text, letter){
@@ -824,8 +839,10 @@
   // a plain Perf.+Limit calculation would predict. Rather than assume a fixed percentage, we recompute
   // the untolerated ("nominal") due ourselves from Perf. + Limit and only surface a Tolerance value when
   // the pasted Due actually disagrees with that nominal figure — i.e. a real tolerance shows up on its own.
-  function emitFromRow(items, reg, typeBadge, taskName, limitText, dueText, remText, detail, perfText){
-    var task = (taskName || '').trim() || 'Task';
+  function emitFromRow(items, reg, typeBadge, taskNameRaw, limitText, dueText, remText, detail, perfText){
+    var tol = extractPctTolerance(taskNameRaw);
+    var task = (tol.name || '').trim() || 'Task';
+    var explicitTolPct = tol.pct; // null (no note on this row) or a number, incl. 0
     var hoursDue = extractUnit(dueText,'H'), hoursRem = extractUnit(remText,'H'), hoursLimit = extractUnit(limitText,'H');
     var cyclesDue = extractUnit(dueText,'C'), cyclesRem = extractUnit(remText,'C'), cyclesLimit = extractUnit(limitText,'C');
     var dateDue = extractDate(dueText), monthsRem = extractUnit(remText,'M'), monthsLimit = extractUnit(limitText,'M');
@@ -833,19 +850,23 @@
 
     if (hoursDue != null || hoursRem != null){
       var tolHours = null;
-      if (hoursDue != null && perfHours != null && hoursLimit != null){
+      if (explicitTolPct != null){
+        tolHours = explicitTolPct > 0 ? explicitTolPct : null;
+      } else if (hoursDue != null && perfHours != null && hoursLimit != null){
         var diffH = hoursDue - (perfHours + hoursLimit);
         if (Math.abs(diffH) > 0.05) tolHours = diffH;
       }
       items.push({ id:uid(), reg:reg, category:'hours', type:typeBadge, task:task,
         limit: fmtRaw(hoursLimit), due: hoursDue!=null?fmtRaw(hoursDue):'', dueNum:hoursDue, dueDate:null,
         remaining: hoursRem, detail: detail||'', dateUpdated:null, source:'paste-list', addedAt:Date.now(),
-        tolerance: tolHours, toleranceUnit:'hrs' });
+        tolerance: tolHours, toleranceUnit: explicitTolPct!=null?'pct':'hrs' });
     }
     if (dateDue != null || monthsRem != null){
       var remDays = dateDue != null ? daysBetween(dateDue, todayMs()) : (monthsRem != null ? Math.round(monthsRem*30.4) : null);
       var tolDays = null;
-      if (dateDue != null && perfDate != null && monthsLimit != null){
+      if (explicitTolPct != null){
+        tolDays = explicitTolPct > 0 ? explicitTolPct : null;
+      } else if (dateDue != null && perfDate != null && monthsLimit != null){
         var nominalDate = addMonthsClamped(perfDate, monthsLimit);
         var diffD = daysBetween(dateDue, nominalDate);
         if (Math.abs(diffD) >= 1) tolDays = diffD;
@@ -853,18 +874,46 @@
       items.push({ id:uid(), reg:reg, category:'calendar', type:typeBadge, task:task,
         limit: fmtRaw(monthsLimit), due:'', dueNum:null, dueDate: dateDue,
         remaining: remDays, detail: detail||'', dateUpdated:null, source:'paste-list', addedAt:Date.now(),
-        tolerance: tolDays, toleranceUnit:'days' });
+        tolerance: tolDays, toleranceUnit: explicitTolPct!=null?'pct':'days' });
     }
     if (cyclesDue != null || cyclesRem != null){
       var tolCyc = null;
-      if (cyclesDue != null && perfCycles != null && cyclesLimit != null){
+      if (explicitTolPct != null){
+        tolCyc = explicitTolPct > 0 ? explicitTolPct : null;
+      } else if (cyclesDue != null && perfCycles != null && cyclesLimit != null){
         var diffC = cyclesDue - (perfCycles + cyclesLimit);
         if (Math.abs(diffC) > 0.05) tolCyc = diffC;
       }
       items.push({ id:uid(), reg:reg, category:'cycles', type:typeBadge, task:task,
         limit: fmtRaw(cyclesLimit), due: cyclesDue!=null?fmtRaw(cyclesDue):'', dueNum:cyclesDue, dueDate:null,
         remaining: cyclesRem, detail: detail||'', dateUpdated:null, source:'paste-list', addedAt:Date.now(),
-        tolerance: tolCyc, toleranceUnit:'cyc' });
+        tolerance: tolCyc, toleranceUnit: explicitTolPct!=null?'pct':'cyc' });
+    }
+  }
+
+  // Same purpose as emitFromRow, for the newer per-category Forecast List layout: the table already
+  // says which one bucket (hours/calendar/cycles) this row belongs to, and Limit/Due/Remain are plain
+  // values in that bucket's unit — so, unlike emitFromRow, this only ever produces one item per row.
+  function emitCategorizedRow(items, reg, typeBadge, taskNameRaw, category, limitText, dueText, remText){
+    var tol = extractPctTolerance(taskNameRaw);
+    var nc = cleanCycleName(tol.name);
+    var task = nc.name || 'Task';
+    var detail = nc.cycleName ? ('Cycle: ' + nc.cycleName) : '';
+    var tolerance = (tol.pct != null && tol.pct > 0) ? tol.pct : null;
+    var base = { id:uid(), reg:reg, type:typeBadge, task:task, detail:detail,
+      dateUpdated:null, source:'paste-list', addedAt:Date.now(), tolerance:tolerance, toleranceUnit:'pct' };
+
+    if (category === 'hours' || category === 'cycles'){
+      var dueNum = parseNum(dueText), rem = parseNum(remText), limit = parseNum(limitText);
+      if (dueNum == null && rem == null) return; // e.g. a stores component that's "NOT INSTALLED"
+      items.push(Object.assign({}, base, { category:category,
+        limit: fmtRaw(limit), due: dueNum!=null?fmtRaw(dueNum):'', dueNum:dueNum, dueDate:null, remaining: rem }));
+    } else if (category === 'calendar'){
+      var dueDate = parseDateLoose(stripAnnotations(dueText));
+      if (dueDate == null) return;
+      var limitM = parseNum(limitText);
+      items.push(Object.assign({}, base, { category:'calendar',
+        limit: fmtRaw(limitM), due:'', dueNum:null, dueDate:dueDate, remaining: daysBetween(dueDate, todayMs()) }));
     }
   }
 
@@ -954,6 +1003,21 @@
           if (iPerf5>=0 && row[iPerf5]) detail5.push('Last perf: ' + row[iPerf5]);
           emitFromRow(items, reg5, 'SP.T', name5, '', iDue5>=0?row[iDue5]:'', iRem5>=0?row[iRem5]:'', detail5.join(' · '), iPerf5>=0?row[iPerf5]:'');
         }
+      } else if (label === 'hours' || label === 'calendar' || label === 'cycles'){
+        // Newer WinAir "Forecast List" layout: one table per due-basis (Hours / Calendar / Cycles)
+        // instead of one table per task type. REG/Type/Limit/Due/Remain are already plain values (no
+        // "150.00H"-style unit letters — the table itself is the unit), and Type already carries the
+        // same CMP/GEN.T./SP.T./AD/SB/INSP. codes used elsewhere, so each row maps to exactly one item.
+        var iRegH=colExact(headers,'REG'), iTypeH=colExact(headers,'Type'), iTaskH=colExact(headers,'Maint. Task'),
+            iLimitH=colExact(headers,'Limit'), iDueH=colExact(headers,'Due'), iRemH=colExact(headers,'Remain');
+        for (var r=2;r<trs.length;r++){
+          row = Array.prototype.map.call(trs[r].cells, cellText);
+          if (iRegH<0 || !row[iRegH]) continue;
+          var regH = row[iRegH].toUpperCase(); noteReg(regH);
+          var typeRawH = (iTypeH>=0 && row[iTypeH]) ? row[iTypeH] : 'GEN.T';
+          emitCategorizedRow(items, regH, typeRawH.replace(/\.+$/,''), iTaskH>=0?row[iTaskH]:'', label,
+            iLimitH>=0?row[iLimitH]:'', iDueH>=0?row[iDueH]:'', iRemH>=0?row[iRemH]:'');
+        }
       } else if (label === 'defects'){
         var iType6=colExact(headers,'Type'), iReg6=colExact(headers,'REG'), iNum6=colExact(headers,'#'), iAta6=colExact(headers,'ATA'),
             iDesc6=colExact(headers,'Description'), iCorr6=colExact(headers,'Correction'), iDate6=colExact(headers,'Date'),
@@ -964,7 +1028,7 @@
           var reg6 = row[iReg6].toUpperCase(); noteReg(reg6);
           var desc6 = iDesc6>=0 ? row[iDesc6] : '';
           if (iCorr6>=0 && row[iCorr6]) desc6 += ' — Correction: ' + row[iCorr6];
-          var dueDateMs6 = iDueDate6>=0 ? parseDateLoose(row[iDueDate6]) : null;
+          var dueDateMs6 = iDueDate6>=0 ? parseDateLoose(stripAnnotations(row[iDueDate6])) : null;
           var ttafVal6 = iTtaf6>=0 ? parseNum(row[iTtaf6]) : null;
           var typeVal6 = (iType6>=0 && row[iType6]) ? row[iType6] : 'DEF';
           var detail6 = [];
