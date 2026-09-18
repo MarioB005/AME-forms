@@ -3977,7 +3977,7 @@
   // current AMM for the actual job.
   const AS350TRB_POINTS = ['1','2','3'];
   const AS350TRB_MAX_WASHER_G = 5.6; // AMM F.4.a -- max permitted weight on an attachment screw
-  const AS350TRB_THRESHOLD_DEFAULT_IPS = 0.8; // AMM F.4.b -- satisfactory at or below 0.8 IPS
+  const AS350TRB_THRESHOLD_DEFAULT_IPS = 0.1; // default target -- keep suggesting corrections until below 0.10 IPS, not just the AMM's 0.8 IPS satisfactory line
   const AS350TRB_THRESHOLD_MIN_IPS = 0.1; // tool floor -- tighten the target below the AMM minimum if desired
   const AS350TRB_THRESHOLD_MAX_IPS = 0.8; // never looser than the AMM's own satisfactory level
   const AS350TRB_AMP_MAX_IPS = 2.5; // ceiling for an initial/as-found reading (a shaft that has
@@ -4272,7 +4272,7 @@
               '<div class="field"><label for="as350trbAme">AME</label><select id="as350trbAme">'+opts(s.ames, a=>a.name, a=>a.name, 'Select AME')+'</select></div>' +
               '<div class="field"><label for="as350trbThreshold">Unbalance threshold (IPS)</label><input type="number" step="0.1" min="'+AS350TRB_THRESHOLD_MIN_IPS+'" max="'+AS350TRB_THRESHOLD_MAX_IPS+'" id="as350trbThreshold" value="'+job.thresholdIps.toFixed(2)+'"></div>' +
             '</div>' +
-            '<p class="trb-note">AMM F.4.b treats '+AS350TRB_THRESHOLD_DEFAULT_IPS.toFixed(1)+' IPS as satisfactory. Tighten this down to as low as '+AS350TRB_THRESHOLD_MIN_IPS.toFixed(1)+' IPS to target a smoother result than the AMM minimum requires — it can\'t be set looser than '+AS350TRB_THRESHOLD_MAX_IPS.toFixed(1)+' IPS.</p>' +
+            '<p class="trb-note">Defaults to '+AS350TRB_THRESHOLD_DEFAULT_IPS.toFixed(2)+' IPS, so the system keeps suggesting a correction until the reading drops below that. AMM F.4.b treats '+AS350TRB_THRESHOLD_MAX_IPS.toFixed(1)+' IPS as satisfactory — loosen this up to that if the AMM\'s own minimum is all you need (it can\'t be set any looser than '+AS350TRB_THRESHOLD_MAX_IPS.toFixed(1)+' IPS).</p>' +
           '</div>' +
 
           '<div class="trb-section">' +
