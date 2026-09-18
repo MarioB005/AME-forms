@@ -354,7 +354,7 @@
   <div id="viewTailRotorBalance" style="display:none;"></div>
   <div id="viewEc120TailRotorBalance" style="display:none;"></div>
   <div id="viewEc135TailRotorBalance" style="display:none;"></div>
-  <div id="viewAs350TailRotorBalance" style="display:none;"></div>
+  <div id="viewDriveShaftBalance" style="display:none;"></div>
   <div id="viewReserved" style="display:none;"></div>
   <div id="viewMpmRevision" style="display:none;"></div>
   <div id="viewMcmRevision" style="display:none;"></div>
@@ -581,7 +581,7 @@
       case 'tailrotorbalance': return buildTrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'ec120tailrotorbalance': return buildEc120TrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'ec135tailrotorbalance': return buildEc135TrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
-      case 'as350tailrotorbalance': return buildAs350TrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
+      case 'driveshaftbalance': return buildDriveShaftPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       default: return null;
     }
   }
@@ -599,7 +599,7 @@
       case 'tailrotorbalance': renderTailRotorBalance(rec.data); break;
       case 'ec120tailrotorbalance': renderEc120TailRotorBalance(rec.data); break;
       case 'ec135tailrotorbalance': renderEc135TailRotorBalance(rec.data); break;
-      case 'as350tailrotorbalance': renderAs350TailRotorBalance(rec.data); break;
+      case 'driveshaftbalance': renderDriveShaftBalance(rec.data); break;
     }
   }
 
@@ -773,7 +773,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','As350TailRotorBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','DriveShaftBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -862,13 +862,13 @@
           '<button class="home-btn" id="balTailRotorBtn"><span class="hb-icon">🌀</span>EC130 Tail Rotor Balancing</button>' +
           '<button class="home-btn" id="balEc120TailRotorBtn"><span class="hb-icon">🌀</span>EC120 Tail Rotor Balancing</button>' +
           '<button class="home-btn" id="balEc135TailRotorBtn"><span class="hb-icon">🌀</span>EC135 Tail Rotor Balancing</button>' +
-          '<button class="home-btn" id="balAs350TailRotorBtn"><span class="hb-icon">🌀</span>AS350 Tail Rotor Drive Shaft Balancing</button>' +
+          '<button class="home-btn" id="balDriveShaftBtn"><span class="hb-icon">🌀</span>Tail Rotor Drive Shaft / Fan Balancing</button>' +
         '</div>' +
       '</div>';
     document.getElementById('balTailRotorBtn').onclick = ()=> renderTailRotorBalance();
     document.getElementById('balEc120TailRotorBtn').onclick = ()=> renderEc120TailRotorBalance();
     document.getElementById('balEc135TailRotorBtn').onclick = ()=> renderEc135TailRotorBalance();
-    document.getElementById('balAs350TailRotorBtn').onclick = ()=> renderAs350TailRotorBalance();
+    document.getElementById('balDriveShaftBtn').onclick = ()=> renderDriveShaftBalance();
   }
   document.getElementById('settingsBtn').onclick = renderSettings;
   document.getElementById('savedFormsBtn').onclick = renderSavedForms;
@@ -3955,58 +3955,32 @@
     );
   }
 
-  // ---------- AS350 Tail Rotor Drive Shaft Balancing (VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER) ----------
-  // Digitizes AMM 65-11-00,5-1A "Adjustment - Balancing of the tail rotor drive shaft - Tail drive
-  // line" (AS350 B2/B3) -- a different system from the EC130/EC120/EC135 tools above (which balance
-  // the tail rotor hub itself): this one balances the drive shaft's rear-section attachment flange,
-  // 3 points 120° apart. Same family of tool as EC135's (the AMM's own Figure 3 chart is described
-  // exactly the same way -- "draw a line ... parallel to the weight scale" -- so it's the same oblique
-  // two-axis decomposition, just with 3 points at 120° instead of EC135's 6 at 60°), and the same
-  // auto-calibration principle as all three tools above: the clock-angle offset is solved for
-  // automatically from the run after a logged correction, not learned/fitted from a run history.
-  // Point 1's own chart position and the chart's g-per-ips scale aren't stated as plain numbers
-  // anywhere in the AMM text (unlike EC135's explicit "1.2 g = 0.1 ips"), so both are solved for once,
-  // here, from the AMM's own single worked example (F.3.c(3)(a)): "For 0.8 IPS unbalance located at 2
-  // o'clock (point M), add: 2.3 grams onto point 1, 3.8 grams onto point 2" -- see
-  // as350trbCalibrate() below. As with the other three tools, the weight -> washer step is left to the
-  // AME to finish: unlike those three, AS350's washers are a fixed catalog (not grindable), so the
-  // suggested total is annotated with the nearest catalog size as a convenience, but the actual field
-  // to fill in is still the exact total weight left installed, in grams, for consistency with the
-  // other tools and because a real installation can land on any combination of the fixed sizes.
-  // This is a maintenance aid, not a substitute for the approved AMM procedure -- always follow the
-  // current AMM for the actual job.
-  const AS350TRB_POINTS = ['1','2','3'];
-  const AS350TRB_MAX_WASHER_G = 5.6; // AMM F.4.a -- max permitted weight on an attachment screw
-  const AS350TRB_THRESHOLD_DEFAULT_IPS = 0.1; // default target -- keep suggesting corrections until below 0.10 IPS, not just the AMM's 0.8 IPS satisfactory line
-  const AS350TRB_THRESHOLD_MIN_IPS = 0.1; // tool floor -- tighten the target below the AMM minimum if desired
-  const AS350TRB_THRESHOLD_MAX_IPS = 0.8; // never looser than the AMM's own satisfactory level
-  const AS350TRB_AMP_MAX_IPS = 2.5; // ceiling for an initial/as-found reading (a shaft that has
-  // never been balanced can read well above the AMM chart's own printed range); in-service
-  // corrections after that are almost always much smaller.
-  // AMM Job Set-up section D (Routine Replacement Parts) -- balancing washer catalog, for reference
-  // only (see note above): the actual field to fill in is always the exact weight left installed.
-  const AS350TRB_WASHERS = [
-    { mm:16, g:1.7, pn:'350A34-1033-20' }, { mm:18, g:2.3, pn:'350A34-1033-21' },
-    { mm:20, g:3.0, pn:'350A34-1033-22' }, { mm:22, g:3.8, pn:'350A34-1033-23' },
-    { mm:24, g:4.6, pn:'350A34-1033-24' }, { mm:26, g:5.6, pn:'350A34-1033-25' },
-  ];
-  function as350trbNearestWasher(g){
-    if(g==null || g<=0.15) return null;
-    let best = AS350TRB_WASHERS[0], bestDiff = Math.abs(AS350TRB_WASHERS[0].g-g);
-    AS350TRB_WASHERS.forEach(w=>{ const d = Math.abs(w.g-g); if(d<bestDiff){ bestDiff=d; best=w; } });
-    return best;
-  }
-
-  // Solve for Point 1's chart position (theta1Min, in the same 720-minutes-per-circle units used by
-  // trbPolarToXY/trbXYToAngleMin) and the chart's grams-per-"ips vector length" scale (C), from the
-  // AMM's own worked example: at 2 o'clock (120 of 720 min) / 0.8 ips, decomposing onto the two
-  // adjacent 120°-apart point axes gives 2.3 g at the nearer-to-Point-1 side and 3.8 g at the
-  // nearer-to-Point-2 side. This is the same "resolve a vector into two oblique axis components"
-  // relationship used by as350trbBracket()/as350trbAnalyze() below, solved in reverse for the one
-  // example the AMM prints. Points 2 and 3 then sit at further 120°/240min steps, "in the shaft
-  // rotation direction" from Point 1 per the AMM's own installation step (E.5.c(1)).
-  function as350trbCalibrate(){
-    const A = 0.8, thetaMin = 120, w1 = 2.3, w2 = 3.8, deltaMin = 240;
+  // ---------- Tail Rotor Drive Shaft / Fan Balancing (AS350 / EC130 T2 / AS355N) ----------
+  // Merges what used to be a standalone AS350-only tool with two more digitized procedures (EC130 T2
+  // AMM 65-11-00,5-1A "Balancing of the Tail Rotor Drive Line", and AS355N MET 65-10-00-604
+  // "Balancing of the first section of the tail rotor drive shaft") behind one "Aircraft / system"
+  // selector, since all three are the same family of procedure: 3 correction points 120° apart on a
+  // drive-shaft flange, read off an oblique two-axis "draw a line parallel to the weight scale" chart,
+  // with the clock-angle phase offset auto-solved from the run after a logged correction (same
+  // principle as the EC130/EC120/EC135 tail-ROTOR balancing tools above -- this is the drive-SHAFT
+  // family instead). EC130 T2 has two independent balancing planes (Bearing No.1 front, Bearing No.5
+  // rear) that are both worked under one job; AS350 and AS355N each have a single plane.
+  //
+  // Every washer in all three procedures can be ground down to an exact weight (per the AME) rather
+  // than picked from the printed catalog sizes, so -- unlike the tool's first version -- nothing here
+  // suggests a nearest catalog size or P/N: only the grams to add or remove, which is what actually
+  // needs grinding to.
+  //
+  // Point 1's own chart position and each chart's grams-per-ips scale aren't stated as plain numbers
+  // in either manual, so they're solved once, algebraically, from each manual's own worked example --
+  // never read off chart pixels. AS350's example (AMM F.3.c(3)(a): 0.8 ips @ 2 o'clock -> 2.3 g onto
+  // point 1, 3.8 g onto point 2) and EC130 T2's own Bearing No.5 example (AMM F.10, the identical
+  // washer catalog and the identical 2.3 g / 3.8 g result for the identical input) solve to the exact
+  // same calibration, so that one calibration ("TDS_V2K_CAL") is shared by AS350, EC130 T2's Bearing
+  // No.5, and AS355N (same washer catalog, same chart family, no worked example of its own in the MET
+  // to solve separately). EC130 T2's Bearing No.1 has its own independent example (AMM F.11: the same
+  // 0.8 ips @ 2 o'clock giving an even 3.8 g / 3.8 g split), solved separately below.
+  function tdsCalibrateFromExample(A, thetaMin, w1, w2, deltaMin){
     const deltaRad = deltaMin * Math.PI/360;
     const ratio = w1/w2;
     const phi1Rad = Math.atan2(Math.sin(deltaRad), ratio + Math.cos(deltaRad));
@@ -4016,51 +3990,110 @@
     const C = w1 / (A * Math.sin(phi2Min*Math.PI/360) / Math.sin(deltaRad));
     return { theta1Min: theta1Min, C: C };
   }
-  const AS350_TRB_CAL = as350trbCalibrate();
-  const AS350TRB_POINT_SEQ = ['1','2','3','1'];
-  const AS350TRB_POINT_POS_MIN = {
-    '1': AS350_TRB_CAL.theta1Min,
-    '2': (AS350_TRB_CAL.theta1Min + 240) % 720,
-    '3': (AS350_TRB_CAL.theta1Min + 480) % 720,
-  };
-  const AS350TRB_SLOPE_G_PER_IPS = AS350_TRB_CAL.C;
+  const TDS_V2K_CAL = tdsCalibrateFromExample(0.8, 120, 2.3, 3.8, 240); // AS350 F.3.c(3)(a) / EC130 T2 F.10 (bearing No.5)
+  const TDS_EC130_B1_CAL = tdsCalibrateFromExample(0.8, 120, 3.8, 3.8, 240); // EC130 T2 F.11 (bearing No.1)
 
-  function as350trbBlankPoints(){
+  const TDS_POINTS = ['1','2','3'];
+  const TDS_POINT_SEQ = ['1','2','3','1'];
+  function tdsPointPos(theta1Min){
+    return { '1': theta1Min, '2': (theta1Min+240)%720, '3': (theta1Min+480)%720 };
+  }
+
+  const TDS_TYPES = {
+    as350: {
+      label: 'AS350 (tail rotor drive shaft)',
+      amm: 'AMM 65-11-00,5-1A',
+      procedureLabel: 'Adjustment - Balancing of the tail rotor drive shaft - Tail drive line',
+      aircraftTypes: ['AS350B2','AS350B3'],
+      equipmentNote: 'VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER tuning equipment',
+      planes: [
+        { id:'main', label:'Tail rotor drive shaft', pointPos: tdsPointPos(TDS_V2K_CAL.theta1Min), slopeGPerIps: TDS_V2K_CAL.C,
+          maxWeightG: 5.6, maxWeightRef: 'AMM F.4.a', minWeightRef: 'AMM E.4',
+          thresholdDefaultIps: 0.1, thresholdMinIps: 0.1, thresholdMaxIps: 0.8, thresholdMaxRef: 'AMM F.4.b', ampMaxIps: 2.5 },
+      ],
+    },
+    ec130t2: {
+      label: 'EC130 T2 (tail rotor drive line)',
+      amm: 'AMM 65-11-00,5-1A',
+      procedureLabel: 'Adjustment - Balancing of the Tail Rotor Drive Line',
+      aircraftTypes: ['H130'],
+      equipmentNote: 'VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER tuning equipment',
+      planes: [
+        { id:'b1', label:'Bearing No. 1 (front)', pointPos: tdsPointPos(TDS_EC130_B1_CAL.theta1Min), slopeGPerIps: TDS_EC130_B1_CAL.C,
+          maxWeightG: 5.6, maxWeightRef: 'AMM F.14', minWeightRef: 'AMM F.16',
+          thresholdDefaultIps: 0.1, thresholdMinIps: 0.1, thresholdMaxIps: 0.2, thresholdMaxRef: 'AMM F.7', ampMaxIps: 1.8 },
+        { id:'b5', label:'Bearing No. 5 (rear)', pointPos: tdsPointPos(TDS_V2K_CAL.theta1Min), slopeGPerIps: TDS_V2K_CAL.C,
+          maxWeightG: 5.6, maxWeightRef: 'AMM F.14', minWeightRef: 'AMM F.16',
+          thresholdDefaultIps: 0.1, thresholdMinIps: 0.1, thresholdMaxIps: 0.8, thresholdMaxRef: 'AMM F.7', ampMaxIps: 1.8 },
+      ],
+    },
+    as355: {
+      label: 'AS355N (tail rotor drive / fan shaft)',
+      amm: 'MET 65-10-00-604',
+      procedureLabel: 'Balancing of the first section of the tail rotor drive shaft - Tail rotor drive line',
+      aircraftTypes: ['AS355'],
+      equipmentNote: 'VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER tuning equipment',
+      planes: [
+        { id:'main', label:'Tail rotor drive shaft (fan inlet flange)', pointPos: tdsPointPos(TDS_V2K_CAL.theta1Min), slopeGPerIps: TDS_V2K_CAL.C,
+          maxWeightG: 8, maxWeightRef: 'MET K.1', minWeightRef: 'MET G.1.c(4)',
+          thresholdDefaultIps: 0.1, thresholdMinIps: 0.1, thresholdMaxIps: 1.75, thresholdMaxRef: 'MET K.2', ampMaxIps: 2.5 },
+      ],
+    },
+  };
+  const TDS_TYPE_IDS = ['as350','ec130t2','as355'];
+
+  // ---------- generic per-plane engine (shared by all three aircraft types) ----------
+  function tdsRound2(n){ return Math.round((n||0) * 100) / 100; }
+  function tdsBlankPoints(){
     const pts = {};
-    AS350TRB_POINTS.forEach(p=>{ pts[p] = { currentG: 0 }; });
+    TDS_POINTS.forEach(p=>{ pts[p] = { currentG: 0 }; });
     return pts;
   }
-  function as350trbNewJob(){
-    return { reg:'', date: todayISO(), ame:'', thresholdIps: AS350TRB_THRESHOLD_DEFAULT_IPS, points: as350trbBlankPoints(), runs: [] };
-  }
-  function as350trbNormalizePoint(pt){
+  function tdsNormalizePoint(pt){
     if(!pt) return { currentG: 0 };
     if(typeof pt.currentG === 'number') return pt;
-    return { currentG: trbRound2(pt.existingG||0) };
+    return { currentG: tdsRound2(pt.existingG||0) };
   }
-  function as350trbPointTotalG(pt){ return trbRound2(pt.currentG||0); }
-  function as350trbClampThreshold(v){
-    if(isNaN(v)) return AS350TRB_THRESHOLD_DEFAULT_IPS;
-    return Math.min(AS350TRB_THRESHOLD_MAX_IPS, Math.max(AS350TRB_THRESHOLD_MIN_IPS, v));
+  function tdsPointTotalG(pt){ return tdsRound2(pt.currentG||0); }
+  function tdsClampThreshold(plane, v){
+    if(isNaN(v)) return plane.thresholdDefaultIps;
+    return Math.min(plane.thresholdMaxIps, Math.max(plane.thresholdMinIps, v));
+  }
+  function tdsNewPlaneData(plane){
+    return { thresholdIps: plane.thresholdDefaultIps, points: tdsBlankPoints(), runs: [] };
+  }
+  function tdsNewJob(typeId){
+    const planeData = {};
+    TDS_TYPES[typeId].planes.forEach(pl=>{ planeData[pl.id] = tdsNewPlaneData(pl); });
+    return { reg:'', date: todayISO(), ame:'', type: typeId, planeData: planeData };
+  }
+  function tdsNormalizeJob(job){
+    if(!TDS_TYPES[job.type]) job.type = 'as350';
+    if(!job.planeData) job.planeData = {};
+    TDS_TYPES[job.type].planes.forEach(pl=>{
+      if(!job.planeData[pl.id]) job.planeData[pl.id] = tdsNewPlaneData(pl);
+      const pd = job.planeData[pl.id];
+      TDS_POINTS.forEach(p=>{ pd.points[p] = tdsNormalizePoint(pd.points[p]); });
+      if(pd.thresholdIps == null) pd.thresholdIps = pl.thresholdDefaultIps;
+      if(!pd.runs) pd.runs = [];
+    });
+    return job;
   }
 
-  // Same oblique two-axis decomposition as EC135's ectrb135Bracket/ectrb135Analyze, with 3 points at
-  // 120° (240 min) apart instead of 6 at 60° (120 min), and Point 1 anchored at its solved chart
-  // position instead of a stated 12 o'clock.
-  function as350trbBracket(correctedMin){
-    const shifted = ((correctedMin - AS350TRB_POINT_POS_MIN['1']) % 720 + 720) % 720;
+  function tdsBracket(plane, correctedMin){
+    const shifted = ((correctedMin - plane.pointPos['1']) % 720 + 720) % 720;
     let k = Math.floor(shifted / 240);
     if(k > 2) k = 2;
     if(k < 0) k = 0;
     const r = shifted - k*240;
-    return { lowerPoint: AS350TRB_POINT_SEQ[k], upperPoint: AS350TRB_POINT_SEQ[k+1], offsetMin: r };
+    return { lowerPoint: TDS_POINT_SEQ[k], upperPoint: TDS_POINT_SEQ[k+1], offsetMin: r };
   }
   // Resolves a measured (amplitude, corrected-phase) reading into its two oblique-axis components
-  // along the nearest pair of correction points, in ips units -- the same trig used both by
-  // as350trbAnalyze() below (to size the suggested correction) and by the balance chart (to place
-  // the parallel-construction guide lines), so the chart always shows exactly what was suggested.
-  function as350trbDecomposeVector(ampIps, correctedMin){
-    const br = as350trbBracket(correctedMin);
+  // along the nearest pair of correction points -- the same trig used both by tdsAnalyze() (to size
+  // the suggested correction) and by the balance chart (to place the parallel-construction guide
+  // lines), so the chart always shows exactly what was suggested.
+  function tdsDecomposeVector(plane, ampIps, correctedMin){
+    const br = tdsBracket(plane, correctedMin);
     const gammaRad = 240 * Math.PI/360; // 120° between adjacent points
     const phiRad = br.offsetMin * Math.PI/360;
     const sinGamma = Math.sin(gammaRad);
@@ -4068,75 +4101,110 @@
     const wUpperIps = ampIps * Math.sin(phiRad) / sinGamma;
     return { br: br, wLowerIps: wLowerIps, wUpperIps: wUpperIps };
   }
-  function as350trbAnalyze(ampIps, rawPhaseMin, calOffsetMin, job, thresholdIps){
+  function tdsAnalyze(plane, ampIps, rawPhaseMin, calOffsetMin, planeData, thresholdIps){
     const correctedMin = trbApplyCalOffset(rawPhaseMin, calOffsetMin);
     if(ampIps <= thresholdIps){
       return { balanced:true, correctedMin: correctedMin };
     }
-    const dec = as350trbDecomposeVector(ampIps, correctedMin);
+    const dec = tdsDecomposeVector(plane, ampIps, correctedMin);
     const cand = [
       { point: dec.br.lowerPoint, addIps: dec.wLowerIps },
       { point: dec.br.upperPoint, addIps: dec.wUpperIps },
-    ].filter(c => trbRound2(c.addIps * AS350TRB_SLOPE_G_PER_IPS) > 0);
+    ].filter(c => tdsRound2(c.addIps * plane.slopeGPerIps) > 0);
     const points = cand.map(c=>{
-      const targetAddG = trbRound2(c.addIps * AS350TRB_SLOPE_G_PER_IPS);
-      const currentTotal = trbRound2((job.points[c.point]||{}).currentG||0);
-      const suggestedTotal = trbRound2(currentTotal + targetAddG);
+      const targetAddG = tdsRound2(c.addIps * plane.slopeGPerIps);
+      const currentTotal = tdsRound2((planeData.points[c.point]||{}).currentG||0);
+      const suggestedTotal = tdsRound2(currentTotal + targetAddG);
       return { point: c.point, targetAddG: targetAddG, currentTotal: currentTotal, suggestedTotal: suggestedTotal };
     });
-    const unchanged = AS350TRB_POINTS.filter(p => !points.some(pt=>pt.point===p));
+    const unchanged = TDS_POINTS.filter(p => !points.some(pt=>pt.point===p));
     return { balanced:false, correctedMin: correctedMin, points: points, unchanged: unchanged };
   }
 
-  // ---------- balance chart (AMM Figure 3 equivalent) ----------
-  // A polar reconstruction of the AMM's own hexagonal weight chart: concentric amplitude rings, a
-  // 12-hour clock dial, 3 accent-colored point axes carrying the washer-catalog gram ticks, and --
-  // once a reading has been analyzed -- the measured point M plotted with the same "draw a line
-  // parallel to the weight scale" construction the AMM chart itself is read by (see
-  // as350trbDecomposeVector() above: M = wLower*unit(lowerAxis) + wUpper*unit(upperAxis), so the
-  // segment from the lower-axis intersection to M is, by construction, parallel to the upper axis,
-  // and vice versa).
-  const AS350TRB_CHART_SIZE = 440;
-  const AS350TRB_CHART_CX = 220;
-  const AS350TRB_CHART_CY = 220;
-  const AS350TRB_CHART_R = 150;
-  const AS350TRB_CHART_MAX_IPS = 2.6; // a hair above AS350TRB_AMP_MAX_IPS so a 2.5 ips point still sits inside the rim
-  const AS350TRB_CHART_RING_IPS = [0.5, 1.0, 1.5, 2.0, 2.5];
+  // ---------- automatic clock-angle calibration (identical method to the tail-ROTOR balancing tools) ----------
+  function tdsCorrectionVectorXY(plane, points){
+    let x = 0, y = 0;
+    (points||[]).forEach(p=>{
+      const delta = (p.actualTotal||0) - (p.previousTotal||0);
+      if(!delta) return;
+      const v = trbPolarToXY(delta/plane.slopeGPerIps, plane.pointPos[p.point]);
+      x += v.x; y += v.y;
+    });
+    return { x: x, y: y };
+  }
+  function tdsAutoCalOffset(plane, prevRun, newAmpIps, newRawPhaseMin){
+    if(!prevRun || !prevRun.points || !prevRun.points.length) return null;
+    if(newAmpIps==null || isNaN(newAmpIps) || newRawPhaseMin==null || isNaN(newRawPhaseMin)) return null;
+    const before = trbPolarToXY(prevRun.ampIps, prevRun.rawPhaseMin);
+    const after = trbPolarToXY(newAmpIps, newRawPhaseMin);
+    const diff = { x: before.x - after.x, y: before.y - after.y };
+    const angleDiff = trbXYToAngleMin(diff.x, diff.y);
+    if(angleDiff === null) return null;
+    const c = tdsCorrectionVectorXY(plane, prevRun.points);
+    const angleC = trbXYToAngleMin(c.x, c.y);
+    if(angleC === null) return null;
+    return ((angleC - angleDiff) % 720 + 720) % 720;
+  }
 
+  // ---------- balance chart (each manual's own Figure equivalent) ----------
+  const TDS_CHART_SIZE = 440;
+  const TDS_CHART_CX = 220;
+  const TDS_CHART_CY = 220;
+  const TDS_CHART_R = 150;
+  function tdsRingStep(ampMaxIps){
+    const raw = ampMaxIps/5;
+    const niceSteps = [0.1, 0.2, 0.25, 0.3, 0.5, 1];
+    let best = niceSteps[0];
+    niceSteps.forEach(s=>{ if(Math.abs(s-raw) < Math.abs(best-raw)) best = s; });
+    return best;
+  }
+  function tdsRingValues(ampMaxIps){
+    const step = tdsRingStep(ampMaxIps);
+    const vals = [];
+    for(let v=step; v<ampMaxIps-1e-9; v+=step) vals.push(Math.round(v*100)/100);
+    vals.push(Math.round(ampMaxIps*100)/100);
+    return vals;
+  }
+  function tdsGramTicks(maxWeightG){
+    const step = maxWeightG > 6 ? 2 : 1;
+    const ticks = [];
+    for(let g=step; g<maxWeightG-1e-9; g+=step) ticks.push(g);
+    ticks.push(Math.round(maxWeightG*10)/10);
+    return ticks;
+  }
   // 0 min = 12 o'clock (top), increasing clockwise -- matches how the AME reads the analyzer's clock
   // dial, and is independent of trbPolarToXY's own math-angle convention (used only for the
   // auto-calibration vector algebra, never for on-screen layout).
-  function as350trbChartXY(minutes, ips){
+  function tdsChartXY(chartMaxIps, minutes, ips){
     const angle = (minutes/720) * 2*Math.PI;
-    const r = Math.max(0, Math.min(ips, AS350TRB_CHART_MAX_IPS)) / AS350TRB_CHART_MAX_IPS * AS350TRB_CHART_R;
-    return { x: AS350TRB_CHART_CX + r*Math.sin(angle), y: AS350TRB_CHART_CY - r*Math.cos(angle) };
+    const r = Math.max(0, Math.min(ips, chartMaxIps)) / chartMaxIps * TDS_CHART_R;
+    return { x: TDS_CHART_CX + r*Math.sin(angle), y: TDS_CHART_CY - r*Math.cos(angle) };
   }
-
-  // What (if anything) the chart should currently plot: the not-yet-confirmed analysis if one is
-  // pending, else the most recent logged run, else nothing (a fresh job with no readings yet).
-  function as350trbChartDisplayState(job, pending){
+  // What (if anything) a plane's chart should currently plot: the not-yet-confirmed analysis if one
+  // is pending, else the most recent logged run, else nothing (no readings yet for this plane).
+  function tdsChartDisplayState(planeData, pending){
     if(pending && pending.analysis){
       return { ampIps: pending.ampIps, correctedMin: pending.analysis.correctedMin, balanced: pending.analysis.balanced };
     }
-    if(job.runs && job.runs.length){
-      const r = job.runs[job.runs.length-1];
+    if(planeData.runs && planeData.runs.length){
+      const r = planeData.runs[planeData.runs.length-1];
       return { ampIps: r.ampIps, correctedMin: r.correctedMin, balanced: r.balanced };
     }
     return null;
   }
-
-  function as350trbChartSvg(display, thresholdIps){
-    const cx = AS350TRB_CHART_CX, cy = AS350TRB_CHART_CY, R = AS350TRB_CHART_R;
+  function tdsChartSvg(plane, display, thresholdIps){
+    const cx = TDS_CHART_CX, cy = TDS_CHART_CY, R = TDS_CHART_R;
+    const chartMaxIps = plane.ampMaxIps * 1.04; // a hair above the ceiling so a max-value point still sits inside the rim
     let svg = '';
 
-    AS350TRB_CHART_RING_IPS.forEach(function(ips){
-      const rr = ips/AS350TRB_CHART_MAX_IPS*R;
+    tdsRingValues(plane.ampMaxIps).forEach(function(ips){
+      const rr = ips/chartMaxIps*R;
       svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+rr.toFixed(1)+'" fill="none" stroke="var(--line)" stroke-width="1"></circle>';
-      svg += '<text x="'+(cx+4).toFixed(1)+'" y="'+(cy-rr+11).toFixed(1)+'" font-size="9" fill="var(--grey-strong)">'+ips.toFixed(1)+'</text>';
+      svg += '<text x="'+(cx+4).toFixed(1)+'" y="'+(cy-rr+11).toFixed(1)+'" font-size="9" fill="var(--grey-strong)">'+ips.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'</text>';
     });
 
-    const thr = thresholdIps || AS350TRB_THRESHOLD_DEFAULT_IPS;
-    const thrR = thr/AS350TRB_CHART_MAX_IPS*R;
+    const thr = thresholdIps || plane.thresholdDefaultIps;
+    const thrR = thr/chartMaxIps*R;
     svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+thrR.toFixed(1)+'" fill="var(--good-bg)" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 3"></circle>';
     svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="var(--line)" stroke-width="1.5"></circle>';
 
@@ -4150,38 +4218,38 @@
       svg += '<text x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+'" font-size="10" fill="var(--grey-strong)" text-anchor="middle">'+(h===0?'12':h)+'</text>';
     }
 
-    AS350TRB_POINTS.forEach(function(p){
-      const posMin = AS350TRB_POINT_POS_MIN[p];
-      const end = as350trbChartXY(posMin, AS350TRB_CHART_MAX_IPS);
+    TDS_POINTS.forEach(function(p){
+      const posMin = plane.pointPos[p];
+      const end = tdsChartXY(chartMaxIps, posMin, chartMaxIps);
       svg += '<line x1="'+cx+'" y1="'+cy+'" x2="'+end.x.toFixed(1)+'" y2="'+end.y.toFixed(1)+'" stroke="var(--accent)" stroke-width="2"></line>';
-      const lbl = as350trbChartXY(posMin, AS350TRB_CHART_MAX_IPS + 0.22);
+      const lbl = tdsChartXY(chartMaxIps, posMin, chartMaxIps + plane.ampMaxIps*0.085);
       svg += '<text x="'+lbl.x.toFixed(1)+'" y="'+(lbl.y+3).toFixed(1)+'" font-size="11" font-weight="700" fill="var(--accent)" text-anchor="middle">N°'+p+'</text>';
       const angle = (posMin/720)*2*Math.PI;
       const perpX = Math.cos(angle), perpY = Math.sin(angle);
-      AS350TRB_WASHERS.forEach(function(w){
-        const ips = w.g/AS350TRB_SLOPE_G_PER_IPS;
-        if(ips > AS350TRB_CHART_MAX_IPS) return;
-        const pt = as350trbChartXY(posMin, ips);
+      tdsGramTicks(plane.maxWeightG).forEach(function(g){
+        const ips = g/plane.slopeGPerIps;
+        if(ips > chartMaxIps) return;
+        const pt = tdsChartXY(chartMaxIps, posMin, ips);
         svg += '<line x1="'+(pt.x-perpX*3).toFixed(1)+'" y1="'+(pt.y+perpY*3).toFixed(1)+'" x2="'+(pt.x+perpX*3).toFixed(1)+'" y2="'+(pt.y-perpY*3).toFixed(1)+'" stroke="var(--ink)" stroke-width="1"></line>';
-        svg += '<text x="'+(pt.x+perpX*8).toFixed(1)+'" y="'+(pt.y-perpY*8+3).toFixed(1)+'" font-size="7" fill="var(--grey-strong)">'+w.g.toFixed(1)+'</text>';
+        svg += '<text x="'+(pt.x+perpX*8).toFixed(1)+'" y="'+(pt.y-perpY*8+3).toFixed(1)+'" font-size="7" fill="var(--grey-strong)">'+g.toFixed(1)+'g</text>';
       });
     });
 
     svg += '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="var(--ink)"></circle>';
 
     if(display){
-      const M = as350trbChartXY(display.correctedMin, display.ampIps);
+      const M = tdsChartXY(chartMaxIps, display.correctedMin, display.ampIps);
       if(display.balanced){
         svg += '<circle cx="'+M.x.toFixed(1)+'" cy="'+M.y.toFixed(1)+'" r="6" fill="var(--good)" stroke="#fff" stroke-width="1.5"></circle>';
         svg += '<text x="'+(M.x+9).toFixed(1)+'" y="'+(M.y-9).toFixed(1)+'" font-size="11" font-weight="700" fill="var(--good)">M '+display.ampIps.toFixed(2)+' ips</text>';
       } else {
-        const dec = as350trbDecomposeVector(display.ampIps, display.correctedMin);
-        const pLower = as350trbChartXY(AS350TRB_POINT_POS_MIN[dec.br.lowerPoint], dec.wLowerIps);
-        const pUpper = as350trbChartXY(AS350TRB_POINT_POS_MIN[dec.br.upperPoint], dec.wUpperIps);
+        const dec = tdsDecomposeVector(plane, display.ampIps, display.correctedMin);
+        const pLower = tdsChartXY(chartMaxIps, plane.pointPos[dec.br.lowerPoint], dec.wLowerIps);
+        const pUpper = tdsChartXY(chartMaxIps, plane.pointPos[dec.br.upperPoint], dec.wUpperIps);
         svg += '<line x1="'+pLower.x.toFixed(1)+'" y1="'+pLower.y.toFixed(1)+'" x2="'+M.x.toFixed(1)+'" y2="'+M.y.toFixed(1)+'" stroke="var(--warn)" stroke-width="1.2" stroke-dasharray="5 3"></line>';
         svg += '<line x1="'+pUpper.x.toFixed(1)+'" y1="'+pUpper.y.toFixed(1)+'" x2="'+M.x.toFixed(1)+'" y2="'+M.y.toFixed(1)+'" stroke="var(--warn)" stroke-width="1.2" stroke-dasharray="5 3"></line>';
-        const gLower = trbRound2(dec.wLowerIps*AS350TRB_SLOPE_G_PER_IPS);
-        const gUpper = trbRound2(dec.wUpperIps*AS350TRB_SLOPE_G_PER_IPS);
+        const gLower = tdsRound2(dec.wLowerIps*plane.slopeGPerIps);
+        const gUpper = tdsRound2(dec.wUpperIps*plane.slopeGPerIps);
         if(gLower > 0){
           svg += '<circle cx="'+pLower.x.toFixed(1)+'" cy="'+pLower.y.toFixed(1)+'" r="4" fill="var(--warn)"></circle>';
           svg += '<text x="'+(pLower.x+7).toFixed(1)+'" y="'+(pLower.y-6).toFixed(1)+'" font-size="10" font-weight="700" fill="var(--warn)">'+gLower.toFixed(2)+'g</text>';
@@ -4195,139 +4263,117 @@
       }
     }
 
-    return '<svg viewBox="0 0 '+AS350TRB_CHART_SIZE+' '+AS350TRB_CHART_SIZE+'" style="width:100%;max-width:440px;height:auto;display:block;margin:0 auto;" role="img" aria-label="AS350 tail rotor drive shaft balance chart">' + svg + '</svg>';
-  }
-
-  // ---------- automatic clock-angle calibration (identical method to the EC130/EC120/EC135 tools) ----------
-  function as350trbCorrectionVectorXY(points){
-    let x = 0, y = 0;
-    (points||[]).forEach(p=>{
-      const delta = (p.actualTotal||0) - (p.previousTotal||0);
-      if(!delta) return;
-      const v = trbPolarToXY(delta/AS350TRB_SLOPE_G_PER_IPS, AS350TRB_POINT_POS_MIN[p.point]);
-      x += v.x; y += v.y;
-    });
-    return { x: x, y: y };
-  }
-  function as350trbAutoCalOffset(prevRun, newAmpIps, newRawPhaseMin){
-    if(!prevRun || !prevRun.points || !prevRun.points.length) return null;
-    if(newAmpIps==null || isNaN(newAmpIps) || newRawPhaseMin==null || isNaN(newRawPhaseMin)) return null;
-    const before = trbPolarToXY(prevRun.ampIps, prevRun.rawPhaseMin);
-    const after = trbPolarToXY(newAmpIps, newRawPhaseMin);
-    const diff = { x: before.x - after.x, y: before.y - after.y };
-    const angleDiff = trbXYToAngleMin(diff.x, diff.y);
-    if(angleDiff === null) return null;
-    const c = as350trbCorrectionVectorXY(prevRun.points);
-    const angleC = trbXYToAngleMin(c.x, c.y);
-    if(angleC === null) return null;
-    return ((angleC - angleDiff) % 720 + 720) % 720;
+    return '<svg viewBox="0 0 '+TDS_CHART_SIZE+' '+TDS_CHART_SIZE+'" style="width:100%;max-width:440px;height:auto;display:block;margin:0 auto;" role="img" aria-label="Balance chart">' + svg + '</svg>';
   }
 
   // ---------- UI ----------
-  function renderAs350TailRotorBalance(prefill){
-    showView('As350TailRotorBalance');
-    const el = document.getElementById('viewAs350TailRotorBalance');
+  function renderDriveShaftBalance(prefill){
+    showView('DriveShaftBalance');
+    const el = document.getElementById('viewDriveShaftBalance');
     const s = state.settings;
-    let job = prefill ? JSON.parse(JSON.stringify(prefill)) : as350trbNewJob();
-    AS350TRB_POINTS.forEach(p=>{ job.points[p] = as350trbNormalizePoint(job.points[p]); });
-    if(job.thresholdIps == null) job.thresholdIps = AS350TRB_THRESHOLD_DEFAULT_IPS;
-    let pending = null; // { ampIps, rawPhaseMin, calOffsetMin, calOffsetAuto, analysis, actual: {point: newTotalG} }
-    const as350Aircraft = (s.aircraft||[]).filter(a => ['AS350B2','AS350B3'].includes(ptrainModelToType(a.model)));
-    let calOffsetOverridden = false;
-    let manualCalOffsetMin = 0;
-    let calOffsetAutoFailed = false;
+    let job = prefill ? tdsNormalizeJob(JSON.parse(JSON.stringify(prefill))) : tdsNewJob('as350');
 
-    function paint(){
-      const nextRunNumber = job.runs.length + 1;
-      const lastRun = job.runs.length ? job.runs[job.runs.length-1] : null;
-      const canAutoCalibrate = !!(lastRun && lastRun.points && lastRun.points.length);
+    // One controller per plane of the CURRENT type, holding that plane's not-yet-saved UI state
+    // (pending analysis, calibration override) -- rebuilt whenever the type (or a new/loaded job)
+    // changes, since a different type means a different set of planes entirely.
+    let planeCtrls = [];
+    function rebuildPlaneCtrls(){
+      planeCtrls = TDS_TYPES[job.type].planes.map(plane=> makePlaneCtrl(plane));
+    }
+    rebuildPlaneCtrls();
 
-      let calOffsetFieldHtml, calOffsetNoteHtml;
-      if(!canAutoCalibrate){
-        calOffsetFieldHtml = '<input type="number" step="1" id="as350trbCalOffset" value="'+(pending?pending.calOffsetMin:manualCalOffsetMin)+'">';
-        calOffsetNoteHtml = 'Compensates for the accelerometer/target/photoelectric-cell installation shifting slightly between runs — leave at 0 unless you have a known offset. Once a correction from a run is logged below, this will be calculated automatically for the next run.';
-      } else if(calOffsetOverridden){
-        calOffsetFieldHtml = '<input type="number" step="1" id="as350trbCalOffset" value="'+(pending?pending.calOffsetMin:manualCalOffsetMin)+'"> <button type="button" class="btn" id="as350trbCalAutoBtn" style="margin-left:8px;">Use automatic calculation</button>';
-        calOffsetNoteHtml = calOffsetAutoFailed ?
-          ('Could not calculate automatically from Run '+lastRun.runNumber+' (its reading and this one\'s were the same, so no rotation could be measured) — defaulted to 0 min. Enter a known offset if you have one, or leave at 0.') :
-          'Manually overridden — enter a known calibration offset.';
-      } else {
-        calOffsetFieldHtml = '<input type="number" id="as350trbCalOffset" value="'+(pending?pending.calOffsetMin:'')+'" placeholder="auto" disabled> <button type="button" class="btn" id="as350trbCalOverrideBtn" style="margin-left:8px;">Override manually</button>';
-        calOffsetNoteHtml = pending ?
-          ('Calculated automatically from Run '+lastRun.runNumber+'\'s confirmed correction: '+pending.calOffsetMin+' min.') :
-          ('Calculated automatically from Run '+lastRun.runNumber+'\'s confirmed correction and this run\'s reading, once you click Analyze.');
-      }
+    function makePlaneCtrl(plane){
+      const idp = 'tds_'+plane.id+'_';
+      let pending = null; // { ampIps, rawPhaseMin, calOffsetMin, calOffsetAuto, analysis, actual: {point: newTotalG} }
+      let calOffsetOverridden = false;
+      let manualCalOffsetMin = 0;
+      let calOffsetAutoFailed = false;
 
-      el.innerHTML =
-        backButton() +
-        '<div class="panel">' +
-          '<h2 class="form-title">AS350 Tail Rotor Drive Shaft Balancing</h2>' +
-          '<p class="form-sub">Digitized AMM 65-11-00,5-1A chart (VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER tuning equipment). Tail drive line attachment flange, 3 points 120° apart. Enter measured amplitude (IPS) and phase (clock position) to get a suggested weight/location correction, then log the exact weight actually left installed. Starting with the run after a logged correction, the clock-angle calibration offset is calculated automatically from that correction and the new reading (still overridable). Max weight per screw is 5.6 g (AMM F.4.a); one of the 3 attachment screws must always keep its original washer; balance only after solving the cause of any vibration increase (AMM E.4.d). For training and reference use only — always follow the current approved AMM.</p>' +
+      function planeData(){ return job.planeData[plane.id]; }
 
-          '<div class="trb-section">' +
-            '<h3>Job</h3>' +
+      function sectionHtml(){
+        const pd = planeData();
+        const nextRunNumber = pd.runs.length + 1;
+        const lastRun = pd.runs.length ? pd.runs[pd.runs.length-1] : null;
+        const canAutoCalibrate = !!(lastRun && lastRun.points && lastRun.points.length);
+
+        let calOffsetFieldHtml, calOffsetNoteHtml;
+        if(!canAutoCalibrate){
+          calOffsetFieldHtml = '<input type="number" step="1" id="'+idp+'calOffset" value="'+(pending?pending.calOffsetMin:manualCalOffsetMin)+'">';
+          calOffsetNoteHtml = 'Compensates for the accelerometer/target/photoelectric-cell installation shifting slightly between runs — leave at 0 unless you have a known offset. Once a correction from a run is logged below, this will be calculated automatically for the next run.';
+        } else if(calOffsetOverridden){
+          calOffsetFieldHtml = '<input type="number" step="1" id="'+idp+'calOffset" value="'+(pending?pending.calOffsetMin:manualCalOffsetMin)+'"> <button type="button" class="btn" id="'+idp+'calAutoBtn" style="margin-left:8px;">Use automatic calculation</button>';
+          calOffsetNoteHtml = calOffsetAutoFailed ?
+            ('Could not calculate automatically from Run '+lastRun.runNumber+' (its reading and this one\'s were the same, so no rotation could be measured) — defaulted to 0 min. Enter a known offset if you have one, or leave at 0.') :
+            'Manually overridden — enter a known calibration offset.';
+        } else {
+          calOffsetFieldHtml = '<input type="number" id="'+idp+'calOffset" value="'+(pending?pending.calOffsetMin:'')+'" placeholder="auto" disabled> <button type="button" class="btn" id="'+idp+'calOverrideBtn" style="margin-left:8px;">Override manually</button>';
+          calOffsetNoteHtml = pending ?
+            ('Calculated automatically from Run '+lastRun.runNumber+'\'s confirmed correction: '+pending.calOffsetMin+' min.') :
+            ('Calculated automatically from Run '+lastRun.runNumber+'\'s confirmed correction and this run\'s reading, once you click Analyze.');
+        }
+
+        const disp = tdsChartDisplayState(pd, pending);
+
+        return (
+          '<div class="trb-section" style="border-top:3px solid var(--accent);padding-top:14px;margin-top:26px;">' +
+            '<h3 style="margin-bottom:2px;">'+escapeHTML(plane.label)+'</h3>' +
             '<div class="field-grid">' +
-              '<div class="field"><label for="as350trbReg">A/C registration</label><select id="as350trbReg">'+opts(as350Aircraft, a=>a.reg, a=>a.reg, 'Select registration')+'</select></div>' +
-              '<div class="field"><label for="as350trbDate">Date</label><input type="date" id="as350trbDate" value="'+(job.date||todayISO())+'"></div>' +
-              '<div class="field"><label for="as350trbAme">AME</label><select id="as350trbAme">'+opts(s.ames, a=>a.name, a=>a.name, 'Select AME')+'</select></div>' +
-              '<div class="field"><label for="as350trbThreshold">Unbalance threshold (IPS)</label><input type="number" step="0.1" min="'+AS350TRB_THRESHOLD_MIN_IPS+'" max="'+AS350TRB_THRESHOLD_MAX_IPS+'" id="as350trbThreshold" value="'+job.thresholdIps.toFixed(2)+'"></div>' +
+              '<div class="field"><label for="'+idp+'threshold">Unbalance threshold (IPS)</label><input type="number" step="0.1" min="'+plane.thresholdMinIps+'" max="'+plane.thresholdMaxIps+'" id="'+idp+'threshold" value="'+pd.thresholdIps.toFixed(2)+'"></div>' +
             '</div>' +
-            '<p class="trb-note">Defaults to '+AS350TRB_THRESHOLD_DEFAULT_IPS.toFixed(2)+' IPS, so the system keeps suggesting a correction until the reading drops below that. AMM F.4.b treats '+AS350TRB_THRESHOLD_MAX_IPS.toFixed(1)+' IPS as satisfactory — loosen this up to that if the AMM\'s own minimum is all you need (it can\'t be set any looser than '+AS350TRB_THRESHOLD_MAX_IPS.toFixed(1)+' IPS).</p>' +
+            '<p class="trb-note">Defaults to '+plane.thresholdDefaultIps.toFixed(2)+' IPS, so the system keeps suggesting a correction until the reading drops below that. '+plane.thresholdMaxRef+' treats '+plane.thresholdMaxIps.toFixed(2)+' IPS as satisfactory — loosen this up to that if the manual\'s own minimum is all you need (it can\'t be set any looser).</p>' +
           '</div>' +
 
           '<div class="trb-section">' +
-            '<h3>Current weight per point</h3>' +
-            '<p class="trb-note">Enter what’s already installed at each of the 3 flange attachment points before this job starts, in grams. AS350 balancing washers are a fixed catalog (see reference below) — this figure updates automatically once a run\'s correction is logged below.</p>' +
+            '<h4 style="margin-bottom:2px;">Current weight per point</h4>' +
+            '<p class="trb-note">Enter what’s already installed at each of the 3 attachment points before this job starts, in grams. Washers can be ground down to the exact weight needed — there\'s no fixed catalog size to match. This figure updates automatically once a run\'s correction is logged below.</p>' +
             '<div style="overflow-x:auto;">' +
             '<table class="pt-table trb-points-table">' +
               '<thead><tr><th>Point</th><th>Current weight (g)</th></tr></thead>' +
               '<tbody>' +
-                AS350TRB_POINTS.map(p=>{
-                  const pt = job.points[p];
+                TDS_POINTS.map(p=>{
+                  const pt = pd.points[p];
                   return '<tr>' +
                     '<td><b>N°'+p+'</b></td>' +
-                    '<td><input type="number" step="0.01" min="0" class="as350trb-existing-input" data-point="'+p+'" value="'+as350trbPointTotalG(pt).toFixed(2)+'" style="width:90px;"> g</td>' +
+                    '<td><input type="number" step="0.01" min="0" class="'+idp+'existing-input" data-point="'+p+'" value="'+tdsPointTotalG(pt).toFixed(2)+'" style="width:90px;"> g</td>' +
                   '</tr>';
                 }).join('') +
               '</tbody>' +
             '</table>' +
             '</div>' +
-            '<p class="trb-note" style="margin-top:8px;">Washer reference (AMM Job Set-up D): '+AS350TRB_WASHERS.map(w=>'Ø'+w.mm+'mm='+w.g.toFixed(1)+'g (P/N '+w.pn+')').join(', ')+'.</p>' +
           '</div>' +
 
           '<div class="trb-section">' +
-            '<h3>Run '+nextRunNumber+' — new measurement</h3>' +
+            '<h4 style="margin-bottom:2px;">Run '+nextRunNumber+' — new measurement</h4>' +
             '<div class="field-grid">' +
-              '<div class="field"><label for="as350trbAmp">Measured amplitude (IPS)</label><input type="number" step="0.01" min="0" max="'+AS350TRB_AMP_MAX_IPS+'" id="as350trbAmp" value="'+(pending?pending.ampIps:'')+'"></div>' +
-              '<div class="field"><label>Measured phase (clock position)</label><div class="trb-phase-inputs"><input type="number" min="0" max="12" id="as350trbPhaseHour" value="'+(pending?Math.floor(pending.rawPhaseMin/60):'')+'" placeholder="H">:<input type="number" min="0" max="59" id="as350trbPhaseMin" value="'+(pending?String(pending.rawPhaseMin%60).padStart(2,'0'):'')+'" placeholder="MM"></div></div>' +
-              '<div class="field"><label for="as350trbCalOffset">Clock angle calibration offset (min)</label>'+calOffsetFieldHtml+'</div>' +
+              '<div class="field"><label for="'+idp+'amp">Measured amplitude (IPS)</label><input type="number" step="0.01" min="0" max="'+plane.ampMaxIps+'" id="'+idp+'amp" value="'+(pending?pending.ampIps:'')+'"></div>' +
+              '<div class="field"><label>Measured phase (clock position)</label><div class="trb-phase-inputs"><input type="number" min="0" max="12" id="'+idp+'phaseHour" value="'+(pending?Math.floor(pending.rawPhaseMin/60):'')+'" placeholder="H">:<input type="number" min="0" max="59" id="'+idp+'phaseMin" value="'+(pending?String(pending.rawPhaseMin%60).padStart(2,'0'):'')+'" placeholder="MM"></div></div>' +
+              '<div class="field"><label for="'+idp+'calOffset">Clock angle calibration offset (min)</label>'+calOffsetFieldHtml+'</div>' +
             '</div>' +
-            '<p class="trb-note">Readings up to '+AS350TRB_AMP_MAX_IPS.toFixed(1)+' IPS are accepted for an initial/as-found check on a shaft that has never been balanced -- in-service corrections afterward are almost always much smaller. Readings above '+AS350TRB_AMP_MAX_IPS.toFixed(1)+' IPS aren\'t supported here.</p>' +
+            '<p class="trb-note">Readings up to '+plane.ampMaxIps.toFixed(1)+' IPS are accepted for an initial/as-found check on a shaft that has never been balanced -- in-service corrections afterward are almost always much smaller. Readings above '+plane.ampMaxIps.toFixed(1)+' IPS aren\'t supported here.</p>' +
             '<p class="trb-note">'+calOffsetNoteHtml+'</p>' +
-            '<div class="btn-row"><button type="button" class="btn primary" id="as350trbAnalyzeBtn">Analyze</button></div>' +
+            '<div class="btn-row"><button type="button" class="btn primary" id="'+idp+'analyzeBtn">Analyze</button></div>' +
           '</div>' +
 
-          (function(){
-            const disp = as350trbChartDisplayState(job, pending);
-            return '<div class="trb-section">' +
-              '<h3>Balance chart (AMM Fig. 3 equivalent)</h3>' +
-              '<p class="trb-note">Read the same way as the AMM\'s own chart: the measured unbalance (M) is broken into the two nearest correction points by drawing lines parallel to each point\'s weight-scale axis. Shaded ring = current '+job.thresholdIps.toFixed(2)+' IPS threshold.</p>' +
-              as350trbChartSvg(disp, job.thresholdIps) +
-              (disp ? '' : '<p class="trb-note" style="text-align:center;">Enter a reading above and click Analyze to plot it here.</p>') +
-            '</div>';
-          })() +
-          (pending && pending.analysis ? as350trbAnalysisSectionHtml(pending) : '') +
+          '<div class="trb-section">' +
+            '<h4 style="margin-bottom:2px;">Balance chart</h4>' +
+            '<p class="trb-note">The measured unbalance (M) is broken into the two nearest correction points by drawing lines parallel to each point\'s weight-scale axis. Shaded ring = current '+pd.thresholdIps.toFixed(2)+' IPS threshold.</p>' +
+            tdsChartSvg(plane, disp, pd.thresholdIps) +
+            (disp ? '' : '<p class="trb-note" style="text-align:center;">Enter a reading above and click Analyze to plot it here.</p>') +
+          '</div>' +
+
+          (pending && pending.analysis ? analysisSectionHtml(pd) : '') +
 
           '<div class="trb-section">' +
-            '<h3>Run history</h3>' +
-            (job.runs.length ? (
+            '<h4 style="margin-bottom:2px;">Run history</h4>' +
+            (pd.runs.length ? (
               '<div style="overflow-x:auto;">' +
               '<table class="pt-table trb-history-table">' +
                 '<thead><tr><th>Run</th><th>Amplitude</th><th>Raw phase</th><th>Cal. offset</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead>' +
                 '<tbody>' +
-                  job.runs.map(r=>{
+                  pd.runs.map(r=>{
                     const adj = r.balanced ? '—' : (r.points||[]).map(p=>{
-                      const delta = trbRound2(p.actualTotal - p.previousTotal);
+                      const delta = tdsRound2(p.actualTotal - p.previousTotal);
                       const dir = delta > 0 ? ('+'+delta.toFixed(2)+' g added') : (delta < 0 ? (delta.toFixed(2)+' g removed') : 'no change');
                       return 'N°'+p.point+': '+p.previousTotal.toFixed(2)+' → '+p.actualTotal.toFixed(2)+' g ('+dir+')';
                     }).join('; ');
@@ -4345,242 +4391,271 @@
               '</table>' +
               '</div>'
             ) : '<p class="trb-note">No runs logged yet.</p>') +
-          '</div>' +
-
-          '<div class="btn-row" style="justify-content:flex-end;margin-top:16px;">' +
-            '<button type="button" class="btn" id="as350trbNewJobBtn">✖ New job</button>' +
-            '<button type="button" class="btn" id="as350trbPrintBtn">🖨️ Print report</button>' +
-            '<button type="button" class="btn primary" id="as350trbSaveBtn">💾 Save job</button>' +
-          '</div>' +
-        '</div>';
-
-      document.getElementById('as350trbReg').value = job.reg||'';
-      if(job.ame) document.getElementById('as350trbAme').value = job.ame;
-      document.getElementById('as350trbReg').onchange = (e)=>{ job.reg = e.target.value; };
-      document.getElementById('as350trbDate').onchange = (e)=>{ job.date = e.target.value; };
-      document.getElementById('as350trbAme').onchange = (e)=>{ job.ame = e.target.value; };
-      document.getElementById('as350trbThreshold').onchange = (e)=>{ job.thresholdIps = as350trbClampThreshold(parseFloat(e.target.value)); e.target.value = job.thresholdIps.toFixed(2); };
-
-      el.querySelectorAll('.as350trb-existing-input').forEach(inp=>{
-        inp.addEventListener('change', ()=>{
-          const p = inp.dataset.point;
-          job.points[p].currentG = Math.max(0, parseFloat(inp.value)||0);
-          paint();
-        });
-      });
-
-      const as350trbCalOffsetInput = document.getElementById('as350trbCalOffset');
-      if(as350trbCalOffsetInput){
-        as350trbCalOffsetInput.addEventListener('change', ()=>{
-          const v = parseFloat(as350trbCalOffsetInput.value);
-          manualCalOffsetMin = isNaN(v) ? 0 : v;
-        });
-      }
-      const as350trbCalOverrideBtn = document.getElementById('as350trbCalOverrideBtn');
-      if(as350trbCalOverrideBtn){
-        as350trbCalOverrideBtn.onclick = ()=>{
-          calOffsetOverridden = true;
-          manualCalOffsetMin = 0;
-          calOffsetAutoFailed = false;
-          paint();
-        };
-      }
-      const as350trbCalAutoBtn = document.getElementById('as350trbCalAutoBtn');
-      if(as350trbCalAutoBtn){
-        as350trbCalAutoBtn.onclick = ()=>{
-          calOffsetOverridden = false;
-          calOffsetAutoFailed = false;
-          paint();
-        };
-      }
-
-      document.getElementById('as350trbAnalyzeBtn').onclick = ()=>{
-        const ampIps = parseFloat(document.getElementById('as350trbAmp').value);
-        const hour = parseInt(document.getElementById('as350trbPhaseHour').value,10);
-        const minute = parseInt(document.getElementById('as350trbPhaseMin').value,10);
-        if(isNaN(ampIps) || ampIps < 0){ alert('Please enter a valid measured amplitude (IPS).'); return; }
-        if(ampIps > AS350TRB_AMP_MAX_IPS){ alert('Measured amplitude readings above '+AS350TRB_AMP_MAX_IPS.toFixed(1)+' IPS aren\'t supported by this tool (well beyond the AMM chart\'s range) -- double-check the pickup/target installation and the reading before proceeding.'); return; }
-        if(isNaN(hour) || isNaN(minute)){ alert('Please enter a valid measured phase (hour and minute).'); return; }
-        const rawPhaseMin = trbPhaseToMinutes(hour, minute);
-        let calOffsetMin, calOffsetAuto;
-        if(canAutoCalibrate && !calOffsetOverridden){
-          const auto = as350trbAutoCalOffset(lastRun, ampIps, rawPhaseMin);
-          calOffsetMin = (auto!=null) ? Math.round(auto) : 0;
-          calOffsetAuto = (auto!=null);
-          if(auto==null){ calOffsetOverridden = true; manualCalOffsetMin = 0; calOffsetAutoFailed = true; }
-        } else {
-          calOffsetMin = parseFloat(document.getElementById('as350trbCalOffset').value)||0;
-          calOffsetAuto = false;
-        }
-        const analysis = as350trbAnalyze(ampIps, rawPhaseMin, calOffsetMin, job, job.thresholdIps);
-        pending = { ampIps: ampIps, rawPhaseMin: rawPhaseMin, calOffsetMin: calOffsetMin, calOffsetAuto: calOffsetAuto, analysis: analysis, actual: {} };
-        if(!analysis.balanced){
-          analysis.points.forEach(p=>{ pending.actual[p.point] = p.suggestedTotal; });
-        }
-        paint();
-      };
-
-      if(pending && pending.analysis){
-        wireAs350trbAnalysisSection();
-      }
-
-      document.getElementById('as350trbNewJobBtn').onclick = ()=>{
-        if(!confirm('Start a new job? This clears the current points, run history and job header (any unsaved data is lost — saved jobs remain in Saved Forms).')) return;
-        job = as350trbNewJob();
-        pending = null;
-        calOffsetOverridden = false;
-        manualCalOffsetMin = 0;
-        calOffsetAutoFailed = false;
-        paint();
-      };
-
-      document.getElementById('as350trbPrintBtn').onclick = ()=>{
-        openPrint(buildAs350TrbPrintHtml(Object.assign({}, job, { date: fmtDateNice(job.date) })));
-      };
-
-      document.getElementById('as350trbSaveBtn').onclick = ()=>{
-        const desc = 'AME: '+(job.ame||'—')+' — '+job.runs.length+' run(s) logged'+(job.runs.length && job.runs[job.runs.length-1].balanced ? ', balanced' : '');
-        saveRecord(buildRecord('as350tailrotorbalance', 'AS350 Tail Rotor Drive Shaft Balancing', job.reg, job.date, desc, job)).then(()=>{
-          alert('Job saved. You can reopen and continue it later from Saved Forms.');
-        }).catch(()=>{ alert('Could not save the job right now, but you can keep working — try Save again in a moment.'); });
-      };
-    }
-
-    function as350trbAnalysisSectionHtml(pend){
-      const a = pend.analysis;
-      const thresh = job.thresholdIps;
-      if(a.balanced){
-        return (
-          '<div class="trb-section">' +
-            '<div class="trb-banner ok">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — at or below the '+thresh.toFixed(2)+' IPS threshold. No correction needed.</div>' +
-            '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pend.calOffsetMin+' min'+(pend.calOffsetAuto?', calculated automatically':(pend.calOffsetMin?', entered manually':''))+').</p>' +
-            '<div class="btn-row"><button type="button" class="btn primary" id="as350trbLogRunBtn">Log this run as final check</button></div>' +
           '</div>'
         );
       }
-      return (
-        '<div class="trb-section">' +
-          '<div class="trb-banner warn">Unbalance is '+pend.ampIps.toFixed(2)+' IPS — above the '+thresh.toFixed(2)+' IPS threshold. Suggested correction below.</div>' +
-          '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pend.calOffsetMin+' min'+(pend.calOffsetAuto?', calculated automatically':(pend.calOffsetMin?', entered manually':''))+').</p>' +
-          a.points.map(p=>{
-            const actualTotal = (pend.actual[p.point]!==undefined) ? pend.actual[p.point] : p.suggestedTotal;
-            const delta = trbRound2(actualTotal - p.currentTotal);
-            const dirText = delta > 0 ? ('<span style="color:var(--warn);">+'+delta.toFixed(2)+' g to add</span>') :
-                            (delta < 0 ? ('<span style="color:var(--good);">'+delta.toFixed(2)+' g to remove</span>') : '<span>no change</span>');
-            const nearest = as350trbNearestWasher(p.suggestedTotal);
-            const over = p.suggestedTotal > AS350TRB_MAX_WASHER_G;
-            return (
-              '<div class="trb-point-card">' +
-                '<h4>Point N°'+p.point+' — '+p.targetAddG.toFixed(2)+' g additional weight needed</h4>' +
-                '<p class="trb-note">Current weight at this point: '+p.currentTotal.toFixed(2)+' g. Suggested new total: <b>'+p.suggestedTotal.toFixed(2)+' g</b>'+(nearest?(' (nearest catalog washer: Ø'+nearest.mm+'mm, '+nearest.g.toFixed(1)+'g, P/N '+nearest.pn+')'):'')+'. Enter the exact total weight you actually leave installed here — it can differ slightly from the suggestion depending on which catalog washer(s) you use.</p>' +
-                (over ? '<p class="trb-note" style="color:var(--warn);font-weight:700;">Exceeds the 5.6 g max per screw (AMM F.4.a) — re-inspect per E.4 before continuing rather than installing an overweight washer.</p>' : '') +
-                '<div class="trb-qty-row">' +
-                  '<label>Actual total weight left installed: <input type="number" step="0.01" min="0" class="as350trb-actual-total" data-point="'+p.point+'" value="'+actualTotal.toFixed(2)+'" style="width:90px;"> g</label>' +
-                  '<span>('+dirText+' vs. current)</span>' +
-                '</div>' +
-              '</div>'
-            );
-          }).join('') +
-          (a.unchanged && a.unchanged.length ? '<p class="trb-note">Point'+(a.unchanged.length>1?'s':'')+' N°'+a.unchanged.join(', N°')+' — no change suggested; keep current washer (AMM E.4 requires at least one of the 3 screws keep its original washer).</p>' : '') +
-          '<div class="btn-row"><button type="button" class="btn primary" id="as350trbConfirmRunBtn">Confirm &amp; log this correction</button></div>' +
-        '</div>'
-      );
+
+      function analysisSectionHtml(pd){
+        const a = pending.analysis;
+        const thresh = pd.thresholdIps;
+        if(a.balanced){
+          return (
+            '<div class="trb-section">' +
+              '<div class="trb-banner ok">Unbalance is '+pending.ampIps.toFixed(2)+' IPS — at or below the '+thresh.toFixed(2)+' IPS threshold. No correction needed.</div>' +
+              '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pending.calOffsetMin+' min'+(pending.calOffsetAuto?', calculated automatically':(pending.calOffsetMin?', entered manually':''))+').</p>' +
+              '<div class="btn-row"><button type="button" class="btn primary" id="'+idp+'logRunBtn">Log this run as final check</button></div>' +
+            '</div>'
+          );
+        }
+        return (
+          '<div class="trb-section">' +
+            '<div class="trb-banner warn">Unbalance is '+pending.ampIps.toFixed(2)+' IPS — above the '+thresh.toFixed(2)+' IPS threshold. Suggested correction below.</div>' +
+            '<p class="trb-note">Corrected phase used: '+trbMinutesToClockStr(a.correctedMin)+' (calibration offset '+pending.calOffsetMin+' min'+(pending.calOffsetAuto?', calculated automatically':(pending.calOffsetMin?', entered manually':''))+').</p>' +
+            a.points.map(p=>{
+              const actualTotal = (pending.actual[p.point]!==undefined) ? pending.actual[p.point] : p.suggestedTotal;
+              const delta = tdsRound2(actualTotal - p.currentTotal);
+              const dirText = delta > 0 ? ('<span style="color:var(--warn);">+'+delta.toFixed(2)+' g to add</span>') :
+                              (delta < 0 ? ('<span style="color:var(--good);">'+delta.toFixed(2)+' g to remove</span>') : '<span>no change</span>');
+              const over = p.suggestedTotal > plane.maxWeightG;
+              return (
+                '<div class="trb-point-card">' +
+                  '<h4>Point N°'+p.point+' — '+p.targetAddG.toFixed(2)+' g additional weight needed</h4>' +
+                  '<p class="trb-note">Current weight at this point: '+p.currentTotal.toFixed(2)+' g. Suggested new total: <b>'+p.suggestedTotal.toFixed(2)+' g</b>. Grind a washer to this exact weight and enter the exact total you actually leave installed here.</p>' +
+                  (over ? '<p class="trb-note" style="color:var(--warn);font-weight:700;">Exceeds the '+plane.maxWeightG.toFixed(1)+' g max per screw ('+plane.maxWeightRef+') — re-inspect before continuing rather than installing an overweight washer.</p>' : '') +
+                  '<div class="trb-qty-row">' +
+                    '<label>Actual total weight left installed: <input type="number" step="0.01" min="0" class="'+idp+'actual-total" data-point="'+p.point+'" value="'+actualTotal.toFixed(2)+'" style="width:90px;"> g</label>' +
+                    '<span>('+dirText+' vs. current)</span>' +
+                  '</div>' +
+                '</div>'
+              );
+            }).join('') +
+            (a.unchanged && a.unchanged.length ? '<p class="trb-note">Point'+(a.unchanged.length>1?'s':'')+' N°'+a.unchanged.join(', N°')+' — no change suggested; keep current washer ('+plane.minWeightRef+' requires at least one of the 3 screws keep its original/minimum washer).</p>' : '') +
+            '<div class="btn-row"><button type="button" class="btn primary" id="'+idp+'confirmRunBtn">Confirm &amp; log this correction</button></div>' +
+          '</div>'
+        );
+      }
+
+      function wire(repaint){
+        const pd = planeData();
+        document.getElementById(idp+'threshold').onchange = (e)=>{ pd.thresholdIps = tdsClampThreshold(plane, parseFloat(e.target.value)); e.target.value = pd.thresholdIps.toFixed(2); };
+
+        el.querySelectorAll('.'+idp+'existing-input').forEach(inp=>{
+          inp.addEventListener('change', ()=>{
+            const p = inp.dataset.point;
+            pd.points[p].currentG = Math.max(0, parseFloat(inp.value)||0);
+            repaint();
+          });
+        });
+
+        const calOffsetInput = document.getElementById(idp+'calOffset');
+        if(calOffsetInput){
+          calOffsetInput.addEventListener('change', ()=>{
+            const v = parseFloat(calOffsetInput.value);
+            manualCalOffsetMin = isNaN(v) ? 0 : v;
+          });
+        }
+        const calOverrideBtn = document.getElementById(idp+'calOverrideBtn');
+        if(calOverrideBtn){
+          calOverrideBtn.onclick = ()=>{ calOffsetOverridden = true; manualCalOffsetMin = 0; calOffsetAutoFailed = false; repaint(); };
+        }
+        const calAutoBtn = document.getElementById(idp+'calAutoBtn');
+        if(calAutoBtn){
+          calAutoBtn.onclick = ()=>{ calOffsetOverridden = false; calOffsetAutoFailed = false; repaint(); };
+        }
+
+        document.getElementById(idp+'analyzeBtn').onclick = ()=>{
+          const lastRun = pd.runs.length ? pd.runs[pd.runs.length-1] : null;
+          const canAutoCalibrate = !!(lastRun && lastRun.points && lastRun.points.length);
+          const ampIps = parseFloat(document.getElementById(idp+'amp').value);
+          const hour = parseInt(document.getElementById(idp+'phaseHour').value,10);
+          const minute = parseInt(document.getElementById(idp+'phaseMin').value,10);
+          if(isNaN(ampIps) || ampIps < 0){ alert('Please enter a valid measured amplitude (IPS).'); return; }
+          if(ampIps > plane.ampMaxIps){ alert('Measured amplitude readings above '+plane.ampMaxIps.toFixed(1)+' IPS aren\'t supported by this tool (well beyond the chart\'s range) -- double-check the pickup/target installation and the reading before proceeding.'); return; }
+          if(isNaN(hour) || isNaN(minute)){ alert('Please enter a valid measured phase (hour and minute).'); return; }
+          const rawPhaseMin = trbPhaseToMinutes(hour, minute);
+          let calOffsetMin, calOffsetAuto;
+          if(canAutoCalibrate && !calOffsetOverridden){
+            const auto = tdsAutoCalOffset(plane, lastRun, ampIps, rawPhaseMin);
+            calOffsetMin = (auto!=null) ? Math.round(auto) : 0;
+            calOffsetAuto = (auto!=null);
+            if(auto==null){ calOffsetOverridden = true; manualCalOffsetMin = 0; calOffsetAutoFailed = true; }
+          } else {
+            calOffsetMin = parseFloat(document.getElementById(idp+'calOffset').value)||0;
+            calOffsetAuto = false;
+          }
+          const analysis = tdsAnalyze(plane, ampIps, rawPhaseMin, calOffsetMin, pd, pd.thresholdIps);
+          pending = { ampIps: ampIps, rawPhaseMin: rawPhaseMin, calOffsetMin: calOffsetMin, calOffsetAuto: calOffsetAuto, analysis: analysis, actual: {} };
+          if(!analysis.balanced){
+            analysis.points.forEach(p=>{ pending.actual[p.point] = p.suggestedTotal; });
+          }
+          repaint();
+        };
+
+        if(pending && pending.analysis){
+          const logBtn = document.getElementById(idp+'logRunBtn');
+          if(logBtn){
+            logBtn.onclick = ()=>{
+              pd.runs.push({
+                runNumber: pd.runs.length+1, ampIps: pending.ampIps, rawPhaseMin: pending.rawPhaseMin,
+                calOffsetMin: pending.calOffsetMin, calOffsetAuto: pending.calOffsetAuto,
+                correctedMin: pending.analysis.correctedMin, balanced: true, timestamp: new Date().toISOString(),
+              });
+              pending = null; calOffsetOverridden = false; manualCalOffsetMin = 0; calOffsetAutoFailed = false;
+              repaint();
+            };
+          }
+          el.querySelectorAll('.'+idp+'actual-total').forEach(inp=>{
+            inp.addEventListener('change', ()=>{
+              const p = inp.dataset.point;
+              pending.actual[p] = Math.max(0, parseFloat(inp.value)||0);
+              repaint();
+            });
+          });
+          const confirmBtn = document.getElementById(idp+'confirmRunBtn');
+          if(confirmBtn){
+            confirmBtn.onclick = ()=>{
+              const pointResults = pending.analysis.points.map(p=>{
+                const actualTotal = tdsRound2(pending.actual[p.point]!==undefined ? pending.actual[p.point] : p.suggestedTotal);
+                const previousTotal = p.currentTotal;
+                pd.points[p.point].currentG = actualTotal;
+                return { point: p.point, previousTotal: previousTotal, targetAddG: p.targetAddG, suggestedTotal: p.suggestedTotal, actualTotal: actualTotal };
+              });
+              pd.runs.push({
+                runNumber: pd.runs.length+1, ampIps: pending.ampIps, rawPhaseMin: pending.rawPhaseMin,
+                calOffsetMin: pending.calOffsetMin, calOffsetAuto: pending.calOffsetAuto,
+                correctedMin: pending.analysis.correctedMin, balanced: false, points: pointResults, timestamp: new Date().toISOString(),
+              });
+              pending = null; calOffsetOverridden = false; manualCalOffsetMin = 0; calOffsetAutoFailed = false;
+              repaint();
+            };
+          }
+        }
+      }
+
+      function resetUi(){ pending = null; calOffsetOverridden = false; manualCalOffsetMin = 0; calOffsetAutoFailed = false; }
+
+      return { sectionHtml: sectionHtml, wire: wire, resetUi: resetUi };
     }
 
-    function wireAs350trbAnalysisSection(){
-      const logBtn = document.getElementById('as350trbLogRunBtn');
-      if(logBtn){
-        logBtn.onclick = ()=>{
-          job.runs.push({
-            runNumber: job.runs.length+1,
-            ampIps: pending.ampIps,
-            rawPhaseMin: pending.rawPhaseMin,
-            calOffsetMin: pending.calOffsetMin,
-            calOffsetAuto: pending.calOffsetAuto,
-            correctedMin: pending.analysis.correctedMin,
-            balanced: true,
-            timestamp: new Date().toISOString(),
-          });
-          pending = null;
-          calOffsetOverridden = false;
-          manualCalOffsetMin = 0;
-          calOffsetAutoFailed = false;
-          paint();
-        };
-      }
-      el.querySelectorAll('.as350trb-actual-total').forEach(inp=>{
-        inp.addEventListener('change', ()=>{
-          const p = inp.dataset.point;
-          pending.actual[p] = Math.max(0, parseFloat(inp.value)||0);
-          paint();
+    function paint(){
+      const type = TDS_TYPES[job.type];
+      const typeAircraft = (s.aircraft||[]).filter(a => type.aircraftTypes.includes(ptrainModelToType(a.model)));
+
+      el.innerHTML =
+        backButton() +
+        '<div class="panel">' +
+          '<h2 class="form-title">Tail Rotor Drive Shaft / Fan Balancing</h2>' +
+          '<p class="form-sub">Digitized drive-shaft balancing charts for AS350, EC130 T2 and AS355N (VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER tuning equipment). 3 correction points 120° apart per plane. Enter measured amplitude (IPS) and phase (clock position) to get a suggested weight/location correction, then log the exact weight actually left installed — every washer here can be ground to the exact grams needed, so there\'s no catalog size to match. Starting with the run after a logged correction, the clock-angle calibration offset is calculated automatically from that correction and the new reading (still overridable). Balance only after solving the cause of any vibration increase. For training and reference use only — always follow the current approved manual for the actual job.</p>' +
+
+          '<div class="trb-section">' +
+            '<h3>Job</h3>' +
+            '<div class="field-grid">' +
+              '<div class="field"><label for="tdsType">Aircraft / system</label><select id="tdsType">'+TDS_TYPE_IDS.map(tid=>'<option value="'+tid+'"'+(job.type===tid?' selected':'')+'>'+escapeHTML(TDS_TYPES[tid].label)+'</option>').join('')+'</select></div>' +
+              '<div class="field"><label for="tdsReg">A/C registration</label><select id="tdsReg">'+opts(typeAircraft, a=>a.reg, a=>a.reg, 'Select registration')+'</select></div>' +
+              '<div class="field"><label for="tdsDate">Date</label><input type="date" id="tdsDate" value="'+(job.date||todayISO())+'"></div>' +
+              '<div class="field"><label for="tdsAme">AME</label><select id="tdsAme">'+opts(s.ames, a=>a.name, a=>a.name, 'Select AME')+'</select></div>' +
+            '</div>' +
+            '<p class="trb-note">'+escapeHTML(type.amm)+' — '+escapeHTML(type.procedureLabel)+'.'+(type.planes.length>1 ? ' This system has '+type.planes.length+' independent balancing planes, both worked below under the same job.' : '')+'</p>' +
+          '</div>' +
+
+          planeCtrls.map(c=>c.sectionHtml()).join('') +
+
+          '<div class="btn-row" style="justify-content:flex-end;margin-top:16px;">' +
+            '<button type="button" class="btn" id="tdsNewJobBtn">✖ New job</button>' +
+            '<button type="button" class="btn" id="tdsPrintBtn">🖨️ Print report</button>' +
+            '<button type="button" class="btn primary" id="tdsSaveBtn">💾 Save job</button>' +
+          '</div>' +
+        '</div>';
+
+      document.getElementById('tdsReg').value = job.reg||'';
+      if(job.ame) document.getElementById('tdsAme').value = job.ame;
+      document.getElementById('tdsReg').onchange = (e)=>{ job.reg = e.target.value; };
+      document.getElementById('tdsDate').onchange = (e)=>{ job.date = e.target.value; };
+      document.getElementById('tdsAme').onchange = (e)=>{ job.ame = e.target.value; };
+      document.getElementById('tdsType').onchange = (e)=>{
+        const newType = e.target.value;
+        if(newType === job.type) return;
+        const hasData = TDS_TYPES[job.type].planes.some(pl=>{
+          const pd = job.planeData[pl.id];
+          return pd && (pd.runs.length || TDS_POINTS.some(p=>(pd.points[p].currentG||0) > 0));
         });
-      });
-      const confirmBtn = document.getElementById('as350trbConfirmRunBtn');
-      if(confirmBtn){
-        confirmBtn.onclick = ()=>{
-          const pointResults = pending.analysis.points.map(p=>{
-            const actualTotal = trbRound2(pending.actual[p.point]!==undefined ? pending.actual[p.point] : p.suggestedTotal);
-            const previousTotal = p.currentTotal;
-            job.points[p.point].currentG = actualTotal;
-            return { point: p.point, previousTotal: previousTotal, targetAddG: p.targetAddG, suggestedTotal: p.suggestedTotal, actualTotal: actualTotal };
-          });
-          job.runs.push({
-            runNumber: job.runs.length+1,
-            ampIps: pending.ampIps,
-            rawPhaseMin: pending.rawPhaseMin,
-            calOffsetMin: pending.calOffsetMin,
-            calOffsetAuto: pending.calOffsetAuto,
-            correctedMin: pending.analysis.correctedMin,
-            balanced: false,
-            points: pointResults,
-            timestamp: new Date().toISOString(),
-          });
-          pending = null;
-          calOffsetOverridden = false;
-          manualCalOffsetMin = 0;
-          calOffsetAutoFailed = false;
-          paint();
-        };
-      }
+        if(hasData && !confirm('Switch aircraft / system? This clears the points and run history entered for '+TDS_TYPES[job.type].label+' below (the job header — registration, date, AME — is kept).')){
+          e.target.value = job.type;
+          return;
+        }
+        const reg = job.reg, date = job.date, ame = job.ame;
+        job = tdsNewJob(newType);
+        job.reg = ''; job.date = date; job.ame = ame; // registration list differs per type, so it's cleared rather than carried over
+        rebuildPlaneCtrls();
+        paint();
+      };
+
+      planeCtrls.forEach(c=> c.wire(paint));
+
+      document.getElementById('tdsNewJobBtn').onclick = ()=>{
+        if(!confirm('Start a new job? This clears the current points, run history and job header (any unsaved data is lost — saved jobs remain in Saved Forms).')) return;
+        job = tdsNewJob(job.type);
+        rebuildPlaneCtrls();
+        paint();
+      };
+
+      document.getElementById('tdsPrintBtn').onclick = ()=>{
+        openPrint(buildDriveShaftPrintHtml(Object.assign({}, job, { date: fmtDateNice(job.date) })));
+      };
+
+      document.getElementById('tdsSaveBtn').onclick = ()=>{
+        const type = TDS_TYPES[job.type];
+        const runCount = type.planes.reduce((sum,pl)=> sum + (job.planeData[pl.id].runs.length||0), 0);
+        const lastPlaneBalanced = type.planes.every(pl=>{ const r=job.planeData[pl.id].runs; return r.length && r[r.length-1].balanced; });
+        const desc = type.label+' — AME: '+(job.ame||'—')+' — '+runCount+' run(s) logged'+(runCount && lastPlaneBalanced ? ', balanced' : '');
+        saveRecord(buildRecord('driveshaftbalance', 'Tail Rotor Drive Shaft / Fan Balancing', job.reg, job.date, desc, job)).then(()=>{
+          alert('Job saved. You can reopen and continue it later from Saved Forms.');
+        }).catch(()=>{ alert('Could not save the job right now, but you can keep working — try Save again in a moment.'); });
+      };
     }
 
     paint();
   }
 
   // ---------- print report ----------
-  function buildAs350TrbPrintHtml(job){
-    const pointsRows = AS350TRB_POINTS.map(p=>{
-      const pt = job.points[p];
-      return '<tr><td>N°'+p+'</td><td>'+as350trbPointTotalG(pt).toFixed(2)+'</td></tr>';
-    }).join('');
-    const runRows = (job.runs||[]).map(r=>{
-      const adj = r.balanced ? '—' : (r.points||[]).map(p=>{
-        const delta = trbRound2(p.actualTotal - p.previousTotal);
-        const dir = delta > 0 ? ('+'+delta.toFixed(2)+' g added') : (delta < 0 ? (delta.toFixed(2)+' g removed') : 'no change');
-        return 'N°'+p.point+': '+p.previousTotal.toFixed(2)+' → '+p.actualTotal.toFixed(2)+' g ('+dir+')';
-      }).join('; ');
-      return '<tr>' +
-        '<td>'+r.runNumber+'</td>' +
-        '<td>'+r.ampIps.toFixed(2)+'</td>' +
-        '<td>'+trbMinutesToClockStr(r.rawPhaseMin)+'</td>' +
-        '<td>'+(r.calOffsetMin||0)+(r.calOffsetAuto?' (auto)':'')+'</td>' +
-        '<td>'+trbMinutesToClockStr(r.correctedMin)+'</td>' +
-        '<td>'+(r.balanced?'Balanced':'Correction')+'</td>' +
-        '<td>'+adj+'</td>' +
-      '</tr>';
+  function buildDriveShaftPrintHtml(job){
+    const type = TDS_TYPES[job.type];
+    const planesHtml = type.planes.map(plane=>{
+      const pd = job.planeData[plane.id];
+      const pointsRows = TDS_POINTS.map(p=>{
+        const pt = pd.points[p];
+        return '<tr><td>N°'+p+'</td><td>'+tdsPointTotalG(pt).toFixed(2)+'</td></tr>';
+      }).join('');
+      const runRows = (pd.runs||[]).map(r=>{
+        const adj = r.balanced ? '—' : (r.points||[]).map(p=>{
+          const delta = tdsRound2(p.actualTotal - p.previousTotal);
+          const dir = delta > 0 ? ('+'+delta.toFixed(2)+' g added') : (delta < 0 ? (delta.toFixed(2)+' g removed') : 'no change');
+          return 'N°'+p.point+': '+p.previousTotal.toFixed(2)+' → '+p.actualTotal.toFixed(2)+' g ('+dir+')';
+        }).join('; ');
+        return '<tr>' +
+          '<td>'+r.runNumber+'</td>' +
+          '<td>'+r.ampIps.toFixed(2)+'</td>' +
+          '<td>'+trbMinutesToClockStr(r.rawPhaseMin)+'</td>' +
+          '<td>'+(r.calOffsetMin||0)+(r.calOffsetAuto?' (auto)':'')+'</td>' +
+          '<td>'+trbMinutesToClockStr(r.correctedMin)+'</td>' +
+          '<td>'+(r.balanced?'Balanced':'Correction')+'</td>' +
+          '<td>'+adj+'</td>' +
+        '</tr>';
+      }).join('');
+      return (
+        '<h3 style="margin-top:20px;">'+escapeHTML(plane.label)+' — threshold '+(pd.thresholdIps||plane.thresholdDefaultIps).toFixed(2)+' IPS</h3>' +
+        '<table class="mcm-table"><thead><tr><th>Point</th><th>Current weight (g)</th></tr></thead><tbody>'+pointsRows+'</tbody></table>' +
+        (runRows ? ('<table class="mcm-table" style="margin-top:8px;"><thead><tr><th>Run</th><th>Amplitude (ips)</th><th>Raw phase</th><th>Cal. offset (min)</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead><tbody>'+runRows+'</tbody></table>') : '<p>No runs logged.</p>') +
+        tdsChartSvg(plane, tdsChartDisplayState(pd, null), pd.thresholdIps||plane.thresholdDefaultIps)
+      );
     }).join('');
     return (
       PRINT_STYLES +
-      '<div class="pf-head"><img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'"><div class="pf-title-block"><h1>AS350 Tail Rotor Drive Shaft Balancing</h1><div class="pf-sub">AMM 65-11-00,5-1A — VIBREX 2000 / CHADWICK 8500C+ / ROTORTUNER tuning equipment</div></div></div>' +
+      '<div class="pf-head"><img class="pf-logo" src="'+PHOENIX_LOGO_TIGHT_DATA_URI+'"><div class="pf-title-block"><h1>Tail Rotor Drive Shaft / Fan Balancing</h1><div class="pf-sub">'+escapeHTML(type.label)+' — '+escapeHTML(type.amm)+' — '+escapeHTML(type.equipmentNote)+'</div></div></div>' +
       '<div class="pf-box">' +
-        '<div class="pf-row"><span class="pf-field"><b>A/C registration:</b> '+escapeHTML(job.reg||'—')+'</span><span class="pf-field"><b>Date:</b> '+escapeHTML(job.date||'—')+'</span><span class="pf-field"><b>AME:</b> '+escapeHTML(job.ame||'—')+'</span><span class="pf-field"><b>Threshold:</b> '+(job.thresholdIps||AS350TRB_THRESHOLD_DEFAULT_IPS).toFixed(2)+' IPS</span></div>' +
+        '<div class="pf-row"><span class="pf-field"><b>A/C registration:</b> '+escapeHTML(job.reg||'—')+'</span><span class="pf-field"><b>Date:</b> '+escapeHTML(job.date||'—')+'</span><span class="pf-field"><b>AME:</b> '+escapeHTML(job.ame||'—')+'</span></div>' +
       '</div>' +
-      '<h3 style="margin-top:16px;">Weight per point</h3>' +
-      '<table class="mcm-table"><thead><tr><th>Point</th><th>Current weight (g)</th></tr></thead><tbody>'+pointsRows+'</tbody></table>' +
-      '<h3 style="margin-top:16px;">Run history</h3>' +
-      (runRows ? ('<table class="mcm-table"><thead><tr><th>Run</th><th>Amplitude (ips)</th><th>Raw phase</th><th>Cal. offset (min)</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead><tbody>'+runRows+'</tbody></table>') : '<p>No runs logged.</p>') +
-      '<h3 style="margin-top:16px;">Balance chart (last run)</h3>' +
-      as350trbChartSvg(as350trbChartDisplayState(job, null), job.thresholdIps||AS350TRB_THRESHOLD_DEFAULT_IPS)
+      planesHtml
     );
   }
 
