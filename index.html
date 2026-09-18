@@ -3980,6 +3980,9 @@
   const AS350TRB_THRESHOLD_DEFAULT_IPS = 0.8; // AMM F.4.b -- satisfactory at or below 0.8 IPS
   const AS350TRB_THRESHOLD_MIN_IPS = 0.1; // tool floor -- tighten the target below the AMM minimum if desired
   const AS350TRB_THRESHOLD_MAX_IPS = 0.8; // never looser than the AMM's own satisfactory level
+  const AS350TRB_AMP_MAX_IPS = 2.5; // ceiling for an initial/as-found reading (a shaft that has
+  // never been balanced can read well above the AMM chart's own printed range); in-service
+  // corrections after that are almost always much smaller.
   // AMM Job Set-up section D (Routine Replacement Parts) -- balancing washer catalog, for reference
   // only (see note above): the actual field to fill in is always the exact weight left installed.
   const AS350TRB_WASHERS = [
@@ -4052,20 +4055,28 @@
     const r = shifted - k*240;
     return { lowerPoint: AS350TRB_POINT_SEQ[k], upperPoint: AS350TRB_POINT_SEQ[k+1], offsetMin: r };
   }
-  function as350trbAnalyze(ampIps, rawPhaseMin, calOffsetMin, job, thresholdIps){
-    const correctedMin = trbApplyCalOffset(rawPhaseMin, calOffsetMin);
-    if(ampIps <= thresholdIps){
-      return { balanced:true, correctedMin: correctedMin };
-    }
+  // Resolves a measured (amplitude, corrected-phase) reading into its two oblique-axis components
+  // along the nearest pair of correction points, in ips units -- the same trig used both by
+  // as350trbAnalyze() below (to size the suggested correction) and by the balance chart (to place
+  // the parallel-construction guide lines), so the chart always shows exactly what was suggested.
+  function as350trbDecomposeVector(ampIps, correctedMin){
     const br = as350trbBracket(correctedMin);
     const gammaRad = 240 * Math.PI/360; // 120° between adjacent points
     const phiRad = br.offsetMin * Math.PI/360;
     const sinGamma = Math.sin(gammaRad);
     const wLowerIps = ampIps * Math.sin(gammaRad - phiRad) / sinGamma;
     const wUpperIps = ampIps * Math.sin(phiRad) / sinGamma;
+    return { br: br, wLowerIps: wLowerIps, wUpperIps: wUpperIps };
+  }
+  function as350trbAnalyze(ampIps, rawPhaseMin, calOffsetMin, job, thresholdIps){
+    const correctedMin = trbApplyCalOffset(rawPhaseMin, calOffsetMin);
+    if(ampIps <= thresholdIps){
+      return { balanced:true, correctedMin: correctedMin };
+    }
+    const dec = as350trbDecomposeVector(ampIps, correctedMin);
     const cand = [
-      { point: br.lowerPoint, addIps: wLowerIps },
-      { point: br.upperPoint, addIps: wUpperIps },
+      { point: dec.br.lowerPoint, addIps: dec.wLowerIps },
+      { point: dec.br.upperPoint, addIps: dec.wUpperIps },
     ].filter(c => trbRound2(c.addIps * AS350TRB_SLOPE_G_PER_IPS) > 0);
     const points = cand.map(c=>{
       const targetAddG = trbRound2(c.addIps * AS350TRB_SLOPE_G_PER_IPS);
@@ -4075,6 +4086,116 @@
     });
     const unchanged = AS350TRB_POINTS.filter(p => !points.some(pt=>pt.point===p));
     return { balanced:false, correctedMin: correctedMin, points: points, unchanged: unchanged };
+  }
+
+  // ---------- balance chart (AMM Figure 3 equivalent) ----------
+  // A polar reconstruction of the AMM's own hexagonal weight chart: concentric amplitude rings, a
+  // 12-hour clock dial, 3 accent-colored point axes carrying the washer-catalog gram ticks, and --
+  // once a reading has been analyzed -- the measured point M plotted with the same "draw a line
+  // parallel to the weight scale" construction the AMM chart itself is read by (see
+  // as350trbDecomposeVector() above: M = wLower*unit(lowerAxis) + wUpper*unit(upperAxis), so the
+  // segment from the lower-axis intersection to M is, by construction, parallel to the upper axis,
+  // and vice versa).
+  const AS350TRB_CHART_SIZE = 440;
+  const AS350TRB_CHART_CX = 220;
+  const AS350TRB_CHART_CY = 220;
+  const AS350TRB_CHART_R = 150;
+  const AS350TRB_CHART_MAX_IPS = 2.6; // a hair above AS350TRB_AMP_MAX_IPS so a 2.5 ips point still sits inside the rim
+  const AS350TRB_CHART_RING_IPS = [0.5, 1.0, 1.5, 2.0, 2.5];
+
+  // 0 min = 12 o'clock (top), increasing clockwise -- matches how the AME reads the analyzer's clock
+  // dial, and is independent of trbPolarToXY's own math-angle convention (used only for the
+  // auto-calibration vector algebra, never for on-screen layout).
+  function as350trbChartXY(minutes, ips){
+    const angle = (minutes/720) * 2*Math.PI;
+    const r = Math.max(0, Math.min(ips, AS350TRB_CHART_MAX_IPS)) / AS350TRB_CHART_MAX_IPS * AS350TRB_CHART_R;
+    return { x: AS350TRB_CHART_CX + r*Math.sin(angle), y: AS350TRB_CHART_CY - r*Math.cos(angle) };
+  }
+
+  // What (if anything) the chart should currently plot: the not-yet-confirmed analysis if one is
+  // pending, else the most recent logged run, else nothing (a fresh job with no readings yet).
+  function as350trbChartDisplayState(job, pending){
+    if(pending && pending.analysis){
+      return { ampIps: pending.ampIps, correctedMin: pending.analysis.correctedMin, balanced: pending.analysis.balanced };
+    }
+    if(job.runs && job.runs.length){
+      const r = job.runs[job.runs.length-1];
+      return { ampIps: r.ampIps, correctedMin: r.correctedMin, balanced: r.balanced };
+    }
+    return null;
+  }
+
+  function as350trbChartSvg(display, thresholdIps){
+    const cx = AS350TRB_CHART_CX, cy = AS350TRB_CHART_CY, R = AS350TRB_CHART_R;
+    let svg = '';
+
+    AS350TRB_CHART_RING_IPS.forEach(function(ips){
+      const rr = ips/AS350TRB_CHART_MAX_IPS*R;
+      svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+rr.toFixed(1)+'" fill="none" stroke="var(--line)" stroke-width="1"></circle>';
+      svg += '<text x="'+(cx+4).toFixed(1)+'" y="'+(cy-rr+11).toFixed(1)+'" font-size="9" fill="var(--grey-strong)">'+ips.toFixed(1)+'</text>';
+    });
+
+    const thr = thresholdIps || AS350TRB_THRESHOLD_DEFAULT_IPS;
+    const thrR = thr/AS350TRB_CHART_MAX_IPS*R;
+    svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+thrR.toFixed(1)+'" fill="var(--good-bg)" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 3"></circle>';
+    svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="var(--line)" stroke-width="1.5"></circle>';
+
+    for(let h=0; h<12; h++){
+      const min = h*60;
+      const angle = (min/720)*2*Math.PI;
+      const x1 = cx + R*Math.sin(angle), y1 = cy - R*Math.cos(angle);
+      const x2 = cx + (R+7)*Math.sin(angle), y2 = cy - (R+7)*Math.cos(angle);
+      svg += '<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="var(--grey-strong)" stroke-width="1"></line>';
+      const lx = cx + (R+18)*Math.sin(angle), ly = cy - (R+18)*Math.cos(angle);
+      svg += '<text x="'+lx.toFixed(1)+'" y="'+(ly+3).toFixed(1)+'" font-size="10" fill="var(--grey-strong)" text-anchor="middle">'+(h===0?'12':h)+'</text>';
+    }
+
+    AS350TRB_POINTS.forEach(function(p){
+      const posMin = AS350TRB_POINT_POS_MIN[p];
+      const end = as350trbChartXY(posMin, AS350TRB_CHART_MAX_IPS);
+      svg += '<line x1="'+cx+'" y1="'+cy+'" x2="'+end.x.toFixed(1)+'" y2="'+end.y.toFixed(1)+'" stroke="var(--accent)" stroke-width="2"></line>';
+      const lbl = as350trbChartXY(posMin, AS350TRB_CHART_MAX_IPS + 0.22);
+      svg += '<text x="'+lbl.x.toFixed(1)+'" y="'+(lbl.y+3).toFixed(1)+'" font-size="11" font-weight="700" fill="var(--accent)" text-anchor="middle">N°'+p+'</text>';
+      const angle = (posMin/720)*2*Math.PI;
+      const perpX = Math.cos(angle), perpY = Math.sin(angle);
+      AS350TRB_WASHERS.forEach(function(w){
+        const ips = w.g/AS350TRB_SLOPE_G_PER_IPS;
+        if(ips > AS350TRB_CHART_MAX_IPS) return;
+        const pt = as350trbChartXY(posMin, ips);
+        svg += '<line x1="'+(pt.x-perpX*3).toFixed(1)+'" y1="'+(pt.y+perpY*3).toFixed(1)+'" x2="'+(pt.x+perpX*3).toFixed(1)+'" y2="'+(pt.y-perpY*3).toFixed(1)+'" stroke="var(--ink)" stroke-width="1"></line>';
+        svg += '<text x="'+(pt.x+perpX*8).toFixed(1)+'" y="'+(pt.y-perpY*8+3).toFixed(1)+'" font-size="7" fill="var(--grey-strong)">'+w.g.toFixed(1)+'</text>';
+      });
+    });
+
+    svg += '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="var(--ink)"></circle>';
+
+    if(display){
+      const M = as350trbChartXY(display.correctedMin, display.ampIps);
+      if(display.balanced){
+        svg += '<circle cx="'+M.x.toFixed(1)+'" cy="'+M.y.toFixed(1)+'" r="6" fill="var(--good)" stroke="#fff" stroke-width="1.5"></circle>';
+        svg += '<text x="'+(M.x+9).toFixed(1)+'" y="'+(M.y-9).toFixed(1)+'" font-size="11" font-weight="700" fill="var(--good)">M '+display.ampIps.toFixed(2)+' ips</text>';
+      } else {
+        const dec = as350trbDecomposeVector(display.ampIps, display.correctedMin);
+        const pLower = as350trbChartXY(AS350TRB_POINT_POS_MIN[dec.br.lowerPoint], dec.wLowerIps);
+        const pUpper = as350trbChartXY(AS350TRB_POINT_POS_MIN[dec.br.upperPoint], dec.wUpperIps);
+        svg += '<line x1="'+pLower.x.toFixed(1)+'" y1="'+pLower.y.toFixed(1)+'" x2="'+M.x.toFixed(1)+'" y2="'+M.y.toFixed(1)+'" stroke="var(--warn)" stroke-width="1.2" stroke-dasharray="5 3"></line>';
+        svg += '<line x1="'+pUpper.x.toFixed(1)+'" y1="'+pUpper.y.toFixed(1)+'" x2="'+M.x.toFixed(1)+'" y2="'+M.y.toFixed(1)+'" stroke="var(--warn)" stroke-width="1.2" stroke-dasharray="5 3"></line>';
+        const gLower = trbRound2(dec.wLowerIps*AS350TRB_SLOPE_G_PER_IPS);
+        const gUpper = trbRound2(dec.wUpperIps*AS350TRB_SLOPE_G_PER_IPS);
+        if(gLower > 0){
+          svg += '<circle cx="'+pLower.x.toFixed(1)+'" cy="'+pLower.y.toFixed(1)+'" r="4" fill="var(--warn)"></circle>';
+          svg += '<text x="'+(pLower.x+7).toFixed(1)+'" y="'+(pLower.y-6).toFixed(1)+'" font-size="10" font-weight="700" fill="var(--warn)">'+gLower.toFixed(2)+'g</text>';
+        }
+        if(gUpper > 0){
+          svg += '<circle cx="'+pUpper.x.toFixed(1)+'" cy="'+pUpper.y.toFixed(1)+'" r="4" fill="var(--warn)"></circle>';
+          svg += '<text x="'+(pUpper.x+7).toFixed(1)+'" y="'+(pUpper.y-6).toFixed(1)+'" font-size="10" font-weight="700" fill="var(--warn)">'+gUpper.toFixed(2)+'g</text>';
+        }
+        svg += '<circle cx="'+M.x.toFixed(1)+'" cy="'+M.y.toFixed(1)+'" r="6" fill="var(--bad)" stroke="#fff" stroke-width="1.5"></circle>';
+        svg += '<text x="'+(M.x+9).toFixed(1)+'" y="'+(M.y-9).toFixed(1)+'" font-size="11" font-weight="700" fill="var(--bad)">M '+display.ampIps.toFixed(2)+' ips</text>';
+      }
+    }
+
+    return '<svg viewBox="0 0 '+AS350TRB_CHART_SIZE+' '+AS350TRB_CHART_SIZE+'" style="width:100%;max-width:440px;height:auto;display:block;margin:0 auto;" role="img" aria-label="AS350 tail rotor drive shaft balance chart">' + svg + '</svg>';
   }
 
   // ---------- automatic clock-angle calibration (identical method to the EC130/EC120/EC135 tools) ----------
@@ -4177,14 +4298,24 @@
           '<div class="trb-section">' +
             '<h3>Run '+nextRunNumber+' — new measurement</h3>' +
             '<div class="field-grid">' +
-              '<div class="field"><label for="as350trbAmp">Measured amplitude (IPS)</label><input type="number" step="0.01" min="0" id="as350trbAmp" value="'+(pending?pending.ampIps:'')+'"></div>' +
+              '<div class="field"><label for="as350trbAmp">Measured amplitude (IPS)</label><input type="number" step="0.01" min="0" max="'+AS350TRB_AMP_MAX_IPS+'" id="as350trbAmp" value="'+(pending?pending.ampIps:'')+'"></div>' +
               '<div class="field"><label>Measured phase (clock position)</label><div class="trb-phase-inputs"><input type="number" min="0" max="12" id="as350trbPhaseHour" value="'+(pending?Math.floor(pending.rawPhaseMin/60):'')+'" placeholder="H">:<input type="number" min="0" max="59" id="as350trbPhaseMin" value="'+(pending?String(pending.rawPhaseMin%60).padStart(2,'0'):'')+'" placeholder="MM"></div></div>' +
               '<div class="field"><label for="as350trbCalOffset">Clock angle calibration offset (min)</label>'+calOffsetFieldHtml+'</div>' +
             '</div>' +
+            '<p class="trb-note">Readings up to '+AS350TRB_AMP_MAX_IPS.toFixed(1)+' IPS are accepted for an initial/as-found check on a shaft that has never been balanced -- in-service corrections afterward are almost always much smaller. Readings above '+AS350TRB_AMP_MAX_IPS.toFixed(1)+' IPS aren\'t supported here.</p>' +
             '<p class="trb-note">'+calOffsetNoteHtml+'</p>' +
             '<div class="btn-row"><button type="button" class="btn primary" id="as350trbAnalyzeBtn">Analyze</button></div>' +
           '</div>' +
 
+          (function(){
+            const disp = as350trbChartDisplayState(job, pending);
+            return '<div class="trb-section">' +
+              '<h3>Balance chart (AMM Fig. 3 equivalent)</h3>' +
+              '<p class="trb-note">Read the same way as the AMM\'s own chart: the measured unbalance (M) is broken into the two nearest correction points by drawing lines parallel to each point\'s weight-scale axis. Shaded ring = current '+job.thresholdIps.toFixed(2)+' IPS threshold.</p>' +
+              as350trbChartSvg(disp, job.thresholdIps) +
+              (disp ? '' : '<p class="trb-note" style="text-align:center;">Enter a reading above and click Analyze to plot it here.</p>') +
+            '</div>';
+          })() +
           (pending && pending.analysis ? as350trbAnalysisSectionHtml(pending) : '') +
 
           '<div class="trb-section">' +
@@ -4268,6 +4399,7 @@
         const hour = parseInt(document.getElementById('as350trbPhaseHour').value,10);
         const minute = parseInt(document.getElementById('as350trbPhaseMin').value,10);
         if(isNaN(ampIps) || ampIps < 0){ alert('Please enter a valid measured amplitude (IPS).'); return; }
+        if(ampIps > AS350TRB_AMP_MAX_IPS){ alert('Measured amplitude readings above '+AS350TRB_AMP_MAX_IPS.toFixed(1)+' IPS aren\'t supported by this tool (well beyond the AMM chart\'s range) -- double-check the pickup/target installation and the reading before proceeding.'); return; }
         if(isNaN(hour) || isNaN(minute)){ alert('Please enter a valid measured phase (hour and minute).'); return; }
         const rawPhaseMin = trbPhaseToMinutes(hour, minute);
         let calOffsetMin, calOffsetAuto;
@@ -4446,7 +4578,9 @@
       '<h3 style="margin-top:16px;">Weight per point</h3>' +
       '<table class="mcm-table"><thead><tr><th>Point</th><th>Current weight (g)</th></tr></thead><tbody>'+pointsRows+'</tbody></table>' +
       '<h3 style="margin-top:16px;">Run history</h3>' +
-      (runRows ? ('<table class="mcm-table"><thead><tr><th>Run</th><th>Amplitude (ips)</th><th>Raw phase</th><th>Cal. offset (min)</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead><tbody>'+runRows+'</tbody></table>') : '<p>No runs logged.</p>')
+      (runRows ? ('<table class="mcm-table"><thead><tr><th>Run</th><th>Amplitude (ips)</th><th>Raw phase</th><th>Cal. offset (min)</th><th>Corrected phase</th><th>Result</th><th>Points adjusted</th></tr></thead><tbody>'+runRows+'</tbody></table>') : '<p>No runs logged.</p>') +
+      '<h3 style="margin-top:16px;">Balance chart (last run)</h3>' +
+      as350trbChartSvg(as350trbChartDisplayState(job, null), job.thresholdIps||AS350TRB_THRESHOLD_DEFAULT_IPS)
     );
   }
 
