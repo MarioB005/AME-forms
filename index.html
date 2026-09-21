@@ -5742,7 +5742,7 @@
   // margin is fixed at 0.5in and isn't user-adjustable at all. A legacy record saved before the
   // margins were split only has a single "margin" (or a left/right pair under "marginH") -- read
   // as the starting point for the right margin.
-  const NOTES_LEFT_MARGIN = 0.5; // fixed, no UI control
+  const NOTES_LEFT_MARGIN = 0.02; // fixed, no UI control
   let notesLastMarginVCache = null, notesLastMarginRightCache = null;
   async function loadNotesLastMargin(axis){ // axis: 'V' (top/bottom) or 'Right'
     const cache = axis==='V' ? notesLastMarginVCache : notesLastMarginRightCache;
@@ -5782,7 +5782,7 @@
       backToReservedBtn() +
       '<div class="panel">' +
         '<h2 class="form-title">Notes</h2>' +
-        '<p class="form-sub">Write a note and print it on a 4" wide x 2" high label (left margin is fixed at 0.5"). A copy of the entry is saved automatically (searchable from Saved Forms) every time "Prepare PDF" is pressed.</p>' +
+        '<p class="form-sub">Write a note and print it on a 4" wide x 2" high label (left margin is fixed at 0.02"). A copy of the entry is saved automatically (searchable from Saved Forms) every time "Prepare PDF" is pressed.</p>' +
         '<div class="field-grid">' +
           '<div class="field"><label>Font size (pt)</label><input type="number" id="noteFontSize" min="6" max="18" step="0.5"></div>' +
           '<div class="field"><label>Top/bottom margin (in)</label><input type="number" id="noteMarginV" min="0" max="0.5" step="0.0625"></div>' +
