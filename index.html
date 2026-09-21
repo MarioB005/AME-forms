@@ -269,16 +269,24 @@
   .note-label{width:4in;height:2in;box-sizing:border-box;padding:0.125in 0.18in;font-family:Calibri,Tahoma,"Segoe UI",Arial,Helvetica,sans-serif;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;color:#000;background:#fff;display:flex;flex-direction:column;}
   .note-label .nl-body{flex:1;white-space:pre-wrap;overflow:hidden;line-height:1.28;}
   .ptl-sub{font-size:6.3px;line-height:1.2;margin-bottom:2px;}
-  .ptl-tasks{font-size:6.9px;line-height:1.15;border-top:0.3px solid #000;}
-  .ptl-tasks div{border-bottom:0.3px solid #000;padding:0.3px 0;}
+  /* Rule lines: Chrome snaps any CSS border under 1px up to a full 1px (0.75pt) when printing, so the old
+     0.3px/0.5px borders were all really 0.75pt. For a genuinely thinner (half-weight, 0.375pt) line, the
+     1px border is kept for layout but made transparent, and the visible line is a 1px pseudo-element
+     squashed to half height with transform:scaleY(.5). (A 0.5px background strip was tried first, but
+     Chrome's pixel snapping randomly dropped some of the lines.) */
+  .ptl-tasks{font-size:6.9px;line-height:1.15;border-top:1px solid transparent;position:relative;}
+  .ptl-tasks::before{content:'';position:absolute;left:0;right:0;top:-1px;height:1px;background:#000;transform:scaleY(.5);transform-origin:top;}
+  .ptl-tasks div{border-bottom:1px solid transparent;padding:0.3px 0;position:relative;}
+  .ptl-tasks div::after, .ptl-ads div div::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;background:#000;transform:scaleY(.5);transform-origin:bottom;}
   .ptl-back-top{font-size:8.7px;margin-bottom:2.5px;}
   .ptl-ads{display:flex;gap:6px;font-size:7.9px;margin-bottom:2.5px;}
   .ptl-ads > div{flex:1;}
-  .ptl-ads div div{border-bottom:0.3px solid #000;padding:0.4px 0;}
+  .ptl-ads div div{border-bottom:1px solid transparent;padding:0.4px 0;position:relative;}
   .ptl-meta{font-size:8px;line-height:1.4;}
   .ptl-meta b{display:inline-block;min-width:0.62in;}
   .ptl-sig-label{margin-left:6px;}
-  .ptl-sig-line{display:inline-block;border-bottom:0.5px solid #000;width:0.55in;margin-left:3px;vertical-align:bottom;}
+  .ptl-sig-line{display:inline-block;border-bottom:1px solid transparent;position:relative;width:0.55in;margin-left:3px;vertical-align:bottom;}
+  .ptl-sig-line::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;background:#000;transform:scaleY(.5);transform-origin:bottom;}
   .ptl-sig-row{margin-bottom:10px;}   /* keeps the trainee & PRM signature lines from touching */
   .ptl-date-gap{display:inline-block;width:0.18in;}   /* ~4-5 characters of separation */
 </style>
