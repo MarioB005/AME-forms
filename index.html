@@ -5738,26 +5738,39 @@
     notesLastFontSizeCache = v;
     await storageSet('notes:lastFontSize', String(v));
   }
-  let notesLastMarginCache = null;
-  async function loadNotesLastMargin(){
-    if(notesLastMarginCache!=null) return notesLastMarginCache;
+  // Top/bottom and left/right margins are tracked (and remembered) separately -- a label is
+  // typically wider than it is tall, so the two directions often need different amounts of space.
+  // A legacy record saved before this split only has a single "margin" -- read as both.
+  let notesLastMarginVCache = null, notesLastMarginHCache = null;
+  async function loadNotesLastMargin(axis){ // axis: 'V' (top/bottom) or 'H' (left/right)
+    const cache = axis==='V' ? notesLastMarginVCache : notesLastMarginHCache;
+    if(cache!=null) return cache;
+    let v;
     try{
-      const raw = await storageGet('notes:lastMargin');
-      notesLastMarginCache = raw ? parseFloat(raw) : 0.125;
-    }catch(e){ notesLastMarginCache = 0.125; }
-    if(isNaN(notesLastMarginCache) || notesLastMarginCache<0) notesLastMarginCache = 0.125;
-    return notesLastMarginCache;
+      const raw = await storageGet('notes:lastMargin'+axis);
+      if(raw){ v = parseFloat(raw); }
+      else {
+        // Not set yet under the new per-axis key -- fall back to the old single "margin" value
+        // (if any site ever saved one) so upgrading doesn't reset anyone's preference to 1/8".
+        const legacyRaw = await storageGet('notes:lastMargin');
+        v = legacyRaw ? parseFloat(legacyRaw) : 0.125;
+      }
+    }catch(e){ v = 0.125; }
+    if(isNaN(v) || v<0) v = 0.125;
+    if(axis==='V') notesLastMarginVCache = v; else notesLastMarginHCache = v;
+    return v;
   }
-  async function saveNotesLastMargin(v){
-    notesLastMarginCache = v;
-    await storageSet('notes:lastMargin', String(v));
+  async function saveNotesLastMargin(axis, v){
+    if(axis==='V') notesLastMarginVCache = v; else notesLastMarginHCache = v;
+    await storageSet('notes:lastMargin'+axis, String(v));
   }
 
   async function renderNotesForm(prefill){
     showView('Notes');
     const el = document.getElementById('viewNotes');
     const defaultFontSize = (prefill && prefill.fontSize) || await loadNotesLastFontSize();
-    const defaultMargin = (prefill && prefill.margin!=null) ? prefill.margin : await loadNotesLastMargin();
+    const defaultMarginV = (prefill && (prefill.marginV!=null || prefill.margin!=null)) ? (prefill.marginV!=null ? prefill.marginV : prefill.margin) : await loadNotesLastMargin('V');
+    const defaultMarginH = (prefill && (prefill.marginH!=null || prefill.margin!=null)) ? (prefill.marginH!=null ? prefill.marginH : prefill.margin) : await loadNotesLastMargin('H');
     el.innerHTML =
       backToReservedBtn() +
       '<div class="panel">' +
@@ -5765,23 +5778,28 @@
         '<p class="form-sub">Write a note and print it on a 4" wide x 2" high label. A copy of the entry is saved automatically (searchable from Saved Forms) every time "Prepare PDF" is pressed.</p>' +
         '<div class="field-grid">' +
           '<div class="field"><label>Font size (pt)</label><input type="number" id="noteFontSize" min="6" max="18" step="0.5"></div>' +
-          '<div class="field"><label>Margin (in)</label><input type="number" id="noteMargin" min="0" max="0.5" step="0.0625"></div>' +
+          '<div class="field"><label>Top/bottom margin (in)</label><input type="number" id="noteMarginV" min="0" max="0.5" step="0.0625"></div>' +
+          '<div class="field"><label>Left/right margin (in)</label><input type="number" id="noteMarginH" min="0" max="0.5" step="0.0625"></div>' +
         '</div>' +
         '<div class="field"><label>Note</label><textarea id="noteText" rows="6" placeholder="Note text to print on the label…"></textarea></div>' +
         '<div class="btn-row"><button class="btn primary" id="notePrintBtn">Prepare PDF</button></div>' +
       '</div>';
     document.getElementById('noteFontSize').value = defaultFontSize;
-    document.getElementById('noteMargin').value = defaultMargin;
+    document.getElementById('noteMarginV').value = defaultMarginV;
+    document.getElementById('noteMarginH').value = defaultMarginH;
     document.getElementById('noteText').value = (prefill && prefill.text) || '';
 
     document.getElementById('notePrintBtn').onclick = async ()=>{
+      const readMargin = (id)=>{ const m = parseFloat(document.getElementById(id).value); return (isNaN(m) || m<0) ? 0.125 : m; };
       const data = {
         fontSize: parseFloat(document.getElementById('noteFontSize').value) || 9,
-        margin: (()=>{ const m = parseFloat(document.getElementById('noteMargin').value); return (isNaN(m) || m<0) ? 0.125 : m; })(),
+        marginV: readMargin('noteMarginV'),
+        marginH: readMargin('noteMarginH'),
         text: document.getElementById('noteText').value,
       };
       await saveNotesLastFontSize(data.fontSize);
-      await saveNotesLastMargin(data.margin);
+      await saveNotesLastMargin('V', data.marginV);
+      await saveNotesLastMargin('H', data.marginH);
       await saveRecord(buildRecord('notes', 'Notes', '', todayISO(), data.text, data));
       const html = buildNotesLabelHtml(data);
       openPrint(html);
@@ -5792,13 +5810,16 @@
   // 4in x 2in @page here matches the same label size already used for the Pilot Training Card
   // (buildPtrainLabelHtml) -- this inline <style> overrides the site-wide @page{margin:12mm;} for
   // just this printout, since it's injected directly into #printArea ahead of window.print().
-  // The margin is applied as inline padding (overriding .note-label's own padding rule) so the
+  // The margins are applied as inline padding (overriding .note-label's own padding rule) so the
   // label's outer size always stays exactly 4in x 2in -- a bigger margin just shrinks the text area.
+  // data.margin (no V/H) is read as a fallback for records saved before the top/bottom vs left/right split.
   function buildNotesLabelHtml(data){
     const fontSize = data.fontSize || 9;
-    const margin = (data.margin!=null && !isNaN(data.margin) && data.margin>=0) ? data.margin : 0.125;
+    const fallback = (data.margin!=null && !isNaN(data.margin) && data.margin>=0) ? data.margin : 0.125;
+    const marginV = (data.marginV!=null && !isNaN(data.marginV) && data.marginV>=0) ? data.marginV : fallback;
+    const marginH = (data.marginH!=null && !isNaN(data.marginH) && data.marginH>=0) ? data.marginH : fallback;
     return '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' +
-      '<div class="note-label" style="padding:'+margin+'in;">' +
+      '<div class="note-label" style="padding:'+marginV+'in '+marginH+'in;">' +
         '<div class="nl-body" style="font-size:'+fontSize+'pt;">'+escapeHTML(data.text||'')+'</div>' +
       '</div>';
   }
