@@ -5721,8 +5721,9 @@
   }
 
   // ---------- Notes (quick note printed on a 4in x 2in label) ----------
-  // The font-size field defaults to whatever was last used (persisted via storageGet/storageSet,
-  // same mechanism as the rest of the site's settings), falling back to 9pt only the very first time.
+  // Both the font size and the margin default to whatever was last used (persisted via
+  // storageGet/storageSet, same mechanism as the rest of the site's settings) -- falling back to
+  // 9pt / 0.125in (1/8") only the very first time either has ever been set.
   let notesLastFontSizeCache = null;
   async function loadNotesLastFontSize(){
     if(notesLastFontSizeCache!=null) return notesLastFontSizeCache;
@@ -5737,29 +5738,50 @@
     notesLastFontSizeCache = v;
     await storageSet('notes:lastFontSize', String(v));
   }
+  let notesLastMarginCache = null;
+  async function loadNotesLastMargin(){
+    if(notesLastMarginCache!=null) return notesLastMarginCache;
+    try{
+      const raw = await storageGet('notes:lastMargin');
+      notesLastMarginCache = raw ? parseFloat(raw) : 0.125;
+    }catch(e){ notesLastMarginCache = 0.125; }
+    if(isNaN(notesLastMarginCache) || notesLastMarginCache<0) notesLastMarginCache = 0.125;
+    return notesLastMarginCache;
+  }
+  async function saveNotesLastMargin(v){
+    notesLastMarginCache = v;
+    await storageSet('notes:lastMargin', String(v));
+  }
 
   async function renderNotesForm(prefill){
     showView('Notes');
     const el = document.getElementById('viewNotes');
     const defaultFontSize = (prefill && prefill.fontSize) || await loadNotesLastFontSize();
+    const defaultMargin = (prefill && prefill.margin!=null) ? prefill.margin : await loadNotesLastMargin();
     el.innerHTML =
       backToReservedBtn() +
       '<div class="panel">' +
         '<h2 class="form-title">Notes</h2>' +
         '<p class="form-sub">Write a note and print it on a 4" wide x 2" high label. A copy of the entry is saved automatically (searchable from Saved Forms) every time "Prepare PDF" is pressed.</p>' +
-        '<div class="field"><label>Font size (pt)</label><input type="number" id="noteFontSize" min="6" max="18" step="0.5" style="max-width:120px;"></div>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Font size (pt)</label><input type="number" id="noteFontSize" min="6" max="18" step="0.5"></div>' +
+          '<div class="field"><label>Margin (in)</label><input type="number" id="noteMargin" min="0" max="0.5" step="0.0625"></div>' +
+        '</div>' +
         '<div class="field"><label>Note</label><textarea id="noteText" rows="6" placeholder="Note text to print on the label…"></textarea></div>' +
         '<div class="btn-row"><button class="btn primary" id="notePrintBtn">Prepare PDF</button></div>' +
       '</div>';
     document.getElementById('noteFontSize').value = defaultFontSize;
+    document.getElementById('noteMargin').value = defaultMargin;
     document.getElementById('noteText').value = (prefill && prefill.text) || '';
 
     document.getElementById('notePrintBtn').onclick = async ()=>{
       const data = {
         fontSize: parseFloat(document.getElementById('noteFontSize').value) || 9,
+        margin: (()=>{ const m = parseFloat(document.getElementById('noteMargin').value); return (isNaN(m) || m<0) ? 0.125 : m; })(),
         text: document.getElementById('noteText').value,
       };
       await saveNotesLastFontSize(data.fontSize);
+      await saveNotesLastMargin(data.margin);
       await saveRecord(buildRecord('notes', 'Notes', '', todayISO(), data.text, data));
       const html = buildNotesLabelHtml(data);
       openPrint(html);
@@ -5770,10 +5792,13 @@
   // 4in x 2in @page here matches the same label size already used for the Pilot Training Card
   // (buildPtrainLabelHtml) -- this inline <style> overrides the site-wide @page{margin:12mm;} for
   // just this printout, since it's injected directly into #printArea ahead of window.print().
+  // The margin is applied as inline padding (overriding .note-label's own padding rule) so the
+  // label's outer size always stays exactly 4in x 2in -- a bigger margin just shrinks the text area.
   function buildNotesLabelHtml(data){
     const fontSize = data.fontSize || 9;
+    const margin = (data.margin!=null && !isNaN(data.margin) && data.margin>=0) ? data.margin : 0.125;
     return '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' +
-      '<div class="note-label">' +
+      '<div class="note-label" style="padding:'+margin+'in;">' +
         '<div class="nl-body" style="font-size:'+fontSize+'pt;">'+escapeHTML(data.text||'')+'</div>' +
       '</div>';
   }
