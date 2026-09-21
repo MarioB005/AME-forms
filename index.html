@@ -262,6 +262,11 @@
   .ptl-head img{height:0.22in;width:auto;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
   .ptl-head h1{font-size:10.7px;margin:0;flex:1;}
   .ptl-head .ptl-id{font-size:9.7px;}
+  /* Quick note / placard label, 4in wide x 2in high -- font size is chosen by the user on the entry
+     form (default 9pt) and applied inline to .nl-body at print time, not fixed here. */
+  .note-label{width:4in;height:2in;box-sizing:border-box;padding:0.14in 0.18in;font-family:Calibri,Tahoma,"Segoe UI",Arial,Helvetica,sans-serif;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;color:#000;background:#fff;display:flex;flex-direction:column;}
+  .note-label .nl-head{display:flex;justify-content:space-between;gap:10px;font-size:9px;font-weight:700;border-bottom:1px solid #000;padding-bottom:3px;margin-bottom:5px;white-space:nowrap;}
+  .note-label .nl-body{flex:1;white-space:pre-wrap;overflow:hidden;line-height:1.28;}
   .ptl-sub{font-size:6.3px;line-height:1.2;margin-bottom:2px;}
   .ptl-tasks{font-size:6.9px;line-height:1.15;border-top:0.3px solid #000;}
   .ptl-tasks div{border-bottom:0.3px solid #000;padding:0.3px 0;}
@@ -356,6 +361,7 @@
   <div id="viewEc135TailRotorBalance" style="display:none;"></div>
   <div id="viewDriveShaftBalance" style="display:none;"></div>
   <div id="viewReserved" style="display:none;"></div>
+  <div id="viewNotes" style="display:none;"></div>
   <div id="viewMpmRevision" style="display:none;"></div>
   <div id="viewMcmRevision" style="display:none;"></div>
   <div id="viewMcmDoc" style="display:none;"></div>
@@ -582,6 +588,7 @@
       case 'ec120tailrotorbalance': return buildEc120TrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'ec135tailrotorbalance': return buildEc135TrbPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
       case 'driveshaftbalance': return buildDriveShaftPrintHtml(Object.assign({}, rec.data, { date: fmtDateNice(rec.data.date) }));
+      case 'notes': return buildNotesLabelHtml(rec.data);
       default: return null;
     }
   }
@@ -600,6 +607,7 @@
       case 'ec120tailrotorbalance': renderEc120TailRotorBalance(rec.data); break;
       case 'ec135tailrotorbalance': renderEc135TailRotorBalance(rec.data); break;
       case 'driveshaftbalance': renderDriveShaftBalance(rec.data); break;
+      case 'notes': renderNotesForm(rec.data); break;
     }
   }
 
@@ -773,7 +781,7 @@
   document.getElementById('lockBtn').onclick = ()=> location.reload();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','DriveShaftBalance','Reserved','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
+  const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','DriveShaftBalance','Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage'];
   function showView(name){
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
@@ -5673,6 +5681,7 @@
           '<button class="home-btn" id="resMpmBtn"><span class="hb-icon">📘</span>MPM Revision</button>' +
           '<button class="home-btn" id="resMcmDocBtn"><span class="hb-icon">📙</span>MCM</button>' +
           '<button class="home-btn" id="resMcmBtn"><span class="hb-icon">📗</span>D.I.R. to MCM</button>' +
+          '<button class="home-btn" id="resNotesBtn"><span class="hb-icon">📝</span>Notes</button>' +
         '</div>' +
         '<div class="btn-row" style="margin-top:14px;"><button type="button" class="btn" id="resLockBtn">🔒 Lock</button></div>' +
       '</div>';
@@ -5680,6 +5689,7 @@
     document.getElementById('resMpmBtn').onclick = ()=> renderMpmRevision();
     document.getElementById('resMcmDocBtn').onclick = ()=> renderMcmDocument();
     document.getElementById('resMcmBtn').onclick = ()=> renderMcmRevision();
+    document.getElementById('resNotesBtn').onclick = ()=> renderNotesForm();
     document.getElementById('resLockBtn').onclick = ptrainLock;
   }
 
@@ -5707,6 +5717,58 @@
         '<iframe src="./manuals/mcm-dir-2024-09-13.pdf" title="MCM Revision PDF" style="width:100%;height:82vh;border:1px solid var(--line);border-radius:8px;margin-top:12px;"></iframe>' +
       '</div>';
     document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
+  }
+
+  // ---------- Notes (quick note printed on a 4in x 2in label) ----------
+  function renderNotesForm(prefill){
+    showView('Notes');
+    const el = document.getElementById('viewNotes');
+    const s = state.settings;
+    el.innerHTML =
+      backToReservedBtn() +
+      '<div class="panel">' +
+        '<h2 class="form-title">Notes</h2>' +
+        '<p class="form-sub">Write a note and print it on a 4" wide x 2" high label. A copy of the entry is saved automatically (searchable from Saved Forms) every time "Prepare PDF" is pressed.</p>' +
+        '<div class="field-grid">' +
+          '<div class="field"><label>Aircraft Reg</label><select id="noteReg">'+opts(s.aircraft, a=>a.reg, a=>a.reg, 'None / general')+'</select></div>' +
+          '<div class="field"><label>Date</label><input type="date" id="noteDate"></div>' +
+          '<div class="field"><label>Font size (pt)</label><input type="number" id="noteFontSize" min="6" max="18" step="0.5" value="9"></div>' +
+        '</div>' +
+        '<div class="field"><label>Note</label><textarea id="noteText" rows="6" placeholder="Note text to print on the label…"></textarea></div>' +
+        '<div class="btn-row"><button class="btn primary" id="notePrintBtn">Prepare PDF</button></div>' +
+      '</div>';
+    document.getElementById('noteReg').value = (prefill && prefill.reg) || '';
+    document.getElementById('noteDate').value = (prefill && prefill.date) || todayISO();
+    document.getElementById('noteFontSize').value = (prefill && prefill.fontSize) || 9;
+    document.getElementById('noteText').value = (prefill && prefill.text) || '';
+
+    document.getElementById('notePrintBtn').onclick = async ()=>{
+      const data = {
+        reg: document.getElementById('noteReg').value,
+        date: document.getElementById('noteDate').value,
+        fontSize: parseFloat(document.getElementById('noteFontSize').value) || 9,
+        text: document.getElementById('noteText').value,
+      };
+      await saveRecord(buildRecord('notes', 'Notes', data.reg, data.date, data.text, data));
+      const html = buildNotesLabelHtml(data);
+      openPrint(html);
+    };
+    document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
+  }
+
+  // 4in x 2in @page here matches the same label size already used for the Pilot Training Card
+  // (buildPtrainLabelHtml) -- this inline <style> overrides the site-wide @page{margin:12mm;} for
+  // just this printout, since it's injected directly into #printArea ahead of window.print().
+  function buildNotesLabelHtml(data){
+    const fontSize = data.fontSize || 9;
+    return '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' +
+      '<div class="note-label">' +
+        '<div class="nl-head">' +
+          '<span>'+escapeHTML(data.reg||'')+'</span>' +
+          '<span>'+escapeHTML(data.date ? (fmtDateNice(data.date)||data.date) : '')+'</span>' +
+        '</div>' +
+        '<div class="nl-body" style="font-size:'+fontSize+'pt;">'+escapeHTML(data.text||'')+'</div>' +
+      '</div>';
   }
 
   // ---------- data layer (Supabase-backed via storageGet/storageSet, same as the rest of the site) ----------
