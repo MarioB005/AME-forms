@@ -5738,30 +5738,35 @@
     notesLastFontSizeCache = v;
     await storageSet('notes:lastFontSize', String(v));
   }
-  // Top/bottom and left/right margins are tracked (and remembered) separately -- a label is
-  // typically wider than it is tall, so the two directions often need different amounts of space.
-  // A legacy record saved before this split only has a single "margin" -- read as both.
-  let notesLastMarginVCache = null, notesLastMarginHCache = null;
-  async function loadNotesLastMargin(axis){ // axis: 'V' (top/bottom) or 'H' (left/right)
-    const cache = axis==='V' ? notesLastMarginVCache : notesLastMarginHCache;
+  // Top/bottom margin and the right margin are tracked (and remembered) separately -- the left
+  // margin is fixed at 0.5in and isn't user-adjustable at all. A legacy record saved before the
+  // margins were split only has a single "margin" (or a left/right pair under "marginH") -- read
+  // as the starting point for the right margin.
+  const NOTES_LEFT_MARGIN = 0.5; // fixed, no UI control
+  let notesLastMarginVCache = null, notesLastMarginRightCache = null;
+  async function loadNotesLastMargin(axis){ // axis: 'V' (top/bottom) or 'Right'
+    const cache = axis==='V' ? notesLastMarginVCache : notesLastMarginRightCache;
     if(cache!=null) return cache;
     let v;
     try{
       const raw = await storageGet('notes:lastMargin'+axis);
       if(raw){ v = parseFloat(raw); }
-      else {
-        // Not set yet under the new per-axis key -- fall back to the old single "margin" value
-        // (if any site ever saved one) so upgrading doesn't reset anyone's preference to 1/8".
-        const legacyRaw = await storageGet('notes:lastMargin');
-        v = legacyRaw ? parseFloat(legacyRaw) : 0.125;
+      else if(axis==='Right'){
+        // Not set yet under the new key -- fall back to the old combined left/right value, then
+        // the even older single "margin" value, so upgrading doesn't reset anyone's preference.
+        const legacyH = await storageGet('notes:lastMarginH');
+        const legacy = legacyH || await storageGet('notes:lastMargin');
+        v = legacy ? parseFloat(legacy) : 0.125;
+      } else {
+        v = 0.125;
       }
     }catch(e){ v = 0.125; }
     if(isNaN(v) || v<0) v = 0.125;
-    if(axis==='V') notesLastMarginVCache = v; else notesLastMarginHCache = v;
+    if(axis==='V') notesLastMarginVCache = v; else notesLastMarginRightCache = v;
     return v;
   }
   async function saveNotesLastMargin(axis, v){
-    if(axis==='V') notesLastMarginVCache = v; else notesLastMarginHCache = v;
+    if(axis==='V') notesLastMarginVCache = v; else notesLastMarginRightCache = v;
     await storageSet('notes:lastMargin'+axis, String(v));
   }
 
@@ -5770,23 +5775,25 @@
     const el = document.getElementById('viewNotes');
     const defaultFontSize = (prefill && prefill.fontSize) || await loadNotesLastFontSize();
     const defaultMarginV = (prefill && (prefill.marginV!=null || prefill.margin!=null)) ? (prefill.marginV!=null ? prefill.marginV : prefill.margin) : await loadNotesLastMargin('V');
-    const defaultMarginH = (prefill && (prefill.marginH!=null || prefill.margin!=null)) ? (prefill.marginH!=null ? prefill.marginH : prefill.margin) : await loadNotesLastMargin('H');
+    const defaultMarginRight = (prefill && (prefill.marginRight!=null || prefill.marginH!=null || prefill.margin!=null))
+      ? (prefill.marginRight!=null ? prefill.marginRight : (prefill.marginH!=null ? prefill.marginH : prefill.margin))
+      : await loadNotesLastMargin('Right');
     el.innerHTML =
       backToReservedBtn() +
       '<div class="panel">' +
         '<h2 class="form-title">Notes</h2>' +
-        '<p class="form-sub">Write a note and print it on a 4" wide x 2" high label. A copy of the entry is saved automatically (searchable from Saved Forms) every time "Prepare PDF" is pressed.</p>' +
+        '<p class="form-sub">Write a note and print it on a 4" wide x 2" high label (left margin is fixed at 0.5"). A copy of the entry is saved automatically (searchable from Saved Forms) every time "Prepare PDF" is pressed.</p>' +
         '<div class="field-grid">' +
           '<div class="field"><label>Font size (pt)</label><input type="number" id="noteFontSize" min="6" max="18" step="0.5"></div>' +
           '<div class="field"><label>Top/bottom margin (in)</label><input type="number" id="noteMarginV" min="0" max="0.5" step="0.0625"></div>' +
-          '<div class="field"><label>Left/right margin (in)</label><input type="number" id="noteMarginH" min="0" max="0.5" step="0.0625"></div>' +
+          '<div class="field"><label>Right margin (in)</label><input type="number" id="noteMarginRight" min="0" max="0.5" step="0.0625"></div>' +
         '</div>' +
         '<div class="field"><label>Note</label><textarea id="noteText" rows="6" placeholder="Note text to print on the label…"></textarea></div>' +
         '<div class="btn-row"><button class="btn primary" id="notePrintBtn">Prepare PDF</button></div>' +
       '</div>';
     document.getElementById('noteFontSize').value = defaultFontSize;
     document.getElementById('noteMarginV').value = defaultMarginV;
-    document.getElementById('noteMarginH').value = defaultMarginH;
+    document.getElementById('noteMarginRight').value = defaultMarginRight;
     document.getElementById('noteText').value = (prefill && prefill.text) || '';
 
     document.getElementById('notePrintBtn').onclick = async ()=>{
@@ -5794,12 +5801,12 @@
       const data = {
         fontSize: parseFloat(document.getElementById('noteFontSize').value) || 9,
         marginV: readMargin('noteMarginV'),
-        marginH: readMargin('noteMarginH'),
+        marginRight: readMargin('noteMarginRight'),
         text: document.getElementById('noteText').value,
       };
       await saveNotesLastFontSize(data.fontSize);
       await saveNotesLastMargin('V', data.marginV);
-      await saveNotesLastMargin('H', data.marginH);
+      await saveNotesLastMargin('Right', data.marginRight);
       await saveRecord(buildRecord('notes', 'Notes', '', todayISO(), data.text, data));
       const html = buildNotesLabelHtml(data);
       openPrint(html);
@@ -5812,14 +5819,18 @@
   // just this printout, since it's injected directly into #printArea ahead of window.print().
   // The margins are applied as inline padding (overriding .note-label's own padding rule) so the
   // label's outer size always stays exactly 4in x 2in -- a bigger margin just shrinks the text area.
-  // data.margin (no V/H) is read as a fallback for records saved before the top/bottom vs left/right split.
+  // Left is always the fixed NOTES_LEFT_MARGIN; data.marginH/data.margin are read as fallbacks for
+  // the right margin on records saved before the left/right split.
   function buildNotesLabelHtml(data){
     const fontSize = data.fontSize || 9;
-    const fallback = (data.margin!=null && !isNaN(data.margin) && data.margin>=0) ? data.margin : 0.125;
-    const marginV = (data.marginV!=null && !isNaN(data.marginV) && data.marginV>=0) ? data.marginV : fallback;
-    const marginH = (data.marginH!=null && !isNaN(data.marginH) && data.marginH>=0) ? data.marginH : fallback;
+    const marginV = (data.marginV!=null && !isNaN(data.marginV) && data.marginV>=0) ? data.marginV : 0.125;
+    const marginRight = (data.marginRight!=null && !isNaN(data.marginRight) && data.marginRight>=0) ? data.marginRight
+      : (data.marginH!=null && !isNaN(data.marginH) && data.marginH>=0) ? data.marginH
+      : (data.margin!=null && !isNaN(data.margin) && data.margin>=0) ? data.margin
+      : 0.125;
+    // CSS padding shorthand order is top, right, bottom, left.
     return '<style>@page{size:4in 2in;margin:0;} @media print{ body{margin:0;} }</style>' +
-      '<div class="note-label" style="padding:'+marginV+'in '+marginH+'in;">' +
+      '<div class="note-label" style="padding:'+marginV+'in '+marginRight+'in '+marginV+'in '+NOTES_LEFT_MARGIN+'in;">' +
         '<div class="nl-body" style="font-size:'+fontSize+'pt;">'+escapeHTML(data.text||'')+'</div>' +
       '</div>';
   }
