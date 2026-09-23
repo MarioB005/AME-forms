@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool &amp; Calibration Tracker</title>
+<style>
+  :root{
+    --ink:#1c2b24;
+    --paper:#fbfaf6;
+    --panel:#ffffff;
+    --line:#dfe2da;
+    --accent:#c05a2c;
+    --grey-strong:#6b6558;
+    --radius:10px;
+    --good:#2f7d4f;
+    --good-bg:#e6f2ea;
+    --warn:#b3791b;
+    --warn-bg:#faf1de;
+    --bad:#b0281e;
+    --bad-bg:#fbe9e7;
+    --hold:#5a4aa8;
+    --hold-bg:#ece9f8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-size:14px;}
+  #app{max-width:1180px;margin:0 auto;padding:18px 20px 60px;}
+
+  h1.tt-title{margin:0 0 2px;font-size:20px;}
+  p.tt-sub{margin:0 0 16px;color:var(--grey-strong);font-size:12.5px;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px;}
+
+  .btn{
+    padding:9px 15px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+    cursor:pointer;font-size:13px;color:var(--ink);font-weight:600;
+  }
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .btn.danger{color:#b0281e;}
+  .btn.tiny{padding:3px 8px;font-size:11px;}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .tt-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .tt-tabs{display:flex;gap:6px;flex-wrap:wrap;}
+  .tt-tab{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:12.5px;font-weight:700;color:var(--grey-strong);}
+  .tt-tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .tt-tab .cnt{opacity:.75;font-weight:600;margin-left:3px;}
+
+  .tt-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .tt-controls input[type="search"]{padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;min-width:190px;}
+  .tt-controls select{padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;background:var(--panel);color:var(--ink);}
+
+  .tt-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .tt-stat{flex:1;min-width:110px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;}
+  .tt-stat .n{font-size:22px;font-weight:800;line-height:1.1;}
+  .tt-stat .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);font-weight:700;margin-top:2px;}
+  .tt-stat.bad .n{color:var(--bad);}
+  .tt-stat.warn .n{color:var(--warn);}
+  .tt-stat.hold .n{color:var(--hold);}
+
+  .tt-group{margin-bottom:20px;}
+  .tt-group-head{font-weight:800;font-size:13.5px;text-transform:uppercase;letter-spacing:.3px;padding-bottom:6px;border-bottom:2px solid var(--ink);margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;}
+  .tt-group-head .cnt{color:var(--grey-strong);font-weight:600;text-transform:none;font-size:11.5px;}
+
+  .tt-card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;}
+  .tt-card.ok{border-left-color:var(--good);}
+  .tt-card.warn{border-left-color:var(--warn);}
+  .tt-card.bad{border-left-color:var(--bad);}
+  .tt-card.holding{border-left-color:var(--hold);background:var(--hold-bg);}
+  .tt-card.nolimit{border-left-color:var(--line);}
+  .tt-card.notinstalled{opacity:.6;}
+  .tt-card-main{flex:1;min-width:220px;}
+  .tt-card-name{font-weight:800;font-size:14px;}
+  .tt-card-tag{display:inline-block;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:middle;}
+  .tt-card-meta{font-size:11.5px;color:var(--grey-strong);margin-top:3px;line-height:1.5;}
+  .tt-card-notes{font-size:11.5px;color:var(--ink);margin-top:4px;font-style:italic;}
+  .tt-card-due{min-width:170px;text-align:right;}
+  .tt-card-due .due-date{font-weight:800;font-size:13.5px;}
+  .tt-card-due .due-status{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.2px;}
+  .tt-card-due.ok .due-date, .tt-card-due.ok .due-status{color:var(--good);}
+  .tt-card-due.warn .due-date, .tt-card-due.warn .due-status{color:var(--warn);}
+  .tt-card-due.bad .due-date, .tt-card-due.bad .due-status{color:var(--bad);}
+  .tt-card-due.holding .due-date, .tt-card-due.holding .due-status{color:var(--hold);}
+  .tt-card-due.nolimit .due-date, .tt-card-due.nolimit .due-status{color:var(--grey-strong);}
+  .tt-card-atts{display:flex;gap:4px;margin-top:4px;font-size:11px;color:var(--grey-strong);}
+  .tt-card-actions{display:flex;flex-direction:column;gap:5px;width:100%;align-items:flex-end;margin-top:4px;}
+  @media (min-width:640px){ .tt-card-actions{width:auto;} }
+
+  .tt-empty{color:var(--grey-strong);font-size:13px;padding:20px 0;text-align:center;}
+
+  /* ---------- WinAir-style component grid + Calendar Items panel ---------- */
+  .wa-check{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--grey-strong);font-weight:600;white-space:nowrap;}
+  .wa-check input{width:15px;height:15px;}
+
+  .wa-table-wrap{border:1px solid var(--line);border-radius:8px;overflow-x:auto;margin-bottom:6px;background:var(--panel);}
+  table.wa-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:920px;}
+  table.wa-table thead th{background:#fbf3d6;border-bottom:1px solid #e3d69a;text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:#7a6a2e;white-space:nowrap;position:sticky;top:0;}
+  table.wa-table tbody tr.item-row{border-bottom:1px solid var(--line);cursor:pointer;}
+  table.wa-table tbody tr.item-row:hover{background:#f4f8fb;}
+  table.wa-table tbody tr.item-row.notinstalled{opacity:.55;}
+  table.wa-table tbody tr.item-row.holding{background:var(--hold-bg);}
+  table.wa-table td{padding:7px 10px;vertical-align:middle;}
+  table.wa-table tr.grp-row td{background:#eef1ea;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink);}
+  table.wa-table td.nm{font-weight:700;white-space:nowrap;}
+  table.wa-table td.nm span{white-space:nowrap;}
+  table.wa-table td.num{white-space:nowrap;}
+  table.wa-table td.due-cell{font-weight:800;white-space:nowrap;}
+  table.wa-table td.due-cell.ok{color:var(--good);}
+  table.wa-table td.due-cell.warn{color:var(--warn);}
+  table.wa-table td.due-cell.bad{color:var(--bad);}
+  table.wa-table td.due-cell.holding{color:var(--hold);}
+  table.wa-table td.due-cell.nolimit{color:var(--grey-strong);font-weight:600;}
+  table.wa-table td.act-cell{white-space:nowrap;text-align:right;}
+  table.wa-table .row-icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:5px;cursor:pointer;font-size:12px;line-height:1;padding:4px 6px;margin-left:3px;}
+  table.wa-table .row-icon-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .status-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0;}
+  .status-dot.ok{background:var(--good);}
+  .status-dot.warn{background:var(--warn);}
+  .status-dot.bad{background:var(--bad);}
+  .status-dot.holding{background:var(--hold);}
+  .status-dot.nolimit{background:#a9b0a5;}
+  .wa-footer-count{font-size:11px;color:var(--grey-strong);padding:6px 4px 16px;text-align:right;}
+
+  .wa-banner{background:#123a5e;color:#fff;font-weight:800;text-align:center;padding:8px 12px;font-size:12.5px;letter-spacing:.6px;text-transform:uppercase;border-radius:8px 8px 0 0;margin-top:18px;}
+  .wa-panel{border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;background:var(--panel);padding:0 0 14px;margin-bottom:16px;}
+  .wa-cal-grid{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);}
+  .wa-cal-cell{padding:12px 14px;border-right:1px solid var(--line);}
+  .wa-cal-cell:last-child{border-right:none;}
+  .wa-cal-cell label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);margin-bottom:6px;}
+  .wa-cal-cell input{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:var(--panel);color:var(--ink);font-family:inherit;}
+  .wa-cal-caption{font-size:9.5px;color:var(--grey-strong);margin-top:4px;}
+  .wa-cal-caption.req{color:var(--bad);font-weight:700;}
+  .wa-flags-row{display:flex;gap:22px;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--paper);font-size:12.5px;}
+  .wa-flags-row label{display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;}
+  .wa-flags-row input{width:15px;height:15px;}
+  @media (max-width:640px){
+    .wa-cal-grid{grid-template-columns:repeat(2,1fr);}
+    .wa-cal-cell:nth-child(2){border-right:none;}
+  }
+
+  /* modal */
+  .tt-modal-backdrop{position:fixed;inset:0;background:rgba(20,25,20,.45);z-index:200;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 14px;}
+  .tt-modal{background:var(--panel);border-radius:12px;max-width:720px;width:100%;padding:22px 24px 24px;}
+  .tt-modal h2{margin:0 0 2px;font-size:18px;}
+  .tt-modal .sub{margin:0 0 16px;color:var(--grey-strong);font-size:12px;}
+  .tt-modal-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--grey-strong);line-height:1;}
+
+  .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 16px;margin-bottom:14px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11px;color:var(--grey-strong);font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+  .field input, .field select, .field textarea{
+    padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-size:13.5px;background:var(--panel);color:var(--ink);
+    font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:56px;}
+  .field.span2{grid-column:span 2;}
+  .field.checkline{flex-direction:row;align-items:center;gap:8px;padding-top:18px;}
+  .field.checkline label{text-transform:none;font-size:13px;font-weight:600;order:2;}
+  .field.checkline input{width:16px;height:16px;order:1;}
+
+  .tt-att-block{margin-bottom:14px;}
+  .tt-att-block > label{font-size:11px;color:var(--grey-strong);font-weight:700;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:6px;}
+  .tt-att-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+  .tt-att-thumb{position:relative;width:74px;}
+  .tt-att-thumb img{width:74px;height:74px;object-fit:cover;border:1px solid var(--line);border-radius:7px;display:block;}
+  .tt-att-thumb .file-chip{width:74px;height:74px;border:1px solid var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--paper);}
+  .tt-att-thumb .fn{font-size:9.5px;color:var(--grey-strong);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+  .tt-att-thumb .rm{position:absolute;top:-6px;right:-6px;background:#b0281e;color:#fff;border:none;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer;}
+
+  .tt-modal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:10px;}
+
+  .tt-holding-note{background:var(--hold-bg);color:var(--hold);border:1px solid #cfc6ea;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px;}
+
+  .tt-report-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .tt-report-table th{text-align:left;padding:6px 8px;color:var(--grey-strong);font-size:10.5px;text-transform:uppercase;border-bottom:2px solid var(--ink);}
+  .tt-report-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .tt-report-table tr.grp td{background:var(--paper);font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding-top:12px;}
+
+  #printArea{display:none;}
+  @page{margin:12mm;}
+  @media print{
+    body > *:not(#printArea){display:none !important;}
+    #printArea{display:block !important;}
+  }
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1c2b24;padding-bottom:10px;margin-bottom:14px;}
+  .pr-head h1{margin:0;font-size:18px;}
+  .pr-head .meta{font-size:11px;color:#555;text-align:right;}
+  .pr-status-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;}
+
+  @media (max-width:600px){
+    .tt-card{flex-direction:column;}
+    .tt-card-due{text-align:left;}
+    .tt-card-actions{align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1 class="tt-title">Tool &amp; Calibration Tracker</h1>
+  <p class="tt-sub">Tool crib, calibrated equipment, and recurring checks — tracked by due date. Phoenix Heli-Flight.</p>
+
+  <div id="ttSummary"></div>
+
+  <div class="tt-toolbar">
+    <div class="tt-tabs" id="ttTabs"></div>
+    <div class="tt-controls">
+      <input type="search" id="ttSearch" placeholder="Search name, serial, tracking #...">
+      <select id="ttSortMode">
+        <option value="group">Grouped by category</option>
+        <option value="due">Flat — by time limit / due date</option>
+      </select>
+      <select id="ttCategoryFilter"><option value="">All categories</option></select>
+      <label class="wa-check"><input type="checkbox" id="ttInstalledOnly"> Show installed item(s) only</label>
+      <button class="btn primary" id="ttAddBtn">+ Add Item</button>
+      <button class="btn" id="ttReportBtn">Auditor Report</button>
+    </div>
+  </div>
+
+  <div id="ttSyncNote" style="display:none;" class="tt-holding-note"></div>
+
+  <div id="ttListArea"></div>
+</div>
+
+<div id="ttModalRoot"></div>
+<div id="printArea"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ---------- storage: same Supabase project/table as the main AME Forms app, own key prefix ----------
+  const SUPABASE_URL = 'https://frlehxadkvgwzyxovwua.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_ioAPLi8DWuC0HCUUYEeQ3Q_dildZYKI';
+  const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
+  const DATA_KEY = 'tooltracker:items:v1';
+
+  window.__storageLastError = null;
+
+  async function storageGet(key){
+    if(SUPABASE_CONFIGURED){
+      try{
+        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?key=eq.' + encodeURIComponent(key) + '&select=value', {
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }
+        });
+        if(res.ok){
+          const rows = await res.json();
+          if(rows && rows.length){
+            try{ localStorage.setItem('cache:'+key, rows[0].value); }catch(e){}
+            return rows[0].value;
+          }
+        } else {
+          window.__storageLastError = 'GET ' + key + ': HTTP ' + res.status;
+        }
+      }catch(e){ window.__storageLastError = 'GET ' + key + ': ' + e; }
+    }
+    try{ return localStorage.getItem('cache:'+key); }catch(e){ return null; }
+  }
+
+  let __storageWriteQueue = Promise.resolve();
+  async function storageSet(key, value){
+    try{ localStorage.setItem('cache:'+key, value); }catch(e){}
+    if(!SUPABASE_CONFIGURED) return true;
+    let ok = true;
+    const doWrite = async ()=>{
+      try{
+        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?on_conflict=key', {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify({ key: key, value: value })
+        });
+        if(!res.ok){
+          ok = false;
+          let detail = '';
+          try{ detail = await res.text(); }catch(e2){}
+          window.__storageLastError = 'PUT ' + key + ': HTTP ' + res.status + (detail?(' — '+detail.slice(0,300)):'');
+          console.error('storageSet failed', key, res.status, detail);
+        }
+      }catch(e){
+        ok = false;
+        window.__storageLastError = 'PUT ' + key + ': ' + e;
+        console.error('storageSet failed', key, e);
+      }
+    };
+    __storageWriteQueue = __storageWriteQueue.then(doWrite, doWrite);
+    await __storageWriteQueue;
+    return ok;
+  }
+
+  // ---------- utils ----------
+  function escapeHTML(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function todayISO(){
+    const d = new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function fmtDateNice(iso){
+    if(!iso) return '—';
+    const [y,m,d] = iso.split('-').map(Number);
+    if(!y) return '—';
+    const dt = new Date(y, m-1, d);
+    return dt.toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'});
+  }
+  function addMonths(iso, months){
+    const [y,m,d] = iso.split('-').map(Number);
+    const totalM = (y*12 + (m-1)) + Math.round(months);
+    const ny = Math.floor(totalM/12), nm = totalM%12;
+    const dt = new Date(Date.UTC(ny, nm, 1));
+    const lastDay = new Date(Date.UTC(ny, nm+1, 0)).getUTCDate();
+    dt.setUTCDate(Math.min(d, lastDay));
+    return dt.toISOString().slice(0,10);
+  }
+  function uid(){ return 'itm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
+
+  function computeDue(item){
+    if(item.manualNextDue) return item.manualNextDue;
+    if(item.lastPerformed && item.limitMonths) return addMonths(item.lastPerformed, item.limitMonths);
+    return null;
+  }
+  function dueInfo(item){
+    if(item.holding && item.holding.active){
+      return {status:'holding', cls:'holding', label:'In Holding', due:computeDue(item), days:null};
+    }
+    const due = computeDue(item);
+    if(!due){
+      return {status:'nolimit', cls:'nolimit', label:item.limitMonths?'No last-performed date':'No limit', due:null, days:null};
+    }
+    const dueDate = new Date(due+'T00:00:00');
+    const today = new Date(); today.setHours(0,0,0,0);
+    const days = Math.round((dueDate - today)/86400000);
+    const warnDays = (item.warningDays==null) ? 30 : item.warningDays;
+    if(days < 0) return {status:'overdue', cls:'bad', label:'Overdue', due, days};
+    if(days <= warnDays) return {status:'soon', cls:'warn', label:'Due Soon', due, days};
+    return {status:'ok', cls:'ok', label:'OK', due, days};
+  }
+
+  const CATEGORY_ORDER = [
+    'Tool Crib Checks',
+    'Torque Wrenches',
+    'Pressure Gauges',
+    'Fuel Tank Cabinet / Filters',
+    'Test & Measurement Equipment',
+    'Servo Controls',
+    'Diagnostic & Balance Equipment',
+    'Ground Support Equipment',
+    '100 Hour Kits',
+    'Quarantine'
+  ];
+  const ACTION_OPTIONS = ['Calibration','Check','Inspection','Expiry Check','Servicing','Replacement','Retirement','Other'];
+
+  function sortedCategories(items){
+    const present = Array.from(new Set(items.map(i=>i.category||'Uncategorized')));
+    const known = CATEGORY_ORDER.filter(c=>present.includes(c));
+    const extra = present.filter(c=>!CATEGORY_ORDER.includes(c)).sort((a,b)=>a.localeCompare(b));
+    return known.concat(extra);
+  }
+
+  function sortItemsByDue(items){
+    return items.slice().sort((a,b)=>{
+      const am = (a.limitMonths==null) ? Infinity : a.limitMonths;
+      const bm = (b.limitMonths==null) ? Infinity : b.limitMonths;
+      if(am !== bm) return am - bm;
+      const ad = computeDue(a), bd = computeDue(b);
+      if(ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+      if(ad && !bd) return -1;
+      if(!ad && bd) return 1;
+      return (a.name||'').localeCompare(b.name||'');
+    });
+  }
+
+  // ---------- state ----------
+  const SEED_ITEMS = [{"name": "Abuzar Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-01", "manualNextDue": null, "id": "seed-1", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Bin Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-01", "manualNextDue": null, "id": "seed-2", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Eiji Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-01", "manualNextDue": null, "id": "seed-3", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Mario F.", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-08", "manualNextDue": "2026-09-30", "id": "seed-4", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Randy Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": "2026-08-25", "manualNextDue": "2026-09-30", "id": "seed-5", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Rich Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": "2026-09-13", "manualNextDue": "2026-10-18", "id": "seed-6", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Mobile Tank #2", "category": "Fuel Tank Cabinet / Filters", "action": "Retirement", "makeModel": "243286", "partNo": "PLT1.00X50MXM", "serialNo": "", "trackingNo": "14978", "installed": true, "limitMonths": 120.0, "lastPerformed": "2022-01-11", "manualNextDue": "2026-06-08", "id": "seed-7", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Mobile Tank Filters (On wheels) (#1)", "category": "Fuel Tank Cabinet / Filters", "action": "Retirement", "makeModel": "243286", "partNo": "PLT1.00X50MXM", "serialNo": "", "trackingNo": "14978", "installed": true, "limitMonths": 10.0, "lastPerformed": "2022-05-18", "manualNextDue": "2026-06-08", "id": "seed-8", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "100 hour Kit (#1)", "category": "100 Hour Kits", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-06", "manualNextDue": null, "id": "seed-9", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "100 hour Kit (#2)", "category": "100 Hour Kits", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-06", "manualNextDue": null, "id": "seed-10", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Main Fuel Tank Cabinet Filters (East Side)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001850067", "trackingNo": "14017", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-06-18", "manualNextDue": "2026-06-30", "id": "seed-11", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Main Fuel Tank Cabinet Filters (West Side)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "", "partNo": "OS-51288", "serialNo": "", "trackingNo": "9353", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-10-27", "manualNextDue": "2026-10-31", "id": "seed-12", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "New Heli-Towcart", "category": "Ground Support Equipment", "action": "Inspection", "makeModel": "", "partNo": "V950", "serialNo": "01", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-07-29", "manualNextDue": null, "id": "seed-13", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "OVERHEAD CRANE", "category": "Ground Support Equipment", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-08-12", "manualNextDue": null, "id": "seed-14", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pitot Static tester", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "1811F-E", "serialNo": "B6309", "trackingNo": "13136", "installed": true, "limitMonths": null, "lastPerformed": "2023-03-29", "manualNextDue": null, "id": "seed-15", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Red Mobile Fuel Tank Filters (#2)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001850067", "trackingNo": "14017", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-03-31", "manualNextDue": "2026-04-16", "id": "seed-16", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Red Mobile Fuel Tank Filters (#3)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001725670", "trackingNo": "13459", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-06-01", "manualNextDue": null, "id": "seed-17", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Red Mobile Fuel Tank Filters (On wheels) (#1)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001850067", "trackingNo": "14017", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-10-20", "manualNextDue": null, "id": "seed-18", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-07-01", "manualNextDue": null, "id": "seed-19", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-06", "manualNextDue": null, "id": "seed-20", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "AIRCRAFT WEIGH KIT", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "Evergreen / JP5000-3", "partNo": "EW9150", "serialNo": "150300135", "trackingNo": "16933", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-04-06", "manualNextDue": "2028-03-24", "id": "seed-21", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Amprobe", "category": "Test & Measurement Equipment", "action": "Check", "makeModel": "", "partNo": "ACDC-52NAV", "serialNo": "14080569", "trackingNo": "11471", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-07-28", "manualNextDue": "2027-07-16", "id": "seed-22", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Caliper", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "CD-6\"ASX", "serialNo": "A22304112", "trackingNo": "16274", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-01-29", "manualNextDue": null, "id": "seed-23", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Force Gauge", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "0777518", "serialNo": "PHF-400", "trackingNo": "17159", "installed": true, "limitMonths": 24.0, "lastPerformed": "2024-06-03", "manualNextDue": "2026-06-03", "id": "seed-24", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "MULTIMETER", "category": "Test & Measurement Equipment", "action": "Check", "makeModel": "ITM / 1587", "partNo": "1587", "serialNo": "10970012", "trackingNo": "4411", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-03-06", "manualNextDue": "2027-03-03", "id": "seed-25", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pressure Gauge (0 to 15 PSI) (Float inflation hose)", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "9424555", "serialNo": "9424555", "trackingNo": "17029", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-07-15", "manualNextDue": null, "id": "seed-26", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pressure Gauge (0 to 200 PSI) (Hydraulic ram (EC135))", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "9424784", "serialNo": "", "trackingNo": "18032", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-06-25", "manualNextDue": null, "id": "seed-27", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pressure Gauge (0 to 3000 PSI) (Hydraulic ram (EC135))", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "9424865", "serialNo": "", "trackingNo": "18033", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-06-25", "manualNextDue": null, "id": "seed-28", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "PRESSURE GAUGE (DIGITAL ON BARFEILD)", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "304-00007", "serialNo": "7116102006", "trackingNo": "8121", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-02-24", "manualNextDue": null, "id": "seed-29", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "SNAP ON / 1/2' DRIVE", "partNo": "TQFR250E", "serialNo": "0606201050", "trackingNo": "5167", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-01-09", "manualNextDue": null, "id": "seed-30", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "3-15 INCH LBS / SCREWDRIVER TYPE", "partNo": "QDRIVER3", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 24.0, "lastPerformed": null, "manualNextDue": "2026-09-02", "id": "seed-31", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "", "partNo": "TSM16-88", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 18.0, "lastPerformed": null, "manualNextDue": "2026-09-23", "id": "seed-32", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "5-75 FT LBS / 3/8 DRIVE", "partNo": "QJFR275E", "serialNo": "10950107670", "trackingNo": "3440", "installed": true, "limitMonths": 24.0, "lastPerformed": "2023-09-13", "manualNextDue": "2027-09-30", "id": "seed-33", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Torque Wrench", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "", "partNo": "39WE18", "serialNo": "3101002937", "trackingNo": "16478", "installed": true, "limitMonths": 18.0, "lastPerformed": "2026-01-29", "manualNextDue": null, "id": "seed-34", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "SNAP ON / 5-100 FT-LB", "partNo": "ATECH2FR100A", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 24.0, "lastPerformed": null, "manualNextDue": "2026-09-02", "id": "seed-35", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "10-50 INCH LBS / SHOP TOOL", "partNo": "QD1R50", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-09-24", "manualNextDue": null, "id": "seed-36", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "SNAP ON / 1/4 DRIVE", "partNo": "QD1R200", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 18.0, "lastPerformed": null, "manualNextDue": "2026-09-02", "id": "seed-37", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Vaciuum Gauge (For FDC filter pump)", "category": "Test & Measurement Equipment", "action": "Replacement", "makeModel": "", "partNo": "9425586", "serialNo": "9425586", "trackingNo": "17030", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-06-09", "manualNextDue": null, "id": "seed-38", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "WEIGHT SCALE (DIGITAL)", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "EB6", "serialNo": "8033325462", "trackingNo": "11192", "installed": true, "limitMonths": null, "lastPerformed": "2016-06-22", "manualNextDue": null, "id": "seed-39", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Inventory quarantine", "category": "Quarantine", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 3.0, "lastPerformed": "2026-07-02", "manualNextDue": null, "id": "seed-40", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Gaug Block", "category": "Test & Measurement Equipment", "action": "Retirement", "makeModel": "Standard DIN 861", "partNo": "181281", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 120.0, "lastPerformed": "2019-01-16", "manualNextDue": null, "id": "seed-41", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-42", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-43", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Hangar floor)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-44", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Hangar floor)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-45", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Hangar floor)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-46", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Stores)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-47", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "EC135 Dolly", "category": "Ground Support Equipment", "action": "Servicing", "makeModel": "", "partNo": "PHF135CART", "serialNo": "PHF1234", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-11-02", "manualNextDue": null, "id": "seed-48", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "8500C BALANCE ANALYZER KIT", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "CHADWICK HELMUTH / 8500C", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-49", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "ARRIUS 1A BORESCOPE TOOLS/ GUIDES", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "NA / NA", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-50", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "BORESCOPE INSPECTION KIT", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "NA / NA", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-51", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "IGNITOR TOOL", "category": "Diagnostic & Balance Equipment", "action": "Check", "makeModel": "HELIPRODUCTS / ARRIEL SERIES", "partNo": "8812331000", "serialNo": "NA", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-52", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Diagnostic & Balance Equipment", "action": "Check", "makeModel": "SMARTTOOL", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-53", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "SLIDE HAMMER/ PULLER KIT", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "OTC / NA", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-54", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "VXP BALANCE ANALYZER", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "CHADWICK HELMUTH / VXP", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-55", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}];
+
+  let ITEMS = [];
+  let VIEW_TAB = 'active'; // active | holding
+  let SORT_MODE = 'group'; // group | due
+  let SEARCH_Q = '';
+  let CATEGORY_FILTER = '';
+  let INSTALLED_ONLY = false;
+  let SAVING = false;
+
+  async function loadData(){
+    const raw = await storageGet(DATA_KEY);
+    if(raw){
+      try{
+        ITEMS = JSON.parse(raw);
+        return;
+      }catch(e){ console.error('bad stored data, falling back to seed', e); }
+    }
+    // first run — seed from the parsed tool crib list, then persist immediately
+    ITEMS = JSON.parse(JSON.stringify(SEED_ITEMS));
+    await persist();
+  }
+  async function persist(){
+    SAVING = true;
+    renderSyncNote();
+    const ok = await storageSet(DATA_KEY, JSON.stringify(ITEMS));
+    SAVING = false;
+    if(!ok){
+      const note = document.getElementById('ttSyncNote');
+      note.style.display = 'block';
+      note.textContent = "Couldn't sync to the cloud just now (saved locally on this device). " + (window.__storageLastError||'');
+    } else {
+      renderSyncNote();
+    }
+  }
+  function renderSyncNote(){
+    const note = document.getElementById('ttSyncNote');
+    if(SAVING){ note.style.display='block'; note.textContent = 'Saving…'; }
+    else if(note.textContent === 'Saving…'){ note.style.display='none'; }
+  }
+
+  // ---------- rendering ----------
+  function matchesSearch(item, q){
+    if(!q) return true;
+    q = q.toLowerCase();
+    return [item.name, item.makeModel, item.partNo, item.serialNo, item.trackingNo, item.category, item.notes]
+      .some(v => v && String(v).toLowerCase().includes(q));
+  }
+
+  function renderAll(){
+    renderSummary();
+    renderTabs();
+    renderCategoryFilter();
+    renderList();
+  }
+
+  function renderSummary(){
+    const active = ITEMS.filter(i=>!(i.holding && i.holding.active));
+    let overdue=0, soon=0, holding=0;
+    ITEMS.forEach(i=>{
+      const di = dueInfo(i);
+      if(di.status==='overdue') overdue++;
+      else if(di.status==='soon') soon++;
+      else if(di.status==='holding') holding++;
+    });
+    document.getElementById('ttSummary').innerHTML =
+      '<div class="tt-summary">' +
+        '<div class="tt-stat"><div class="n">'+ITEMS.length+'</div><div class="l">Total Items</div></div>' +
+        '<div class="tt-stat bad"><div class="n">'+overdue+'</div><div class="l">Overdue</div></div>' +
+        '<div class="tt-stat warn"><div class="n">'+soon+'</div><div class="l">Due Within 30 Days</div></div>' +
+        '<div class="tt-stat hold"><div class="n">'+holding+'</div><div class="l">In Holding</div></div>' +
+      '</div>';
+  }
+
+  function renderTabs(){
+    const activeCount = ITEMS.filter(i=>!(i.holding && i.holding.active)).length;
+    const holdCount = ITEMS.filter(i=>i.holding && i.holding.active).length;
+    document.getElementById('ttTabs').innerHTML =
+      '<button class="tt-tab '+(VIEW_TAB==='active'?'active':'')+'" data-tab="active">Active <span class="cnt">'+activeCount+'</span></button>' +
+      '<button class="tt-tab '+(VIEW_TAB==='holding'?'active':'')+'" data-tab="holding">Holding <span class="cnt">'+holdCount+'</span></button>';
+    document.getElementById('ttTabs').querySelectorAll('.tt-tab').forEach(btn=>{
+      btn.onclick = ()=>{ VIEW_TAB = btn.dataset.tab; renderAll(); };
+    });
+  }
+
+  function renderCategoryFilter(){
+    const sel = document.getElementById('ttCategoryFilter');
+    const cats = sortedCategories(ITEMS);
+    const cur = CATEGORY_FILTER;
+    sel.innerHTML = '<option value="">All categories</option>' + cats.map(c=>'<option value="'+escapeHTML(c)+'"'+(c===cur?' selected':'')+'>'+escapeHTML(c)+'</option>').join('');
+  }
+
+  function attIconStr(item){
+    const p = (item.photoAttachments||[]).length, c = (item.calReportAttachments||[]).length;
+    let parts = [];
+    if(p) parts.push('📷'+p);
+    if(c) parts.push('📄'+c);
+    return parts.join(' ');
+  }
+
+  function dueCellContent(item, di){
+    if(di.status==='holding'){
+      return item.holding && item.holding.sentDate ? ('Since ' + fmtDateNice(item.holding.sentDate)) : 'In Holding';
+    }
+    if(di.status==='nolimit') return di.label;
+    const daysStr = di.status==='overdue' ? (Math.abs(di.days)+'d overdue') : ('in '+di.days+'d');
+    return fmtDateNice(di.due) + ' <span style="font-weight:600;font-size:10.5px;">('+daysStr+')</span>';
+  }
+
+  function renderRowActions(item, di){
+    let html = '<button type="button" class="row-icon-btn" title="Edit" data-act="edit" data-id="'+item.id+'">✏️</button>';
+    if(di.status==='holding'){
+      html += '<button type="button" class="row-icon-btn primary" title="Complete / Return" data-act="complete-holding" data-id="'+item.id+'">✅</button>';
+    } else {
+      html += '<button type="button" class="row-icon-btn" title="Send to Holding" data-act="send-holding" data-id="'+item.id+'">📦</button>';
+    }
+    html += '<button type="button" class="row-icon-btn" title="Delete" data-act="delete" data-id="'+item.id+'">🗑️</button>';
+    return html;
+  }
+
+  function renderItemRow(item, opts){
+    opts = opts || {};
+    const di = dueInfo(item);
+    const notInstalledCls = item.installed ? '' : ' notinstalled';
+    const holdingCls = di.status==='holding' ? ' holding' : '';
+    const nameCell =
+      '<span class="status-dot '+di.cls+'"></span>' +
+      '<span>'+escapeHTML(item.name)+'</span>' +
+      (item.notes ? ' <span title="'+escapeHTML(item.notes)+'" style="cursor:help;">📝</span>' : '') +
+      (!item.installed ? ' <span style="font-size:9.5px;font-weight:800;color:var(--grey-strong);">(NOT INSTALLED)</span>' : '');
+
+    if(opts.holdingMode){
+      return (
+        '<tr class="item-row'+holdingCls+'" data-id="'+item.id+'">' +
+          '<td class="nm">'+nameCell+'</td>' +
+          '<td>'+escapeHTML(item.category||'')+'</td>' +
+          '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+          '<td class="num">'+escapeHTML(item.serialNo||item.trackingNo||'')+'</td>' +
+          '<td class="num">'+(item.holding&&item.holding.sentDate?fmtDateNice(item.holding.sentDate):'—')+'</td>' +
+          '<td>'+escapeHTML((item.holding&&item.holding.note)||'')+'</td>' +
+          '<td class="num">'+attIconStr(item)+'</td>' +
+          '<td class="act-cell">'+renderRowActions(item, di)+'</td>' +
+        '</tr>'
+      );
+    }
+
+    return (
+      '<tr class="item-row'+notInstalledCls+holdingCls+'" data-id="'+item.id+'">' +
+        '<td class="nm">'+nameCell+'</td>' +
+        '<td>'+escapeHTML(item.action||'')+'</td>' +
+        '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+        '<td class="num">'+escapeHTML(item.partNo||'')+'</td>' +
+        '<td class="num">'+escapeHTML(item.serialNo||'')+'</td>' +
+        '<td class="num">'+escapeHTML(item.trackingNo||'')+'</td>' +
+        '<td class="num">'+(item.limitMonths?item.limitMonths+' mo':'No limit')+'</td>' +
+        '<td class="num">'+fmtDateNice(item.lastPerformed)+'</td>' +
+        '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>' +
+        '<td class="num">'+attIconStr(item)+'</td>' +
+        '<td class="act-cell">'+renderRowActions(item, di)+'</td>' +
+      '</tr>'
+    );
+  }
+
+  const ACTIVE_HEAD = '<tr><th>Name</th><th>Action</th><th>Make / Model</th><th>Part No.</th><th>Serial No.</th><th>Tracking No.</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>';
+  const HOLDING_HEAD = '<tr><th>Name</th><th>Category</th><th>Make / Model</th><th>Serial / Tracking</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>';
+
+  function renderList(){
+    const area = document.getElementById('ttListArea');
+    let pool = ITEMS.filter(i => VIEW_TAB==='holding' ? (i.holding && i.holding.active) : !(i.holding && i.holding.active));
+    if(CATEGORY_FILTER) pool = pool.filter(i => (i.category||'Uncategorized') === CATEGORY_FILTER);
+    if(INSTALLED_ONLY) pool = pool.filter(i => i.installed);
+    pool = pool.filter(i => matchesSearch(i, SEARCH_Q));
+
+    if(pool.length === 0){
+      area.innerHTML = '<div class="tt-empty">No items match.</div>';
+      return;
+    }
+
+    let bodyRows;
+    let head;
+    if(VIEW_TAB === 'holding'){
+      head = HOLDING_HEAD;
+      bodyRows = sortItemsByDue(pool).map(i=>renderItemRow(i,{holdingMode:true})).join('');
+    } else if(SORT_MODE === 'due'){
+      head = ACTIVE_HEAD;
+      bodyRows = sortItemsByDue(pool).map(i=>renderItemRow(i)).join('');
+    } else {
+      head = ACTIVE_HEAD;
+      const cats = sortedCategories(pool);
+      let rows = '';
+      cats.forEach(cat=>{
+        const inCat = sortItemsByDue(pool.filter(i => (i.category||'Uncategorized') === cat));
+        if(!inCat.length) return;
+        rows += '<tr class="grp-row"><td colspan="11">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCat.length+' item'+(inCat.length===1?'':'s')+')</span></td></tr>';
+        rows += inCat.map(i=>renderItemRow(i)).join('');
+      });
+      bodyRows = rows;
+    }
+
+    area.innerHTML =
+      '<div class="wa-table-wrap"><table class="wa-table"><thead>'+head+'</thead><tbody>'+bodyRows+'</tbody></table></div>' +
+      '<div class="wa-footer-count">'+pool.length+' item'+(pool.length===1?'':'s')+' found</div>';
+
+    area.querySelectorAll('[data-act]').forEach(btn=>{
+      btn.onclick = (e)=>{ e.stopPropagation(); handleCardAction(btn.dataset.act, btn.dataset.id); };
+    });
+    area.querySelectorAll('tr.item-row').forEach(tr=>{
+      tr.onclick = ()=>{
+        const item = ITEMS.find(i=>i.id===tr.dataset.id);
+        if(item) openItemForm(item);
+      };
+    });
+  }
+
+  function handleCardAction(act, id){
+    const item = ITEMS.find(i=>i.id===id);
+    if(!item) return;
+    if(act === 'edit') openItemForm(item);
+    else if(act === 'delete') openDeleteConfirm(item);
+    else if(act === 'send-holding') openSendToHolding(item);
+    else if(act === 'complete-holding') openCompleteHolding(item);
+  }
+
+  // ---------- attachments ----------
+  function readFileSmart(file, maxDim, quality){
+    maxDim = maxDim || 1600; quality = quality || 0.82;
+    return new Promise((resolve, reject)=>{
+      if(!file.type || !file.type.startsWith('image/')){
+        const r = new FileReader();
+        r.onload = ()=> resolve({name:file.name, type:file.type||'application/octet-stream', dataUrl:r.result});
+        r.onerror = reject;
+        r.readAsDataURL(file);
+        return;
+      }
+      const r = new FileReader();
+      r.onload = ()=>{
+        const img = new Image();
+        img.onload = ()=>{
+          let w = img.width, h = img.height;
+          if(w > maxDim || h > maxDim){
+            if(w > h){ h = Math.round(h*maxDim/w); w = maxDim; } else { w = Math.round(w*maxDim/h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve({name:file.name, type:'image/jpeg', dataUrl: canvas.toDataURL('image/jpeg', quality)});
+        };
+        img.onerror = reject;
+        img.src = r.result;
+      };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
+  function renderAttThumb(att, idx, kind){
+    const isImg = att.type && att.type.startsWith('image/');
+    return (
+      '<div class="tt-att-thumb" data-kind="'+kind+'" data-idx="'+idx+'">' +
+        (isImg ? '<img src="'+att.dataUrl+'">' : '<div class="file-chip">📄</div>') +
+        '<div class="fn">'+escapeHTML(att.name||'file')+'</div>' +
+        '<button type="button" class="rm" data-rm-kind="'+kind+'" data-rm-idx="'+idx+'">×</button>' +
+      '</div>'
+    );
+  }
+
+  // ---------- item form (add/edit) ----------
+  let FORM_STATE = null;
+
+  function openItemForm(item){
+    const editing = !!item;
+    FORM_STATE = editing ? JSON.parse(JSON.stringify(item)) : {
+      id: uid(), name:'', category:'', action:'Calibration', makeModel:'', partNo:'', serialNo:'', trackingNo:'',
+      installed:true, limitMonths:null, lastPerformed:null, manualNextDue:null, warningDays:30, notes:'',
+      photoAttachments:[], calReportAttachments:[], holding:null
+    };
+    if(FORM_STATE.warningDays == null) FORM_STATE.warningDays = 30;
+    const cats = sortedCategories(ITEMS.length ? ITEMS : SEED_ITEMS);
+
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal">' +
+          '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
+          '<h2>'+(editing?'Edit Item':'Add Item')+'</h2>' +
+          '<p class="sub">'+(editing?'Update the details, interval, or due-date override for this item.':'Add a new tool, piece of equipment, or recurring check to track.')+'</p>' +
+          '<div class="field-grid">' +
+            '<div class="field span2"><label>Name</label><input id="fName" value="'+escapeHTML(FORM_STATE.name)+'" placeholder="e.g. Torque Wrench"></div>' +
+            '<div class="field"><label>Category</label><input id="fCategory" list="ttCatList" value="'+escapeHTML(FORM_STATE.category)+'" placeholder="e.g. Torque Wrenches"></div>' +
+            '<datalist id="ttCatList">'+cats.map(c=>'<option value="'+escapeHTML(c)+'">').join('')+'</datalist>' +
+            '<div class="field"><label>Action</label><input id="fAction" list="ttActList" value="'+escapeHTML(FORM_STATE.action)+'" placeholder="Calibration"></div>' +
+            '<datalist id="ttActList">'+ACTION_OPTIONS.map(a=>'<option value="'+a+'">').join('')+'</datalist>' +
+            '<div class="field"><label>Make / Model</label><input id="fMakeModel" value="'+escapeHTML(FORM_STATE.makeModel)+'"></div>' +
+            '<div class="field"><label>Part No.</label><input id="fPartNo" value="'+escapeHTML(FORM_STATE.partNo)+'"></div>' +
+            '<div class="field"><label>Serial No.</label><input id="fSerialNo" value="'+escapeHTML(FORM_STATE.serialNo)+'"></div>' +
+            '<div class="field"><label>Tracking No.</label><input id="fTrackingNo" value="'+escapeHTML(FORM_STATE.trackingNo)+'"></div>' +
+          '</div>' +
+
+          '<div class="wa-banner">Calendar Items</div>' +
+          '<div class="wa-panel">' +
+            '<div class="wa-cal-grid">' +
+              '<div class="wa-cal-cell"><label>Limit</label><input id="fLimitMonths" type="number" min="0" step="1" value="'+(FORM_STATE.limitMonths==null?'':FORM_STATE.limitMonths)+'" placeholder="blank = no limit"><div class="wa-cal-caption">(Number of Months)</div></div>' +
+              '<div class="wa-cal-cell"><label>Performed</label><input id="fLastPerformed" type="date" value="'+(FORM_STATE.lastPerformed||'')+'"><div class="wa-cal-caption">Last time completed</div></div>' +
+              '<div class="wa-cal-cell"><label>Warning</label><input id="fWarningDays" type="number" min="0" step="1" value="'+(FORM_STATE.warningDays==null?30:FORM_STATE.warningDays)+'"><div class="wa-cal-caption">(Number of Days before due)</div></div>' +
+              '<div class="wa-cal-cell"><label>Manual Next Due</label><input id="fManualNextDue" type="date" value="'+(FORM_STATE.manualNextDue||'')+'"><div class="wa-cal-caption req">Overrides the calculated due date</div></div>' +
+            '</div>' +
+            '<div class="wa-flags-row">' +
+              '<label><input id="fInstalled" type="checkbox" '+(FORM_STATE.installed?'checked':'')+'> Component is installed / in service</label>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="field-grid">' +
+            '<div class="field span2"><label>Remarks</label><textarea id="fNotes">'+escapeHTML(FORM_STATE.notes)+'</textarea></div>' +
+          '</div>' +
+
+          '<div class="tt-att-block">' +
+            '<label>Photo Attachments</label>' +
+            '<div class="tt-att-list" id="ttPhotoList">'+FORM_STATE.photoAttachments.map((a,i)=>renderAttThumb(a,i,'photo')).join('')+'</div>' +
+            '<input type="file" id="fPhotoFile" accept="image/*" multiple>' +
+          '</div>' +
+          '<div class="tt-att-block">' +
+            '<label>Calibration Receiving Report / Certificate</label>' +
+            '<div class="tt-att-list" id="ttCalList">'+FORM_STATE.calReportAttachments.map((a,i)=>renderAttThumb(a,i,'cal')).join('')+'</div>' +
+            '<input type="file" id="fCalFile" accept="image/*,application/pdf" multiple>' +
+          '</div>' +
+
+          '<div class="tt-modal-footer">' +
+            '<div>'+(editing?'<button class="btn danger" id="ttFormDelete">Delete Item</button>':'')+'</div>' +
+            '<div class="btn-row">' +
+              '<button class="btn" id="ttFormCancel">Cancel</button>' +
+              '<button class="btn primary" id="ttFormSave">Save</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalClose').onclick = closeModal;
+    document.getElementById('ttFormCancel').onclick = closeModal;
+    document.getElementById('ttModalBackdrop').onclick = (e)=>{ if(e.target.id==='ttModalBackdrop') closeModal(); };
+
+    document.getElementById('fPhotoFile').onchange = async (e)=>{
+      const files = Array.from(e.target.files||[]);
+      for(const f of files){
+        try{ FORM_STATE.photoAttachments.push(await readFileSmart(f)); }catch(err){ console.error(err); }
+      }
+      refreshAttLists();
+      e.target.value = '';
+    };
+    document.getElementById('fCalFile').onchange = async (e)=>{
+      const files = Array.from(e.target.files||[]);
+      for(const f of files){
+        try{ FORM_STATE.calReportAttachments.push(await readFileSmart(f, 2000, 0.85)); }catch(err){ console.error(err); }
+      }
+      refreshAttLists();
+      e.target.value = '';
+    };
+
+    function refreshAttLists(){
+      document.getElementById('ttPhotoList').innerHTML = FORM_STATE.photoAttachments.map((a,i)=>renderAttThumb(a,i,'photo')).join('');
+      document.getElementById('ttCalList').innerHTML = FORM_STATE.calReportAttachments.map((a,i)=>renderAttThumb(a,i,'cal')).join('');
+      wireRemoveButtons();
+    }
+    function wireRemoveButtons(){
+      document.querySelectorAll('#ttModalRoot [data-rm-kind]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const kind = btn.dataset.rmKind, idx = parseInt(btn.dataset.rmIdx,10);
+          const arr = kind==='photo' ? FORM_STATE.photoAttachments : FORM_STATE.calReportAttachments;
+          arr.splice(idx,1);
+          refreshAttLists();
+        };
+      });
+    }
+    wireRemoveButtons();
+
+    if(editing){
+      document.getElementById('ttFormDelete').onclick = ()=>{ closeModal(); openDeleteConfirm(item); };
+    }
+
+    document.getElementById('ttFormSave').onclick = async ()=>{
+      const name = document.getElementById('fName').value.trim();
+      if(!name){ alert('Please enter a name for this item.'); return; }
+      FORM_STATE.name = name;
+      FORM_STATE.category = document.getElementById('fCategory').value.trim() || 'Uncategorized';
+      FORM_STATE.action = document.getElementById('fAction').value.trim() || 'Check';
+      FORM_STATE.makeModel = document.getElementById('fMakeModel').value.trim();
+      FORM_STATE.partNo = document.getElementById('fPartNo').value.trim();
+      FORM_STATE.serialNo = document.getElementById('fSerialNo').value.trim();
+      FORM_STATE.trackingNo = document.getElementById('fTrackingNo').value.trim();
+      const lm = document.getElementById('fLimitMonths').value;
+      FORM_STATE.limitMonths = lm === '' ? null : Number(lm);
+      FORM_STATE.lastPerformed = document.getElementById('fLastPerformed').value || null;
+      FORM_STATE.manualNextDue = document.getElementById('fManualNextDue').value || null;
+      const wd = document.getElementById('fWarningDays').value;
+      FORM_STATE.warningDays = wd === '' ? 30 : Number(wd);
+      FORM_STATE.installed = document.getElementById('fInstalled').checked;
+      FORM_STATE.notes = document.getElementById('fNotes').value.trim();
+
+      const idx = ITEMS.findIndex(i=>i.id===FORM_STATE.id);
+      if(idx >= 0) ITEMS[idx] = FORM_STATE; else ITEMS.push(FORM_STATE);
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  function closeModal(){
+    document.getElementById('ttModalRoot').innerHTML = '';
+    FORM_STATE = null;
+  }
+
+  function openDeleteConfirm(item){
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:420px;">' +
+          '<h2>Delete "'+escapeHTML(item.name)+'"?</h2>' +
+          '<p class="sub">This removes the item and its attachments permanently. This can\'t be undone.</p>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttDelCancel">Cancel</button>' +
+            '<button class="btn danger" id="ttDelConfirm">Delete</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttDelCancel').onclick = closeModal;
+    document.getElementById('ttDelConfirm').onclick = async ()=>{
+      ITEMS = ITEMS.filter(i=>i.id!==item.id);
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  function openSendToHolding(item){
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:460px;">' +
+          '<h2>Send "'+escapeHTML(item.name)+'" to Holding</h2>' +
+          '<p class="sub">Use this when the item is pulled out of service and sent out for calibration.</p>' +
+          '<div class="field-grid">' +
+            '<div class="field"><label>Date Sent</label><input id="hSentDate" type="date" value="'+todayISO()+'"></div>' +
+            '<div class="field span2"><label>Note (vendor, PO#, etc.)</label><input id="hNote" placeholder="optional"></div>' +
+          '</div>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttHoldCancel">Cancel</button>' +
+            '<button class="btn primary" id="ttHoldConfirm">Send to Holding</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttHoldCancel').onclick = closeModal;
+    document.getElementById('ttHoldConfirm').onclick = async ()=>{
+      item.holding = { active:true, sentDate: document.getElementById('hSentDate').value || todayISO(), note: document.getElementById('hNote').value.trim() };
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  function openCompleteHolding(item){
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:520px;">' +
+          '<h2>Complete Calibration — "'+escapeHTML(item.name)+'"</h2>' +
+          '<p class="sub">Record the completion, attach the receiving report / certificate, and this item returns to Active with a fresh due date.</p>' +
+          '<div class="field-grid">' +
+            '<div class="field"><label>Completion Date</label><input id="cDate" type="date" value="'+todayISO()+'"></div>' +
+            '<div class="field"><label>Update Time Limit (months)</label><input id="cLimit" type="number" min="0" step="1" value="'+(item.limitMonths==null?'':item.limitMonths)+'"></div>' +
+          '</div>' +
+          '<div class="tt-att-block">' +
+            '<label>Calibration Receiving Report / Certificate</label>' +
+            '<div class="tt-att-list" id="ttCalListH">'+(item.calReportAttachments||[]).map((a,i)=>renderAttThumb(a,i,'cal')).join('')+'</div>' +
+            '<input type="file" id="cCalFile" accept="image/*,application/pdf" multiple>' +
+          '</div>' +
+          '<div class="tt-modal-footer">' +
+            '<div><button class="btn" id="ttHoldReturn">Return Without Completing</button></div>' +
+            '<div class="btn-row">' +
+              '<button class="btn" id="ttCompleteCancel">Cancel</button>' +
+              '<button class="btn primary" id="ttCompleteConfirm">Mark Complete</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttCompleteCancel').onclick = closeModal;
+
+    document.getElementById('cCalFile').onchange = async (e)=>{
+      const files = Array.from(e.target.files||[]);
+      for(const f of files){
+        try{ item.calReportAttachments = item.calReportAttachments || []; item.calReportAttachments.push(await readFileSmart(f, 2000, 0.85)); }catch(err){ console.error(err); }
+      }
+      document.getElementById('ttCalListH').innerHTML = (item.calReportAttachments||[]).map((a,i)=>renderAttThumb(a,i,'cal')).join('');
+      wireRemoveH();
+      e.target.value = '';
+    };
+    function wireRemoveH(){
+      document.querySelectorAll('#ttCalListH [data-rm-kind]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const idx = parseInt(btn.dataset.rmIdx,10);
+          item.calReportAttachments.splice(idx,1);
+          document.getElementById('ttCalListH').innerHTML = (item.calReportAttachments||[]).map((a,i)=>renderAttThumb(a,i,'cal')).join('');
+          wireRemoveH();
+        };
+      });
+    }
+    wireRemoveH();
+
+    document.getElementById('ttHoldReturn').onclick = async ()=>{
+      item.holding = null;
+      closeModal();
+      renderAll();
+      await persist();
+    };
+    document.getElementById('ttCompleteConfirm').onclick = async ()=>{
+      const cDate = document.getElementById('cDate').value || todayISO();
+      const cLimit = document.getElementById('cLimit').value;
+      item.lastPerformed = cDate;
+      if(cLimit !== '') item.limitMonths = Number(cLimit);
+      item.manualNextDue = null;
+      item.holding = null;
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  // ---------- auditor report ----------
+  function openPrint(bodyHTML){
+    document.getElementById('printArea').innerHTML = bodyHTML;
+    setTimeout(()=>window.print(), 50);
+  }
+
+  function openReportModal(){
+    const cats = sortedCategories(ITEMS);
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal">' +
+          '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
+          '<h2>Auditor Report</h2>' +
+          '<p class="sub">Choose what to include, then generate a printable report (Save as PDF from the print dialog).</p>' +
+          '<div class="field-grid">' +
+            '<div class="field"><label>Category</label><select id="rCategory"><option value="">All categories</option>'+cats.map(c=>'<option value="'+escapeHTML(c)+'">'+escapeHTML(c)+'</option>').join('')+'</select></div>' +
+            '<div class="field"><label>Status</label><select id="rStatus">' +
+              '<option value="">All statuses</option>' +
+              '<option value="overdue">Overdue only</option>' +
+              '<option value="soon">Due within 30 days</option>' +
+              '<option value="ok">OK</option>' +
+              '<option value="nolimit">No limit</option>' +
+              '<option value="holding">In Holding</option>' +
+            '</select></div>' +
+          '</div>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttReportCancel">Cancel</button>' +
+            '<button class="btn primary" id="ttReportGenerate">Generate &amp; Print</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalClose').onclick = closeModal;
+    document.getElementById('ttReportCancel').onclick = closeModal;
+    document.getElementById('ttReportGenerate').onclick = ()=>{
+      const cat = document.getElementById('rCategory').value;
+      const status = document.getElementById('rStatus').value;
+      generateReport(cat, status);
+      closeModal();
+    };
+  }
+
+  function generateReport(catFilter, statusFilter){
+    let pool = ITEMS.slice();
+    if(catFilter) pool = pool.filter(i => (i.category||'Uncategorized') === catFilter);
+    if(statusFilter) pool = pool.filter(i => dueInfo(i).status === statusFilter);
+
+    const cats = sortedCategories(pool);
+    let rows = '';
+    cats.forEach(cat=>{
+      const inCat = sortItemsByDue(pool.filter(i => (i.category||'Uncategorized') === cat));
+      if(!inCat.length) return;
+      rows += '<tr class="grp"><td colspan="9">'+escapeHTML(cat)+'</td></tr>';
+      inCat.forEach(item=>{
+        const di = dueInfo(item);
+        const certOnFile = (item.calReportAttachments||[]).length > 0 ? 'Yes ('+item.calReportAttachments.length+')' : 'No';
+        const holdStr = (item.holding && item.holding.active) ? ('Yes, since '+fmtDateNice(item.holding.sentDate)) : 'No';
+        const chipColor = di.status==='overdue' ? '#fbe9e7;color:#b0281e' : di.status==='soon' ? '#faf1de;color:#b3791b' : di.status==='holding' ? '#ece9f8;color:#5a4aa8' : di.status==='nolimit' ? '#eee;color:#666' : '#e6f2ea;color:#2f7d4f';
+        rows += '<tr>' +
+          '<td>'+escapeHTML(item.name)+'</td>' +
+          '<td>'+escapeHTML(item.action||'')+'</td>' +
+          '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+          '<td>'+escapeHTML(item.serialNo||item.trackingNo||'')+'</td>' +
+          '<td>'+(item.limitMonths?item.limitMonths+' mo':'No limit')+'</td>' +
+          '<td>'+fmtDateNice(item.lastPerformed)+'</td>' +
+          '<td>'+(di.due?fmtDateNice(di.due):'—')+'</td>' +
+          '<td><span class="pr-status-chip" style="background:'+chipColor+'">'+escapeHTML(di.label)+'</span></td>' +
+          '<td>'+certOnFile+'</td>' +
+        '</tr>';
+      });
+    });
+
+    const genDate = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
+    const html =
+      '<div class="pr-head">' +
+        '<h1>Phoenix Heli-Flight — Tool &amp; Calibration Tracking Report</h1>' +
+        '<div class="meta">Generated ' + genDate + '<br>' + pool.length + ' item(s)' + (catFilter?(' · '+escapeHTML(catFilter)):'') + (statusFilter?(' · '+statusFilter):'') + '</div>' +
+      '</div>' +
+      '<table class="tt-report-table"><thead><tr>' +
+        '<th>Name</th><th>Action</th><th>Make/Model</th><th>Serial/Tracking</th><th>Interval</th><th>Last Performed</th><th>Due Date</th><th>Status</th><th>Cert on File</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+    openPrint(html);
+  }
+
+  // ---------- init ----------
+  async function init(){
+    await loadData();
+    document.getElementById('ttAddBtn').onclick = ()=>openItemForm(null);
+    document.getElementById('ttReportBtn').onclick = openReportModal;
+    document.getElementById('ttSearch').oninput = (e)=>{ SEARCH_Q = e.target.value; renderList(); };
+    document.getElementById('ttSortMode').onchange = (e)=>{ SORT_MODE = e.target.value; renderList(); };
+    document.getElementById('ttCategoryFilter').onchange = (e)=>{ CATEGORY_FILTER = e.target.value; renderList(); };
+    document.getElementById('ttInstalledOnly').onchange = (e)=>{ INSTALLED_ONLY = e.target.checked; renderList(); };
+    renderAll();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
