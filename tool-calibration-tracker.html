@@ -43,6 +43,16 @@
   .btn:disabled{opacity:.45;cursor:default;}
   .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
 
+  .tt-section-switch{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+  .tt-section-btn{padding:10px 18px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:13.5px;font-weight:800;color:var(--grey-strong);}
+  .tt-section-btn.active{background:#123a5e;color:#fff;border-color:#123a5e;}
+  .tt-section-btn .cnt{opacity:.85;font-weight:700;margin-left:4px;}
+
+  .mc-header{display:grid;grid-template-columns:1fr 220px;gap:10px;padding:0 0 6px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);border-bottom:1px solid var(--line);margin-bottom:4px;}
+  .mc-row{display:grid;grid-template-columns:1fr 220px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);}
+  .mc-row input, .mc-row select{padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:var(--panel);color:var(--ink);font-family:inherit;}
+  #mcRows{max-height:360px;overflow:auto;margin-bottom:4px;}
+
   .tt-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px;}
   .tt-tabs{display:flex;gap:6px;flex-wrap:wrap;}
   .tt-tab{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:12.5px;font-weight:700;color:var(--grey-strong);}
@@ -202,6 +212,8 @@
   <h1 class="tt-title">Tool &amp; Calibration Tracker</h1>
   <p class="tt-sub">Tool crib, calibrated equipment, and recurring checks — tracked by due date. Phoenix Heli-Flight.</p>
 
+  <div id="ttSectionSwitch" class="tt-section-switch"></div>
+
   <div id="ttSummary"></div>
 
   <div class="tt-toolbar">
@@ -236,6 +248,12 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_ioAPLi8DWuC0HCUUYEeQ3Q_dildZYKI';
   const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
   const DATA_KEY = 'tooltracker:items:v1';
+  const CATMETA_KEY = 'tooltracker:catmeta:v1';
+  // Default section assignment for categories seen for the first time -- Tool Crib Checks and Servo
+  // Controls are recurring checks rather than tracked equipment, so they start in Task Tracker.
+  // Anything else defaults to Tool & Calibration Tracker. Mario can move any category between the two
+  // (and rename it) from "Manage Categories".
+  const DEFAULT_CATEGORY_SECTIONS = { 'Tool Crib Checks': 'tasks', 'Servo Controls': 'tasks' };
 
   window.__storageLastError = null;
 
@@ -380,6 +398,8 @@
   const SEED_ITEMS = [{"name": "Abuzar Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-01", "manualNextDue": null, "id": "seed-1", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Bin Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-01", "manualNextDue": null, "id": "seed-2", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Eiji Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-01", "manualNextDue": null, "id": "seed-3", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Mario F.", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-08", "manualNextDue": "2026-09-30", "id": "seed-4", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Randy Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": "2026-08-25", "manualNextDue": "2026-09-30", "id": "seed-5", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Rich Tool Check", "category": "Tool Crib Checks", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": "2026-09-13", "manualNextDue": "2026-10-18", "id": "seed-6", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Mobile Tank #2", "category": "Fuel Tank Cabinet / Filters", "action": "Retirement", "makeModel": "243286", "partNo": "PLT1.00X50MXM", "serialNo": "", "trackingNo": "14978", "installed": true, "limitMonths": 120.0, "lastPerformed": "2022-01-11", "manualNextDue": "2026-06-08", "id": "seed-7", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Mobile Tank Filters (On wheels) (#1)", "category": "Fuel Tank Cabinet / Filters", "action": "Retirement", "makeModel": "243286", "partNo": "PLT1.00X50MXM", "serialNo": "", "trackingNo": "14978", "installed": true, "limitMonths": 10.0, "lastPerformed": "2022-05-18", "manualNextDue": "2026-06-08", "id": "seed-8", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "100 hour Kit (#1)", "category": "100 Hour Kits", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-06", "manualNextDue": null, "id": "seed-9", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "100 hour Kit (#2)", "category": "100 Hour Kits", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-06", "manualNextDue": null, "id": "seed-10", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Main Fuel Tank Cabinet Filters (East Side)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001850067", "trackingNo": "14017", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-06-18", "manualNextDue": "2026-06-30", "id": "seed-11", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Main Fuel Tank Cabinet Filters (West Side)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "", "partNo": "OS-51288", "serialNo": "", "trackingNo": "9353", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-10-27", "manualNextDue": "2026-10-31", "id": "seed-12", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "New Heli-Towcart", "category": "Ground Support Equipment", "action": "Inspection", "makeModel": "", "partNo": "V950", "serialNo": "01", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-07-29", "manualNextDue": null, "id": "seed-13", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "OVERHEAD CRANE", "category": "Ground Support Equipment", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-08-12", "manualNextDue": null, "id": "seed-14", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pitot Static tester", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "1811F-E", "serialNo": "B6309", "trackingNo": "13136", "installed": true, "limitMonths": null, "lastPerformed": "2023-03-29", "manualNextDue": null, "id": "seed-15", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Red Mobile Fuel Tank Filters (#2)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001850067", "trackingNo": "14017", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-03-31", "manualNextDue": "2026-04-16", "id": "seed-16", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Red Mobile Fuel Tank Filters (#3)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001725670", "trackingNo": "13459", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-06-01", "manualNextDue": null, "id": "seed-17", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Red Mobile Fuel Tank Filters (On wheels) (#1)", "category": "Fuel Tank Cabinet / Filters", "action": "Replacement", "makeModel": "velcon / refueling tanks", "partNo": "OS-51288", "serialNo": "C001850067", "trackingNo": "14017", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-10-20", "manualNextDue": null, "id": "seed-18", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-07-01", "manualNextDue": null, "id": "seed-19", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-06", "manualNextDue": null, "id": "seed-20", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "AIRCRAFT WEIGH KIT", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "Evergreen / JP5000-3", "partNo": "EW9150", "serialNo": "150300135", "trackingNo": "16933", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-04-06", "manualNextDue": "2028-03-24", "id": "seed-21", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Amprobe", "category": "Test & Measurement Equipment", "action": "Check", "makeModel": "", "partNo": "ACDC-52NAV", "serialNo": "14080569", "trackingNo": "11471", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-07-28", "manualNextDue": "2027-07-16", "id": "seed-22", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Caliper", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "CD-6\"ASX", "serialNo": "A22304112", "trackingNo": "16274", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-01-29", "manualNextDue": null, "id": "seed-23", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Force Gauge", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "0777518", "serialNo": "PHF-400", "trackingNo": "17159", "installed": true, "limitMonths": 24.0, "lastPerformed": "2024-06-03", "manualNextDue": "2026-06-03", "id": "seed-24", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "MULTIMETER", "category": "Test & Measurement Equipment", "action": "Check", "makeModel": "ITM / 1587", "partNo": "1587", "serialNo": "10970012", "trackingNo": "4411", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-03-06", "manualNextDue": "2027-03-03", "id": "seed-25", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pressure Gauge (0 to 15 PSI) (Float inflation hose)", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "9424555", "serialNo": "9424555", "trackingNo": "17029", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-07-15", "manualNextDue": null, "id": "seed-26", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pressure Gauge (0 to 200 PSI) (Hydraulic ram (EC135))", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "9424784", "serialNo": "", "trackingNo": "18032", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-06-25", "manualNextDue": null, "id": "seed-27", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Pressure Gauge (0 to 3000 PSI) (Hydraulic ram (EC135))", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "9424865", "serialNo": "", "trackingNo": "18033", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-06-25", "manualNextDue": null, "id": "seed-28", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "PRESSURE GAUGE (DIGITAL ON BARFEILD)", "category": "Pressure Gauges", "action": "Calibration", "makeModel": "", "partNo": "304-00007", "serialNo": "7116102006", "trackingNo": "8121", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-02-24", "manualNextDue": null, "id": "seed-29", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "SNAP ON / 1/2' DRIVE", "partNo": "TQFR250E", "serialNo": "0606201050", "trackingNo": "5167", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-01-09", "manualNextDue": null, "id": "seed-30", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "3-15 INCH LBS / SCREWDRIVER TYPE", "partNo": "QDRIVER3", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 24.0, "lastPerformed": null, "manualNextDue": "2026-09-02", "id": "seed-31", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "", "partNo": "TSM16-88", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 18.0, "lastPerformed": null, "manualNextDue": "2026-09-23", "id": "seed-32", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "5-75 FT LBS / 3/8 DRIVE", "partNo": "QJFR275E", "serialNo": "10950107670", "trackingNo": "3440", "installed": true, "limitMonths": 24.0, "lastPerformed": "2023-09-13", "manualNextDue": "2027-09-30", "id": "seed-33", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Torque Wrench", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "", "partNo": "39WE18", "serialNo": "3101002937", "trackingNo": "16478", "installed": true, "limitMonths": 18.0, "lastPerformed": "2026-01-29", "manualNextDue": null, "id": "seed-34", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "SNAP ON / 5-100 FT-LB", "partNo": "ATECH2FR100A", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 24.0, "lastPerformed": null, "manualNextDue": "2026-09-02", "id": "seed-35", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "10-50 INCH LBS / SHOP TOOL", "partNo": "QD1R50", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 24.0, "lastPerformed": "2025-09-24", "manualNextDue": null, "id": "seed-36", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "TORQUE WRENCH", "category": "Torque Wrenches", "action": "Calibration", "makeModel": "SNAP ON / 1/4 DRIVE", "partNo": "QD1R200", "serialNo": "", "trackingNo": "", "installed": false, "limitMonths": 18.0, "lastPerformed": null, "manualNextDue": "2026-09-02", "id": "seed-37", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Vaciuum Gauge (For FDC filter pump)", "category": "Test & Measurement Equipment", "action": "Replacement", "makeModel": "", "partNo": "9425586", "serialNo": "9425586", "trackingNo": "17030", "installed": true, "limitMonths": 24.0, "lastPerformed": "2026-06-09", "manualNextDue": null, "id": "seed-38", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "WEIGHT SCALE (DIGITAL)", "category": "Test & Measurement Equipment", "action": "Calibration", "makeModel": "", "partNo": "EB6", "serialNo": "8033325462", "trackingNo": "11192", "installed": true, "limitMonths": null, "lastPerformed": "2016-06-22", "manualNextDue": null, "id": "seed-39", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Inventory quarantine", "category": "Quarantine", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 3.0, "lastPerformed": "2026-07-02", "manualNextDue": null, "id": "seed-40", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Gaug Block", "category": "Test & Measurement Equipment", "action": "Retirement", "makeModel": "Standard DIN 861", "partNo": "181281", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 120.0, "lastPerformed": "2019-01-16", "manualNextDue": null, "id": "seed-41", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-42", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-43", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Hangar floor)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-44", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Hangar floor)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-45", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Hangar floor)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-46", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control (Stores)", "category": "Servo Controls", "action": "Expiry Check", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 1.0, "lastPerformed": "2026-09-13", "manualNextDue": null, "id": "seed-47", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "EC135 Dolly", "category": "Ground Support Equipment", "action": "Servicing", "makeModel": "", "partNo": "PHF135CART", "serialNo": "PHF1234", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-11-02", "manualNextDue": null, "id": "seed-48", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "8500C BALANCE ANALYZER KIT", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "CHADWICK HELMUTH / 8500C", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-49", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "ARRIUS 1A BORESCOPE TOOLS/ GUIDES", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "NA / NA", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-50", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "BORESCOPE INSPECTION KIT", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "NA / NA", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-51", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "IGNITOR TOOL", "category": "Diagnostic & Balance Equipment", "action": "Check", "makeModel": "HELIPRODUCTS / ARRIEL SERIES", "partNo": "8812331000", "serialNo": "NA", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-52", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Servo Control", "category": "Diagnostic & Balance Equipment", "action": "Check", "makeModel": "SMARTTOOL", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-53", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "SLIDE HAMMER/ PULLER KIT", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "OTC / NA", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-54", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "VXP BALANCE ANALYZER", "category": "Diagnostic & Balance Equipment", "action": "Inspection", "makeModel": "CHADWICK HELMUTH / VXP", "partNo": "NA", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-55", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}];
 
   let ITEMS = [];
+  let CATEGORY_META = {}; // { [categoryName]: { section: 'tasks'|'tools' } }
+  let CURRENT_SECTION = 'tools'; // 'tasks' (Task Tracker) | 'tools' (Tool & Calibration Tracker)
   let VIEW_TAB = 'active'; // active | holding
   let SORT_MODE = 'group'; // group | due
   let SEARCH_Q = '';
@@ -398,6 +418,38 @@
     // first run — seed from the parsed tool crib list, then persist immediately
     ITEMS = JSON.parse(JSON.stringify(SEED_ITEMS));
     await persist();
+  }
+
+  function getCategorySection(cat){
+    cat = cat || 'Uncategorized';
+    const m = CATEGORY_META[cat];
+    return (m && m.section) ? m.section : (DEFAULT_CATEGORY_SECTIONS[cat] || 'tools');
+  }
+  // Fills in a meta entry (defaulted) for any category that doesn't have one yet -- covers both the
+  // very first load and any new category typed into the Add/Edit form later.
+  function ensureCategoryMeta(){
+    let changed = false;
+    sortedCategories(ITEMS).forEach(cat=>{
+      if(!CATEGORY_META[cat]){
+        CATEGORY_META[cat] = { section: DEFAULT_CATEGORY_SECTIONS[cat] || 'tools' };
+        changed = true;
+      }
+    });
+    return changed;
+  }
+  async function loadCategoryMeta(){
+    const raw = await storageGet(CATMETA_KEY);
+    if(raw){
+      try{ CATEGORY_META = JSON.parse(raw); }catch(e){ CATEGORY_META = {}; }
+    }
+    const changed = ensureCategoryMeta();
+    if(changed || !raw) await persistCategoryMeta();
+  }
+  async function persistCategoryMeta(){
+    await storageSet(CATMETA_KEY, JSON.stringify(CATEGORY_META));
+  }
+  function sectionItems(){
+    return ITEMS.filter(i => getCategorySection(i.category) === CURRENT_SECTION);
   }
   async function persist(){
     SAVING = true;
@@ -427,16 +479,37 @@
   }
 
   function renderAll(){
+    renderSectionSwitch();
     renderSummary();
     renderTabs();
     renderCategoryFilter();
     renderList();
   }
 
+  function renderSectionSwitch(){
+    const tasksCount = ITEMS.filter(i=>getCategorySection(i.category)==='tasks').length;
+    const toolsCount = ITEMS.filter(i=>getCategorySection(i.category)==='tools').length;
+    document.getElementById('ttSectionSwitch').innerHTML =
+      '<button class="tt-section-btn '+(CURRENT_SECTION==='tasks'?'active':'')+'" data-sec="tasks">🗓️ Task Tracker <span class="cnt">'+tasksCount+'</span></button>' +
+      '<button class="tt-section-btn '+(CURRENT_SECTION==='tools'?'active':'')+'" data-sec="tools">🧰 Tool &amp; Calibration Tracker <span class="cnt">'+toolsCount+'</span></button>' +
+      '<button class="btn small" id="ttManageCatsBtn" style="margin-left:8px;">Manage Categories</button>';
+    document.querySelectorAll('.tt-section-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        if(CURRENT_SECTION === btn.dataset.sec) return;
+        CURRENT_SECTION = btn.dataset.sec;
+        CATEGORY_FILTER = '';
+        SEARCH_Q = '';
+        document.getElementById('ttSearch').value = '';
+        renderAll();
+      };
+    });
+    document.getElementById('ttManageCatsBtn').onclick = openManageCategories;
+  }
+
   function renderSummary(){
-    const active = ITEMS.filter(i=>!(i.holding && i.holding.active));
+    const pool = sectionItems();
     let overdue=0, soon=0, holding=0;
-    ITEMS.forEach(i=>{
+    pool.forEach(i=>{
       const di = dueInfo(i);
       if(di.status==='overdue') overdue++;
       else if(di.status==='soon') soon++;
@@ -444,7 +517,7 @@
     });
     document.getElementById('ttSummary').innerHTML =
       '<div class="tt-summary">' +
-        '<div class="tt-stat"><div class="n">'+ITEMS.length+'</div><div class="l">Total Items</div></div>' +
+        '<div class="tt-stat"><div class="n">'+pool.length+'</div><div class="l">Total Items</div></div>' +
         '<div class="tt-stat bad"><div class="n">'+overdue+'</div><div class="l">Overdue</div></div>' +
         '<div class="tt-stat warn"><div class="n">'+soon+'</div><div class="l">Due Within 30 Days</div></div>' +
         '<div class="tt-stat hold"><div class="n">'+holding+'</div><div class="l">In Holding</div></div>' +
@@ -452,8 +525,9 @@
   }
 
   function renderTabs(){
-    const activeCount = ITEMS.filter(i=>!(i.holding && i.holding.active)).length;
-    const holdCount = ITEMS.filter(i=>i.holding && i.holding.active).length;
+    const pool = sectionItems();
+    const activeCount = pool.filter(i=>!(i.holding && i.holding.active)).length;
+    const holdCount = pool.filter(i=>i.holding && i.holding.active).length;
     document.getElementById('ttTabs').innerHTML =
       '<button class="tt-tab '+(VIEW_TAB==='active'?'active':'')+'" data-tab="active">Active <span class="cnt">'+activeCount+'</span></button>' +
       '<button class="tt-tab '+(VIEW_TAB==='holding'?'active':'')+'" data-tab="holding">Holding <span class="cnt">'+holdCount+'</span></button>';
@@ -464,7 +538,7 @@
 
   function renderCategoryFilter(){
     const sel = document.getElementById('ttCategoryFilter');
-    const cats = sortedCategories(ITEMS);
+    const cats = sortedCategories(sectionItems());
     const cur = CATEGORY_FILTER;
     sel.innerHTML = '<option value="">All categories</option>' + cats.map(c=>'<option value="'+escapeHTML(c)+'"'+(c===cur?' selected':'')+'>'+escapeHTML(c)+'</option>').join('');
   }
@@ -499,6 +573,7 @@
 
   function renderItemRow(item, opts){
     opts = opts || {};
+    const tasksMode = CURRENT_SECTION === 'tasks';
     const di = dueInfo(item);
     const notInstalledCls = item.installed ? '' : ' notinstalled';
     const holdingCls = di.status==='holding' ? ' holding' : '';
@@ -509,43 +584,49 @@
       (!item.installed ? ' <span style="font-size:9.5px;font-weight:800;color:var(--grey-strong);">(NOT INSTALLED)</span>' : '');
 
     if(opts.holdingMode){
-      return (
-        '<tr class="item-row'+holdingCls+'" data-id="'+item.id+'">' +
-          '<td class="nm">'+nameCell+'</td>' +
-          '<td>'+escapeHTML(item.category||'')+'</td>' +
-          '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
-          '<td class="num">'+escapeHTML(item.serialNo||item.trackingNo||'')+'</td>' +
-          '<td class="num">'+(item.holding&&item.holding.sentDate?fmtDateNice(item.holding.sentDate):'—')+'</td>' +
-          '<td>'+escapeHTML((item.holding&&item.holding.note)||'')+'</td>' +
-          '<td class="num">'+attIconStr(item)+'</td>' +
-          '<td class="act-cell">'+renderRowActions(item, di)+'</td>' +
-        '</tr>'
-      );
+      let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.category||'')+'</td>';
+      if(!tasksMode){
+        cells += '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+          '<td class="num">'+escapeHTML(item.serialNo||item.trackingNo||'')+'</td>';
+      }
+      cells += '<td class="num">'+(item.holding&&item.holding.sentDate?fmtDateNice(item.holding.sentDate):'—')+'</td>' +
+        '<td>'+escapeHTML((item.holding&&item.holding.note)||'')+'</td>' +
+        '<td class="num">'+attIconStr(item)+'</td>' +
+        '<td class="act-cell">'+renderRowActions(item, di)+'</td>';
+      return '<tr class="item-row'+holdingCls+'" data-id="'+item.id+'">'+cells+'</tr>';
     }
 
-    return (
-      '<tr class="item-row'+notInstalledCls+holdingCls+'" data-id="'+item.id+'">' +
-        '<td class="nm">'+nameCell+'</td>' +
-        '<td>'+escapeHTML(item.action||'')+'</td>' +
-        '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+    let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.action||'')+'</td>';
+    if(!tasksMode){
+      cells += '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
         '<td class="num">'+escapeHTML(item.partNo||'')+'</td>' +
         '<td class="num">'+escapeHTML(item.serialNo||'')+'</td>' +
-        '<td class="num">'+escapeHTML(item.trackingNo||'')+'</td>' +
-        '<td class="num">'+(item.limitMonths?item.limitMonths+' mo':'No limit')+'</td>' +
-        '<td class="num">'+fmtDateNice(item.lastPerformed)+'</td>' +
-        '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>' +
-        '<td class="num">'+attIconStr(item)+'</td>' +
-        '<td class="act-cell">'+renderRowActions(item, di)+'</td>' +
-      '</tr>'
-    );
+        '<td class="num">'+escapeHTML(item.trackingNo||'')+'</td>';
+    }
+    cells += '<td class="num">'+(item.limitMonths?item.limitMonths+' mo':'No limit')+'</td>' +
+      '<td class="num">'+fmtDateNice(item.lastPerformed)+'</td>' +
+      '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>' +
+      '<td class="num">'+attIconStr(item)+'</td>' +
+      '<td class="act-cell">'+renderRowActions(item, di)+'</td>';
+    return '<tr class="item-row'+notInstalledCls+holdingCls+'" data-id="'+item.id+'">'+cells+'</tr>';
   }
 
-  const ACTIVE_HEAD = '<tr><th>Name</th><th>Action</th><th>Make / Model</th><th>Part No.</th><th>Serial No.</th><th>Tracking No.</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>';
-  const HOLDING_HEAD = '<tr><th>Name</th><th>Category</th><th>Make / Model</th><th>Serial / Tracking</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>';
+  function activeHead(tasksMode){
+    return tasksMode
+      ? '<tr><th>Name</th><th>Action</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>'
+      : '<tr><th>Name</th><th>Action</th><th>Make / Model</th><th>Part No.</th><th>Serial No.</th><th>Tracking No.</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>';
+  }
+  function holdingHead(tasksMode){
+    return tasksMode
+      ? '<tr><th>Name</th><th>Category</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>'
+      : '<tr><th>Name</th><th>Category</th><th>Make / Model</th><th>Serial / Tracking</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>';
+  }
+  function activeColCount(tasksMode){ return tasksMode ? 7 : 11; }
 
   function renderList(){
     const area = document.getElementById('ttListArea');
-    let pool = ITEMS.filter(i => VIEW_TAB==='holding' ? (i.holding && i.holding.active) : !(i.holding && i.holding.active));
+    const tasksMode = CURRENT_SECTION === 'tasks';
+    let pool = sectionItems().filter(i => VIEW_TAB==='holding' ? (i.holding && i.holding.active) : !(i.holding && i.holding.active));
     if(CATEGORY_FILTER) pool = pool.filter(i => (i.category||'Uncategorized') === CATEGORY_FILTER);
     if(INSTALLED_ONLY) pool = pool.filter(i => i.installed);
     pool = pool.filter(i => matchesSearch(i, SEARCH_Q));
@@ -558,19 +639,20 @@
     let bodyRows;
     let head;
     if(VIEW_TAB === 'holding'){
-      head = HOLDING_HEAD;
+      head = holdingHead(tasksMode);
       bodyRows = sortItemsByDue(pool).map(i=>renderItemRow(i,{holdingMode:true})).join('');
     } else if(SORT_MODE === 'due'){
-      head = ACTIVE_HEAD;
+      head = activeHead(tasksMode);
       bodyRows = sortItemsByDue(pool).map(i=>renderItemRow(i)).join('');
     } else {
-      head = ACTIVE_HEAD;
+      head = activeHead(tasksMode);
       const cats = sortedCategories(pool);
       let rows = '';
+      const colCount = activeColCount(tasksMode);
       cats.forEach(cat=>{
         const inCat = sortItemsByDue(pool.filter(i => (i.category||'Uncategorized') === cat));
         if(!inCat.length) return;
-        rows += '<tr class="grp-row"><td colspan="11">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCat.length+' item'+(inCat.length===1?'':'s')+')</span></td></tr>';
+        rows += '<tr class="grp-row"><td colspan="'+colCount+'">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCat.length+' item'+(inCat.length===1?'':'s')+')</span></td></tr>';
         rows += inCat.map(i=>renderItemRow(i)).join('');
       });
       bodyRows = rows;
@@ -655,6 +737,10 @@
     };
     if(FORM_STATE.warningDays == null) FORM_STATE.warningDays = 30;
     const cats = sortedCategories(ITEMS.length ? ITEMS : SEED_ITEMS);
+    // Task Tracker items (recurring checks) don't have make/model/part/serial/tracking numbers, so
+    // those fields start hidden when the item's category (or, for a new item, the section currently
+    // open) belongs to Task Tracker -- and the Category field below toggles them live as it's edited.
+    const hideDetailFields = FORM_STATE.category ? (getCategorySection(FORM_STATE.category) === 'tasks') : (CURRENT_SECTION === 'tasks');
 
     const html =
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
@@ -668,10 +754,12 @@
             '<datalist id="ttCatList">'+cats.map(c=>'<option value="'+escapeHTML(c)+'">').join('')+'</datalist>' +
             '<div class="field"><label>Action</label><input id="fAction" list="ttActList" value="'+escapeHTML(FORM_STATE.action)+'" placeholder="Calibration"></div>' +
             '<datalist id="ttActList">'+ACTION_OPTIONS.map(a=>'<option value="'+a+'">').join('')+'</datalist>' +
-            '<div class="field"><label>Make / Model</label><input id="fMakeModel" value="'+escapeHTML(FORM_STATE.makeModel)+'"></div>' +
-            '<div class="field"><label>Part No.</label><input id="fPartNo" value="'+escapeHTML(FORM_STATE.partNo)+'"></div>' +
-            '<div class="field"><label>Serial No.</label><input id="fSerialNo" value="'+escapeHTML(FORM_STATE.serialNo)+'"></div>' +
-            '<div class="field"><label>Tracking No.</label><input id="fTrackingNo" value="'+escapeHTML(FORM_STATE.trackingNo)+'"></div>' +
+            '<div id="fDetailFieldsWrap" style="display:'+(hideDetailFields?'none':'contents')+';">' +
+              '<div class="field"><label>Make / Model</label><input id="fMakeModel" value="'+escapeHTML(FORM_STATE.makeModel)+'"></div>' +
+              '<div class="field"><label>Part No.</label><input id="fPartNo" value="'+escapeHTML(FORM_STATE.partNo)+'"></div>' +
+              '<div class="field"><label>Serial No.</label><input id="fSerialNo" value="'+escapeHTML(FORM_STATE.serialNo)+'"></div>' +
+              '<div class="field"><label>Tracking No.</label><input id="fTrackingNo" value="'+escapeHTML(FORM_STATE.trackingNo)+'"></div>' +
+            '</div>' +
           '</div>' +
 
           '<div class="wa-banner">Calendar Items</div>' +
@@ -717,6 +805,11 @@
     document.getElementById('ttFormCancel').onclick = closeModal;
     document.getElementById('ttModalBackdrop').onclick = (e)=>{ if(e.target.id==='ttModalBackdrop') closeModal(); };
 
+    document.getElementById('fCategory').oninput = ()=>{
+      const sec = getCategorySection(document.getElementById('fCategory').value.trim());
+      document.getElementById('fDetailFieldsWrap').style.display = (sec==='tasks') ? 'none' : 'contents';
+    };
+
     document.getElementById('fPhotoFile').onchange = async (e)=>{
       const files = Array.from(e.target.files||[]);
       for(const f of files){
@@ -761,10 +854,17 @@
       FORM_STATE.name = name;
       FORM_STATE.category = document.getElementById('fCategory').value.trim() || 'Uncategorized';
       FORM_STATE.action = document.getElementById('fAction').value.trim() || 'Check';
-      FORM_STATE.makeModel = document.getElementById('fMakeModel').value.trim();
-      FORM_STATE.partNo = document.getElementById('fPartNo').value.trim();
-      FORM_STATE.serialNo = document.getElementById('fSerialNo').value.trim();
-      FORM_STATE.trackingNo = document.getElementById('fTrackingNo').value.trim();
+      const fieldsHidden = document.getElementById('fDetailFieldsWrap').style.display === 'none';
+      if(!fieldsHidden){
+        FORM_STATE.makeModel = document.getElementById('fMakeModel').value.trim();
+        FORM_STATE.partNo = document.getElementById('fPartNo').value.trim();
+        FORM_STATE.serialNo = document.getElementById('fSerialNo').value.trim();
+        FORM_STATE.trackingNo = document.getElementById('fTrackingNo').value.trim();
+      }
+      if(!CATEGORY_META[FORM_STATE.category]){
+        CATEGORY_META[FORM_STATE.category] = { section: fieldsHidden ? 'tasks' : 'tools' };
+        persistCategoryMeta();
+      }
       const lm = document.getElementById('fLimitMonths').value;
       FORM_STATE.limitMonths = lm === '' ? null : Number(lm);
       FORM_STATE.lastPerformed = document.getElementById('fLastPerformed').value || null;
@@ -785,6 +885,69 @@
   function closeModal(){
     document.getElementById('ttModalRoot').innerHTML = '';
     FORM_STATE = null;
+  }
+
+  function openManageCategories(){
+    const cats = sortedCategories(ITEMS);
+    const rows = cats.map(cat=>{
+      const count = ITEMS.filter(i=>(i.category||'Uncategorized')===cat).length;
+      const sec = getCategorySection(cat);
+      return '<div class="mc-row" data-orig-cat="'+escapeHTML(cat)+'">' +
+        '<div><input class="mc-name" value="'+escapeHTML(cat)+'"> <span style="font-size:11px;color:var(--grey-strong);white-space:nowrap;">('+count+' item'+(count===1?'':'s')+')</span></div>' +
+        '<select class="mc-section">' +
+          '<option value="tasks"'+(sec==='tasks'?' selected':'')+'>🗓️ Task Tracker</option>' +
+          '<option value="tools"'+(sec==='tools'?' selected':'')+'>🧰 Tool &amp; Calibration Tracker</option>' +
+        '</select>' +
+      '</div>';
+    }).join('');
+
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:640px;">' +
+          '<h2>Manage Categories</h2>' +
+          '<p class="sub">Rename a category or move it between Task Tracker and Tool &amp; Calibration Tracker. Renaming updates every item currently in that category.</p>' +
+          '<div class="mc-header"><div>Category Name</div><div>Section</div></div>' +
+          '<div id="mcRows">'+(rows || '<p class="sub">No categories yet — add an item first.</p>')+'</div>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttMcCancel">Cancel</button>' +
+            '<button class="btn primary" id="ttMcSave">Save</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalBackdrop').onclick = (e)=>{ if(e.target.id==='ttModalBackdrop') closeModal(); };
+    document.getElementById('ttMcCancel').onclick = closeModal;
+    document.getElementById('ttMcSave').onclick = async ()=>{
+      const rowEls = Array.from(document.querySelectorAll('#mcRows .mc-row'));
+      const plan = [];
+      const usedNames = new Set();
+      for(const row of rowEls){
+        const origCat = row.dataset.origCat;
+        let newName = row.querySelector('.mc-name').value.trim();
+        if(!newName) newName = origCat;
+        const section = row.querySelector('.mc-section').value === 'tasks' ? 'tasks' : 'tools';
+        const key = newName.toLowerCase();
+        if(usedNames.has(key)){
+          alert('Category name "'+newName+'" is used more than once. Please make category names unique, or delete the duplicate row by renaming items to a single category from the item edit form.');
+          return;
+        }
+        usedNames.add(key);
+        plan.push({ from: origCat, to: newName, section: section });
+      }
+      plan.forEach(p=>{
+        if(p.from !== p.to){
+          ITEMS.forEach(i=>{ if((i.category||'Uncategorized') === p.from) i.category = p.to; });
+        }
+      });
+      const newMeta = {};
+      plan.forEach(p=>{ newMeta[p.to] = { section: p.section }; });
+      CATEGORY_META = newMeta;
+
+      closeModal();
+      renderAll();
+      await persist();
+      await persistCategoryMeta();
+    };
   }
 
   function openDeleteConfirm(item){
@@ -990,6 +1153,7 @@
   // ---------- init ----------
   async function init(){
     await loadData();
+    await loadCategoryMeta();
     document.getElementById('ttAddBtn').onclick = ()=>openItemForm(null);
     document.getElementById('ttReportBtn').onclick = openReportModal;
     document.getElementById('ttSearch').oninput = (e)=>{ SEARCH_Q = e.target.value; renderList(); };
