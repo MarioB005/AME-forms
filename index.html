@@ -5704,7 +5704,9 @@
           '<button class="home-btn" id="resMcmBtn"><span class="hb-icon">📗</span>D.I.R. to MCM</button>' +
           '<button class="home-btn" id="resNotesBtn"><span class="hb-icon">📝</span>Notes</button>' +
           '<button class="home-btn" id="resToolTrackerBtn"><span class="hb-icon">🧰</span>Tool &amp; Calibration Tracker</button>' +
+          '<button class="home-btn" id="resBackupBtn"><span class="hb-icon">💾</span>Backup All Data</button>' +
         '</div>' +
+        '<div id="resBackupStatus" style="font-size:12px;color:var(--grey-strong);min-height:16px;margin:-4px 0 4px;"></div>' +
         '<div class="btn-row" style="margin-top:14px;"><button type="button" class="btn" id="resLockBtn">🔒 Lock</button></div>' +
       '</div>';
     document.getElementById('resPilotTrainingBtn').onclick = ()=> renderPilotTraining();
@@ -5713,7 +5715,100 @@
     document.getElementById('resMcmBtn').onclick = ()=> renderMcmRevision();
     document.getElementById('resNotesBtn').onclick = ()=> renderNotesForm();
     document.getElementById('resToolTrackerBtn').onclick = ()=> renderToolTracker();
+    document.getElementById('resBackupBtn').onclick = ()=> backupAllData();
     document.getElementById('resLockBtn').onclick = ptrainLock;
+  }
+
+  // Every key this app (forms:, mcm:, notes:, ptrain:) and its embedded Tool & Calibration
+  // Tracker (tooltracker:) write live in the same shared Supabase app_data table as a couple of
+  // Mario's other apps (Fleet Forecast Board, AME Work Schedule) -- those use their own key
+  // prefixes and are deliberately left out, so this only ever backs up "Phoenix Heli-Flight —
+  // Maintenance Forms" itself. Downloads a single JSON file with every matching key/value pair,
+  // exactly as stored, so it could be restored (or just inspected) later if ever needed.
+  const BACKUP_KEY_PREFIXES = ['forms:', 'mcm:', 'notes:', 'ptrain:', 'tooltracker:'];
+
+  async function backupAllData(){
+    const statusEl = document.getElementById('resBackupStatus');
+    const setStatus = (msg, kind)=>{
+      if(!statusEl) return;
+      statusEl.style.color = kind==='bad' ? 'var(--bad)' : kind==='good' ? 'var(--good)' : 'var(--grey-strong)';
+      statusEl.textContent = msg;
+    };
+    setStatus('Preparing backup…');
+
+    let rows = null;
+    let source = 'cloud';
+
+    if(SUPABASE_CONFIGURED){
+      try{
+        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?select=key,value&order=key.asc', {
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }
+        });
+        if(res.ok){
+          const all = await res.json();
+          rows = all.filter(r => BACKUP_KEY_PREFIXES.some(p => r.key.indexOf(p) === 0));
+        } else {
+          setStatus('Could not reach the cloud database (HTTP '+res.status+') — falling back to this device\'s local copy…');
+        }
+      }catch(e){
+        setStatus('Could not reach the cloud database — falling back to this device\'s local copy…');
+      }
+    }
+
+    if(!rows || !rows.length){
+      // Falls back to whatever this browser has cached locally -- covers offline use, or the
+      // cloud fetch above failing. This only reflects what THIS device has loaded/saved, so it
+      // can be an incomplete picture if other stations have data this one never touched.
+      source = 'local-cache-only';
+      rows = [];
+      try{
+        for(let i=0;i<localStorage.length;i++){
+          const lsKey = localStorage.key(i);
+          if(!lsKey || lsKey.indexOf('cache:') !== 0) continue;
+          const key = lsKey.slice('cache:'.length);
+          if(!BACKUP_KEY_PREFIXES.some(p => key.indexOf(p) === 0)) continue;
+          rows.push({ key: key, value: localStorage.getItem(lsKey) });
+        }
+      }catch(e){}
+    }
+
+    if(!rows.length){
+      setStatus('Nothing to back up yet — no saved data found.', 'bad');
+      return;
+    }
+
+    const data = {};
+    rows.forEach(r=>{ data[r.key] = r.value; });
+    const payload = {
+      app: 'Phoenix Heli-Flight — Maintenance Forms',
+      exportedAt: new Date().toISOString(),
+      source: source,
+      keyCount: rows.length,
+      data: data
+    };
+
+    const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    const filename = 'phoenix-heli-flight-forms-backup-'+stamp+'.json';
+    try{
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=> URL.revokeObjectURL(url), 4000);
+    }catch(e){
+      setStatus('Backup was prepared but the download could not start: ' + e, 'bad');
+      return;
+    }
+
+    setStatus(
+      'Downloaded ' + filename + ' — ' + rows.length + ' item' + (rows.length===1?'':'s') +
+      (source==='local-cache-only' ? ' (from this device\'s local copy only — connect to the internet for a complete backup).' : '.'),
+      'good'
+    );
   }
 
   function renderToolTracker(){
