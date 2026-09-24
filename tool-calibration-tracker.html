@@ -11,7 +11,7 @@
     --panel:#ffffff;
     --line:#dfe2da;
     --accent:#c05a2c;
-    --grey-strong:#6b6558;
+    --grey-strong:#1c2b24;
     --radius:10px;
     --good:#2f7d4f;
     --good-bg:#e6f2ea;
@@ -106,7 +106,7 @@
   .wa-check input{width:15px;height:15px;}
 
   .wa-table-wrap{border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:calc(100vh - 300px);margin-bottom:6px;background:var(--panel);}
-  table.wa-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:920px;}
+  table.wa-table{width:100%;border-collapse:collapse;font-size:11pt;min-width:920px;}
   table.wa-table thead th{background:#fbf3d6;border-bottom:1px solid #e3d69a;text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:#7a6a2e;white-space:nowrap;position:sticky;top:0;z-index:5;box-shadow:0 1px 0 #e3d69a;}
   table.wa-table tbody tr.item-row{border-bottom:1px solid var(--line);cursor:pointer;}
   table.wa-table tbody tr.item-row:hover{background:#f4f8fb;}
@@ -126,7 +126,7 @@
   table.wa-table td.act-cell{white-space:nowrap;text-align:right;}
   table.wa-table .row-icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:5px;cursor:pointer;font-size:12px;line-height:1;padding:4px 6px;margin-left:3px;}
   table.wa-table .row-icon-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
-  .status-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0;}
+  .status-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0;}
   .status-dot.ok{background:var(--good);}
   .status-dot.warn{background:var(--warn);}
   .status-dot.bad{background:var(--bad);}
@@ -139,7 +139,7 @@
   table.wa-table tbody tr.item-row.tt-child-row td.nm{padding-left:26px;}
   table.wa-table tbody tr.item-row.tt-child-row td.nm::before{content:'\21b3';margin-right:6px;color:var(--grey-strong);font-weight:700;}
   table.wa-table tbody tr.item-row.tt-child-row{background:#fcfcfa;}
-  .tt-orphan-note{display:block;font-size:9.5px;font-weight:700;color:var(--grey-strong);margin-top:1px;}
+  .tt-orphan-note{display:block;font-size:9.5px;font-weight:700;color:var(--grey-strong);margin-top:1px;margin-left:1ch;}
 
   /* "My Order" drag-to-reorder (Tool & Calibration Tracker, active list only). */
   table.wa-table tbody tr.item-row.tt-draggable{cursor:grab;}
@@ -175,17 +175,37 @@
   .tt-modal .sub{margin:0 0 16px;color:var(--grey-strong);font-size:12px;}
   .tt-modal-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--grey-strong);line-height:1;}
 
+  /* Item Add/Edit form: text that was grey should read black for easier reading. */
+  .tt-item-form .sub,
+  .tt-item-form .field label,
+  .tt-item-form .wa-cal-cell label,
+  .tt-item-form .wa-cal-caption:not(.req),
+  .tt-item-form .tt-att-block > label,
+  .tt-item-form .tt-att-thumb .fn,
+  .tt-item-form .tt-modal-close{
+    color:var(--ink);
+  }
+
   .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 16px;margin-bottom:14px;}
   .field{display:flex;flex-direction:column;gap:4px;}
-  .field label{font-size:11px;color:var(--grey-strong);font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+  .field label{font-size:9.5px;color:var(--grey-strong);font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
   .field input, .field select, .field textarea{
-    padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-size:13.5px;background:var(--panel);color:var(--ink);
+    padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:var(--panel);color:var(--ink);
     font-family:inherit;
   }
   .field textarea{resize:vertical;min-height:56px;}
   .field.span2{grid-column:span 2;}
   .field.checkline{flex-direction:row;align-items:center;gap:8px;padding-top:18px;}
   .field.checkline label{text-transform:none;font-size:13px;font-weight:600;order:2;}
+
+  .tt-cat-multi{max-height:150px;overflow-y:auto;border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:6px 8px;display:flex;flex-direction:column;gap:2px;}
+  .tt-cat-check{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink);padding:2px 0;cursor:pointer;}
+  .tt-cat-check input{margin:0;cursor:pointer;}
+
+  .tt-undo-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;max-height:320px;overflow-y:auto;}
+  .tt-undo-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--panel);}
+  .tt-undo-label{font-weight:700;font-size:13px;}
+  .tt-undo-time{font-size:11px;color:var(--grey-strong);margin-top:2px;}
   .field.checkline input{width:16px;height:16px;order:1;}
 
   .tt-att-block{margin-bottom:14px;}
@@ -201,20 +221,20 @@
 
   .tt-holding-note{background:var(--hold-bg);color:var(--hold);border:1px solid #cfc6ea;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px;}
 
-  .tt-report-table{width:100%;border-collapse:collapse;font-size:12px;}
-  .tt-report-table th{text-align:left;padding:6px 8px;color:var(--grey-strong);font-size:10.5px;text-transform:uppercase;border-bottom:2px solid var(--ink);}
+  .tt-report-table{width:100%;border-collapse:collapse;font-size:11pt;}
+  .tt-report-table th{text-align:left;padding:6px 8px;color:var(--ink);font-size:10.5px;text-transform:uppercase;border-bottom:2px solid var(--ink);}
   .tt-report-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
   .tt-report-table tr.grp td{background:var(--paper);font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding-top:12px;}
 
   #printArea{display:none;}
-  @page{margin:12mm;}
+  @page{margin:12mm;size:landscape;}
   @media print{
     body > *:not(#printArea){display:none !important;}
     #printArea{display:block !important;}
   }
   .pr-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1c2b24;padding-bottom:10px;margin-bottom:14px;}
   .pr-head h1{margin:0;font-size:18px;}
-  .pr-head .meta{font-size:11px;color:#555;text-align:right;}
+  .pr-head .meta{font-size:11px;color:var(--ink);text-align:right;}
   .pr-status-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;}
 
   @media (max-width:600px){
@@ -245,7 +265,8 @@
       <select id="ttCategoryFilter"><option value="">All categories</option></select>
       <label class="wa-check"><input type="checkbox" id="ttInstalledOnly"> Show installed item(s) only</label>
       <button class="btn primary" id="ttAddBtn">+ Add Item</button>
-      <button class="btn" id="ttReportBtn">Auditor Report</button>
+      <button class="btn" id="ttReportBtn">Forecast List</button>
+      <button class="btn" id="ttUndoBtn" title="See and restore the last 4 saved states">↩️ Undo</button>
     </div>
   </div>
 
@@ -430,6 +451,11 @@
   let CATEGORY_FILTER = '';
   let INSTALLED_ONLY = false;
   let SAVING = false;
+  // In-memory (not persisted) history of ITEMS after each successful save, newest last, so "Undo"
+  // can offer the last few states to jump back to. Reset on page reload -- this is a short-term
+  // working-session convenience, not a durable audit trail.
+  let SAVE_HISTORY = [];
+  const SAVE_HISTORY_LIMIT = 5; // current state + up to 4 prior states to restore
 
   async function loadData(){
     const raw = await storageGet(DATA_KEY);
@@ -536,7 +562,8 @@
   async function persist(){
     SAVING = true;
     renderSyncNote();
-    const ok = await storageSet(DATA_KEY, JSON.stringify(ITEMS));
+    const itemsJSON = JSON.stringify(ITEMS);
+    const ok = await storageSet(DATA_KEY, itemsJSON);
     SAVING = false;
     if(!ok){
       const note = document.getElementById('ttSyncNote');
@@ -545,11 +572,106 @@
     } else {
       renderSyncNote();
     }
+    // Record this state for "Undo" regardless of cloud-sync success -- it reflects what's
+    // actually showing right now. Skip if nothing actually changed since the last save.
+    if(!SAVE_HISTORY.length || SAVE_HISTORY[SAVE_HISTORY.length-1].itemsJSON !== itemsJSON){
+      SAVE_HISTORY.push({ ts: Date.now(), itemsJSON: itemsJSON });
+      if(SAVE_HISTORY.length > SAVE_HISTORY_LIMIT) SAVE_HISTORY.shift();
+    }
   }
   function renderSyncNote(){
     const note = document.getElementById('ttSyncNote');
     if(SAVING){ note.style.display='block'; note.textContent = 'Saving…'; }
     else if(note.textContent === 'Saving…'){ note.style.display='none'; }
+  }
+
+  // ---------- undo ----------
+  function formatRelativeTime(ts){
+    const diffSec = Math.round((Date.now() - ts) / 1000);
+    if(diffSec < 5) return 'just now';
+    if(diffSec < 60) return diffSec + 's ago';
+    const diffMin = Math.round(diffSec/60);
+    if(diffMin < 60) return diffMin + ' min ago';
+    return new Date(ts).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  }
+
+  // Describes the move that turned prevJSON into nextJSON, in plain language, so someone
+  // choosing an "Undo" target can tell what they'd be reverting.
+  function describeSaveChange(prevJSON, nextJSON){
+    try{
+      const prev = prevJSON ? JSON.parse(prevJSON) : [];
+      const next = JSON.parse(nextJSON);
+      const prevById = new Map(prev.map(i=>[i.id,i]));
+      const nextById = new Map(next.map(i=>[i.id,i]));
+      const added = next.filter(i=>!prevById.has(i.id));
+      const removed = prev.filter(i=>!nextById.has(i.id));
+      if(added.length && !removed.length && next.length === prev.length + added.length){
+        return added.length === 1 ? ('Added "'+added[0].name+'"') : (added.length+' items added');
+      }
+      if(removed.length && !added.length){
+        return removed.length === 1 ? ('Deleted "'+removed[0].name+'"') : (removed.length+' items deleted');
+      }
+      if(!added.length && !removed.length && next.length === prev.length){
+        const changed = [];
+        let onlyOrderChanged = true;
+        next.forEach(n=>{
+          const p = prevById.get(n.id);
+          if(!p) return;
+          if(JSON.stringify(n) !== JSON.stringify(p)) changed.push(n);
+          const pSameOrder = Object.assign({}, p, {sortIndex: n.sortIndex});
+          if(JSON.stringify(n) !== JSON.stringify(pSameOrder)) onlyOrderChanged = false;
+        });
+        if(!changed.length) return 'No change';
+        if(onlyOrderChanged) return 'Reordered items';
+        return changed.length === 1 ? ('Edited "'+changed[0].name+'"') : (changed.length+' items edited');
+      }
+      const parts = [];
+      if(added.length) parts.push(added.length+' added');
+      if(removed.length) parts.push(removed.length+' removed');
+      return parts.length ? parts.join(', ') : 'Changes saved';
+    }catch(e){ return 'Changes saved'; }
+  }
+
+  function openUndoPanel(){
+    // SAVE_HISTORY's last entry is the current state -- everything before it is something to
+    // offer restoring back to. Newest-first for display.
+    const restorable = [];
+    for(let i = SAVE_HISTORY.length - 2; i >= 0; i--){
+      restorable.push({ index: i, label: describeSaveChange(SAVE_HISTORY[i].itemsJSON, SAVE_HISTORY[i+1].itemsJSON), ts: SAVE_HISTORY[i+1].ts });
+    }
+    const rowsHtml = restorable.length ? restorable.map(r =>
+      '<div class="tt-undo-row">' +
+        '<div class="tt-undo-info"><div class="tt-undo-label">Undo: '+escapeHTML(r.label)+'</div><div class="tt-undo-time">'+escapeHTML(formatRelativeTime(r.ts))+'</div></div>' +
+        '<button type="button" class="btn small" data-undo-index="'+r.index+'">Restore this version</button>' +
+      '</div>'
+    ).join('') : '<p class="tt-empty">No saved changes yet to undo in this session.</p>';
+
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal">' +
+          '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
+          '<h2>Undo</h2>' +
+          '<p class="sub">Restores this device\'s list to how it looked at that point. Only covers changes made this session -- it resets on reload.</p>' +
+          '<div class="tt-undo-list">' + rowsHtml + '</div>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttUndoCancel">Close</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalClose').onclick = closeModal;
+    document.getElementById('ttUndoCancel').onclick = closeModal;
+    document.querySelectorAll('[data-undo-index]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const idx = Number(btn.dataset.undoIndex);
+        const entry = SAVE_HISTORY[idx];
+        if(!entry) return;
+        ITEMS = JSON.parse(entry.itemsJSON);
+        closeModal();
+        await persist();
+        renderAll();
+      };
+    });
   }
 
   // ---------- rendering ----------
@@ -644,8 +766,10 @@
 
   function renderRowActions(item, di, opts){
     opts = opts || {};
-    let html = '<button type="button" class="row-icon-btn" title="Edit" data-act="edit" data-id="'+item.id+'">✏️</button>';
-    html += '<button type="button" class="row-icon-btn" title="Duplicate (clears Serial No., Tracking No. &amp; Date Performed)" data-act="duplicate" data-id="'+item.id+'">📋</button>';
+    // Edit and Delete each have their own dedicated row/modal buttons elsewhere (clicking
+    // anywhere on the row opens Edit; the edit form itself has its own Delete button), so they
+    // aren't duplicated here as separate row icons.
+    let html = '<button type="button" class="row-icon-btn" title="Duplicate (clears Serial No., Tracking No. &amp; Date Performed)" data-act="duplicate" data-id="'+item.id+'">📋</button>';
     // "Add Sub-Item" -- only on a top-level (non-child) row, only in the Tool & Calibration
     // Tracker section, and only from the active list (not holding, not a search/filter view
     // where the parent itself might not even be showing).
@@ -657,7 +781,6 @@
     } else {
       html += '<button type="button" class="row-icon-btn" title="Send to Holding" data-act="send-holding" data-id="'+item.id+'">📦</button>';
     }
-    html += '<button type="button" class="row-icon-btn" title="Delete" data-act="delete" data-id="'+item.id+'">🗑️</button>';
     return html;
   }
 
@@ -1013,7 +1136,7 @@
 
     const html =
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
-        '<div class="tt-modal">' +
+        '<div class="tt-modal tt-item-form">' +
           '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
           '<h2>'+(editing?'Edit Item':(isDuplicate?'Duplicate Item':'Add Item'))+'</h2>' +
           '<p class="sub">'+(editing?'Update the details, interval, or due-date override for this item.':(isDuplicate?'This is a copy -- Serial No., Tracking No., and Date Performed were cleared. Fill those in and Save when ready.':'Add a new tool, piece of equipment, or recurring check to track.'))+'</p>' +
@@ -1384,10 +1507,18 @@
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
         '<div class="tt-modal">' +
           '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
-          '<h2>Auditor Report</h2>' +
+          '<h2>Forecast List</h2>' +
           '<p class="sub">Choose what to include, then generate a printable report (Save as PDF from the print dialog).</p>' +
           '<div class="field-grid">' +
-            '<div class="field"><label>Category</label><select id="rCategory"><option value="">All categories</option>'+cats.map(c=>'<option value="'+escapeHTML(c)+'">'+escapeHTML(c)+'</option>').join('')+'</select></div>' +
+            '<div class="field"><label>Categories</label>' +
+              '<div class="tt-cat-multi" id="rCategoryList">' +
+                cats.map(c=>'<label class="tt-cat-check"><input type="checkbox" value="'+escapeHTML(c)+'" checked> '+escapeHTML(c)+'</label>').join('') +
+              '</div>' +
+              '<div class="btn-row" style="margin-top:6px;">' +
+                '<button type="button" class="btn tiny" id="rCatAll">All</button>' +
+                '<button type="button" class="btn tiny" id="rCatNone">None</button>' +
+              '</div>' +
+            '</div>' +
             '<div class="field"><label>Status</label><select id="rStatus">' +
               '<option value="">All statuses</option>' +
               '<option value="overdue">Overdue only</option>' +
@@ -1406,17 +1537,30 @@
     document.getElementById('ttModalRoot').innerHTML = html;
     document.getElementById('ttModalClose').onclick = closeModal;
     document.getElementById('ttReportCancel').onclick = closeModal;
+    document.getElementById('rCatAll').onclick = ()=>{
+      document.querySelectorAll('#rCategoryList input[type="checkbox"]').forEach(el=>{ el.checked = true; });
+    };
+    document.getElementById('rCatNone').onclick = ()=>{
+      document.querySelectorAll('#rCategoryList input[type="checkbox"]').forEach(el=>{ el.checked = false; });
+    };
     document.getElementById('ttReportGenerate').onclick = ()=>{
-      const cat = document.getElementById('rCategory').value;
+      const checked = Array.from(document.querySelectorAll('#rCategoryList input[type="checkbox"]:checked')).map(el=>el.value);
       const status = document.getElementById('rStatus').value;
-      generateReport(cat, status);
+      generateReport(checked, status);
       closeModal();
     };
   }
 
-  function generateReport(catFilter, statusFilter){
+  function generateReport(catFilters, statusFilter){
     let pool = ITEMS.slice();
-    if(catFilter) pool = pool.filter(i => (i.category||'Uncategorized') === catFilter);
+    const allCats = sortedCategories(ITEMS);
+    // Only actually filter by category when the person narrowed the selection -- if every
+    // category is checked (or, as a safety net, none are), treat it the same as "all categories".
+    const catFilterActive = Array.isArray(catFilters) && catFilters.length > 0 && catFilters.length < allCats.length;
+    if(catFilterActive){
+      const catSet = new Set(catFilters);
+      pool = pool.filter(i => catSet.has(i.category||'Uncategorized'));
+    }
     if(statusFilter) pool = pool.filter(i => dueInfo(i).status === statusFilter);
 
     const cats = sortedCategories(pool);
@@ -1448,7 +1592,7 @@
     const html =
       '<div class="pr-head">' +
         '<h1>Phoenix Heli-Flight — Tool &amp; Calibration Tracking Report</h1>' +
-        '<div class="meta">Generated ' + genDate + '<br>' + pool.length + ' item(s)' + (catFilter?(' · '+escapeHTML(catFilter)):'') + (statusFilter?(' · '+statusFilter):'') + '</div>' +
+        '<div class="meta">Generated ' + genDate + '<br>' + pool.length + ' item(s)' + (catFilterActive?(' · '+escapeHTML(catFilters.join(', '))):'') + (statusFilter?(' · '+statusFilter):'') + '</div>' +
       '</div>' +
       '<table class="tt-report-table"><thead><tr>' +
         '<th>Name</th><th>Action</th><th>Make/Model</th><th>Serial/Tracking</th><th>Interval</th><th>Last Performed</th><th>Due Date</th><th>Status</th><th>Cert on File</th>' +
@@ -1463,6 +1607,7 @@
     await loadCategoryMeta();
     document.getElementById('ttAddBtn').onclick = ()=>openItemForm(null);
     document.getElementById('ttReportBtn').onclick = openReportModal;
+    document.getElementById('ttUndoBtn').onclick = openUndoPanel;
     document.getElementById('ttSearch').oninput = (e)=>{ SEARCH_Q = e.target.value; renderList(); };
     document.getElementById('ttSortMode').onchange = (e)=>{ SORT_MODE = e.target.value; renderList(); };
     document.getElementById('ttCategoryFilter').onchange = (e)=>{ CATEGORY_FILTER = e.target.value; renderList(); };
