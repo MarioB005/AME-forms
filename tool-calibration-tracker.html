@@ -571,6 +571,7 @@
   function renderRowActions(item, di, opts){
     opts = opts || {};
     let html = '<button type="button" class="row-icon-btn" title="Edit" data-act="edit" data-id="'+item.id+'">✏️</button>';
+    html += '<button type="button" class="row-icon-btn" title="Duplicate (clears Serial No., Tracking No. &amp; Date Performed)" data-act="duplicate" data-id="'+item.id+'">📋</button>';
     // "Add Sub-Item" -- only on a top-level (non-child) row, only in the Tool & Calibration
     // Tracker section, and only from the active list (not holding, not a search/filter view
     // where the parent itself might not even be showing).
@@ -733,10 +734,28 @@
     const item = ITEMS.find(i=>i.id===id);
     if(!item) return;
     if(act === 'edit') openItemForm(item);
-    else if(act === 'add-sub') openItemForm(null, item);
+    else if(act === 'add-sub') openItemForm(null, { category: item.category, parentId: item.id });
+    else if(act === 'duplicate') duplicateItem(item);
     else if(act === 'delete') openDeleteConfirm(item);
     else if(act === 'send-holding') openSendToHolding(item);
     else if(act === 'complete-holding') openCompleteHolding(item);
+  }
+
+  // Opens the Add-Item form pre-filled with a copy of an existing item -- everything is carried
+  // over (make/model, part no., category, action, limit/warning, notes, attachments, assembly
+  // membership) EXCEPT Serial No., Tracking No., and Date Performed, which are blanked out since
+  // a duplicate is a distinct physical item/record that hasn't been serialed or calibrated yet.
+  // It's also never left "in holding" -- the duplicate itself was never actually sent out.
+  // Nothing is added to the list until the form is saved, same as any other new item.
+  function duplicateItem(item){
+    const draft = JSON.parse(JSON.stringify(item));
+    delete draft.id;
+    draft.serialNo = '';
+    draft.trackingNo = '';
+    draft.lastPerformed = null;
+    draft.holding = null;
+    draft.__isDuplicate = true;
+    openItemForm(null, draft);
   }
 
   // ---------- attachments ----------
@@ -785,16 +804,26 @@
   // ---------- item form (add/edit) ----------
   let FORM_STATE = null;
 
-  function openItemForm(item, presetParent){
+  // draftOverrides pre-fills a brand-new (non-editing) form -- used for both "Add Sub-Item"
+  // (just {category, parentId}) and "Duplicate" (a full copy of another item's fields, with
+  // serialNo/trackingNo/lastPerformed/holding already stripped out by duplicateItem() below).
+  // draftOverrides.__isDuplicate is only a UI hint (title/subtitle text) and is never itself
+  // stored on the item.
+  function openItemForm(item, draftOverrides){
     const editing = !!item;
-    FORM_STATE = editing ? JSON.parse(JSON.stringify(item)) : {
-      id: uid(), name:'', category: presetParent ? presetParent.category : '', action:'Calibration', makeModel:'', partNo:'', serialNo:'', trackingNo:'',
+    const isDuplicate = !editing && !!(draftOverrides && draftOverrides.__isDuplicate);
+    const defaults = {
+      id: uid(), name:'', category:'', action:'Calibration', makeModel:'', partNo:'', serialNo:'', trackingNo:'',
       installed:true, limitMonths:null, lastPerformed:null, manualNextDue:null, warningDays:30, notes:'',
-      photoAttachments:[], calReportAttachments:[], holding:null, parentId: presetParent ? presetParent.id : null
+      photoAttachments:[], calReportAttachments:[], holding:null, parentId: null
     };
+    FORM_STATE = editing ? JSON.parse(JSON.stringify(item)) : Object.assign({}, defaults, draftOverrides || {});
+    if(!editing){ FORM_STATE.id = uid(); delete FORM_STATE.__isDuplicate; }
     if(FORM_STATE.warningDays == null) FORM_STATE.warningDays = 30;
     if(FORM_STATE.parentId === undefined) FORM_STATE.parentId = null;
     const cats = sortedCategories(ITEMS.length ? ITEMS : SEED_ITEMS);
+    const actionOptions = ACTION_OPTIONS.slice();
+    if(FORM_STATE.action && !actionOptions.includes(FORM_STATE.action)) actionOptions.push(FORM_STATE.action);
     // Task Tracker items (recurring checks) don't have make/model/part/serial/tracking numbers, so
     // those fields start hidden when the item's category (or, for a new item, the section currently
     // open) belongs to Task Tracker -- and the Category field below toggles them live as it's edited.
@@ -814,14 +843,15 @@
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
         '<div class="tt-modal">' +
           '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
-          '<h2>'+(editing?'Edit Item':'Add Item')+'</h2>' +
-          '<p class="sub">'+(editing?'Update the details, interval, or due-date override for this item.':'Add a new tool, piece of equipment, or recurring check to track.')+'</p>' +
+          '<h2>'+(editing?'Edit Item':(isDuplicate?'Duplicate Item':'Add Item'))+'</h2>' +
+          '<p class="sub">'+(editing?'Update the details, interval, or due-date override for this item.':(isDuplicate?'This is a copy -- Serial No., Tracking No., and Date Performed were cleared. Fill those in and Save when ready.':'Add a new tool, piece of equipment, or recurring check to track.'))+'</p>' +
           '<div class="field-grid">' +
             '<div class="field span2"><label>Name</label><input id="fName" value="'+escapeHTML(FORM_STATE.name)+'" placeholder="e.g. Torque Wrench"></div>' +
             '<div class="field"><label>Category</label><input id="fCategory" list="ttCatList" value="'+escapeHTML(FORM_STATE.category)+'" placeholder="e.g. Torque Wrenches"></div>' +
             '<datalist id="ttCatList">'+cats.map(c=>'<option value="'+escapeHTML(c)+'">').join('')+'</datalist>' +
-            '<div class="field"><label>Action</label><input id="fAction" list="ttActList" value="'+escapeHTML(FORM_STATE.action)+'" placeholder="Calibration"></div>' +
-            '<datalist id="ttActList">'+ACTION_OPTIONS.map(a=>'<option value="'+a+'">').join('')+'</datalist>' +
+            '<div class="field"><label>Action</label><select id="fAction">' +
+              actionOptions.map(a=>'<option value="'+escapeHTML(a)+'"'+(FORM_STATE.action===a?' selected':'')+'>'+escapeHTML(a)+'</option>').join('') +
+            '</select></div>' +
             '<div id="fDetailFieldsWrap" style="display:'+(hideDetailFields?'none':'contents')+';">' +
               '<div class="field"><label>Make / Model</label><input id="fMakeModel" value="'+escapeHTML(FORM_STATE.makeModel)+'"></div>' +
               '<div class="field"><label>Part No.</label><input id="fPartNo" value="'+escapeHTML(FORM_STATE.partNo)+'"></div>' +
