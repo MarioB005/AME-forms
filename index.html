@@ -289,6 +289,22 @@
   .ptl-sig-line::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;background:#000;transform:scaleY(.5);transform-origin:bottom;}
   .ptl-sig-row{margin-bottom:10px;}   /* keeps the trainee & PRM signature lines from touching */
   .ptl-date-gap{display:inline-block;width:0.18in;}   /* ~4-5 characters of separation */
+
+  /* ---------- Undo panel (global, appended to <body>, independent of the view-routing system so
+     it's reachable from every screen -- see the ↩️ button in the dark banner header) ---------- */
+  .undo-modal-backdrop{position:fixed;inset:0;background:rgba(20,25,20,0.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:9999;}
+  .undo-modal{background:var(--panel);border-radius:var(--radius);max-width:560px;width:100%;padding:22px 24px;position:relative;}
+  .undo-modal h2{margin:0 0 2px;font-size:18px;}
+  .undo-sub{margin:0 0 16px;color:var(--grey-strong);font-size:12px;}
+  .undo-modal-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--grey-strong);line-height:1;}
+  .undo-section{margin-bottom:16px;}
+  .undo-section h3{font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);border-bottom:1px solid var(--line);padding-bottom:5px;margin:0 0 8px;}
+  .undo-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin-bottom:8px;background:var(--paper);}
+  .undo-label{font-weight:700;font-size:13px;color:var(--ink);}
+  .undo-time{font-size:11px;color:var(--grey-strong);margin-top:2px;}
+  .undo-empty{color:var(--grey-strong);font-size:12.5px;padding:4px 0 12px;}
+  .undo-restore-btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer;font-size:12px;padding:6px 10px;white-space:nowrap;}
+  .undo-modal-footer{text-align:right;margin-top:4px;}
 </style>
 </head>
 <body>
@@ -329,6 +345,7 @@
       <span class="db-title">Phoenix Heli-Flight — Maintenance Forms</span>
     </div>
     <div class="db-right">
+      <button class="db-icon-btn" id="undoBtn" title="Undo — see and restore your last 4 saved changes">↩️</button>
       <button class="db-icon-btn" id="savedFormsBtn" title="Saved Forms">🗂</button>
       <button class="db-icon-btn" id="settingsBtn" title="Settings">⚙</button>
       <button class="db-icon-btn" id="lockBtn" title="Lock">🔒</button>
@@ -434,8 +451,22 @@
   // Returns true only once the row has actually been confirmed written (HTTP 2xx) -- callers that skip
   // checking this will keep behaving exactly as before (local cache is always updated first), but a
   // caller that DOES check it can now tell the user "this didn't actually sync" instead of staying quiet.
+  // In-memory (not persisted) history of the last few values saved to each key, so "Undo" can
+  // offer the last few states to jump back to. Resets on reload -- a short-term working-session
+  // convenience, not a durable audit trail synced anywhere.
+  const SAVE_HISTORY_BY_KEY = {};
+  const SAVE_HISTORY_LIMIT = 5; // current state + up to 4 prior states to restore
+  function recordSaveHistory(key, value){
+    const hist = SAVE_HISTORY_BY_KEY[key] || (SAVE_HISTORY_BY_KEY[key] = []);
+    if(!hist.length || hist[hist.length-1].value !== value){
+      hist.push({ ts: Date.now(), value: value });
+      if(hist.length > SAVE_HISTORY_LIMIT) hist.shift();
+    }
+  }
+
   async function storageSet(key, value){
     try{ localStorage.setItem('cache:'+key, value); }catch(e){}
+    recordSaveHistory(key, value);
     if(!SUPABASE_CONFIGURED) return true;
     let ok = true;
     const doWrite = async ()=>{
@@ -582,6 +613,150 @@
       data: data,
       createdAt: new Date().toISOString()
     };
+  }
+
+  // ---------- Undo (last 4 saved states, per storage key) ----------
+  function formatRelativeTime(ts){
+    const diffSec = Math.round((Date.now() - ts) / 1000);
+    if(diffSec < 5) return 'just now';
+    if(diffSec < 60) return diffSec + 's ago';
+    const diffMin = Math.round(diffSec/60);
+    if(diffMin < 60) return diffMin + ' min ago';
+    return new Date(ts).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  }
+
+  // Generic describer for a "list of records" key (forms:records, ptrain:records): compares two
+  // JSON-array snapshots by their .id field and explains, in plain language, what changed between
+  // them, regardless of which specific form/screen made the save.
+  function describeRecordsChange(prevJSON, nextJSON){
+    try{
+      const prev = prevJSON ? JSON.parse(prevJSON) : [];
+      const next = JSON.parse(nextJSON);
+      if(!Array.isArray(prev) || !Array.isArray(next)) return 'Changes saved';
+      const prevById = new Map(prev.map(r=>[r.id,r]));
+      const nextById = new Map(next.map(r=>[r.id,r]));
+      const added = next.filter(r=>!prevById.has(r.id));
+      const removed = prev.filter(r=>!nextById.has(r.id));
+      const labelOf = r => {
+        const name = r.formLabel || r.traineeName || r.name || r.title || ('Record #' + (r.id!=null?r.id:''));
+        const sub = r.reg || r.originalTrainingDate || r.date || '';
+        return name + (sub ? ' ('+sub+')' : '');
+      };
+      if(added.length && !removed.length){
+        return added.length === 1 ? ('Saved "'+labelOf(added[0])+'"') : (added.length+' records saved');
+      }
+      if(removed.length && !added.length){
+        return removed.length === 1 ? ('Removed "'+labelOf(removed[0])+'"') : (removed.length+' records removed');
+      }
+      if(!added.length && !removed.length && next.length === prev.length){
+        const changed = next.filter(n => JSON.stringify(n) !== JSON.stringify(prevById.get(n.id)));
+        if(!changed.length) return 'No change';
+        return changed.length === 1 ? ('Edited "'+labelOf(changed[0])+'"') : (changed.length+' records edited');
+      }
+      const parts = [];
+      if(added.length) parts.push(added.length+' added');
+      if(removed.length) parts.push(removed.length+' removed');
+      return parts.length ? parts.join(', ') : 'Changes saved';
+    }catch(e){ return 'Changes saved'; }
+  }
+
+  // Undo sources shown in the global Undo panel -- one section per tracked storage key. "restore"
+  // is called with the historical raw value to write back; it should persist it and refresh
+  // whatever's currently on screen so the change is actually visible.
+  const UNDO_SOURCES = [
+    {
+      key: 'forms:records',
+      title: 'Maintenance Forms',
+      describe: describeRecordsChange,
+      restore: async (value)=>{
+        await storageSet('forms:records', value);
+        if(document.getElementById('viewSavedForms').style.display !== 'none') renderSavedForms();
+      }
+    },
+    {
+      key: 'ptrain:records',
+      title: 'Pilot Training Records',
+      describe: describeRecordsChange,
+      restore: async (value)=>{
+        ptrainRecordsCache = value ? JSON.parse(value) : [];
+        await storageSet('ptrain:records', value);
+        if(document.getElementById('viewPilotTrainRecords').style.display !== 'none') renderPilotTrainRecords();
+      }
+    },
+    {
+      key: 'mcm:document',
+      title: 'MCM Document',
+      describe: (prevJSON, nextJSON)=>{
+        try{
+          const prev = prevJSON ? JSON.parse(prevJSON) : null;
+          const next = JSON.parse(nextJSON);
+          if(prev && next && Array.isArray(prev.pages) && Array.isArray(next.pages)){
+            const prevById = new Map(prev.pages.map(p=>[p.id,p]));
+            const nextById = new Map(next.pages.map(p=>[p.id,p]));
+            const added = next.pages.filter(p=>!prevById.has(p.id));
+            const removed = prev.pages.filter(p=>!nextById.has(p.id));
+            const changed = next.pages.filter(p=>{ const o=prevById.get(p.id); return o && JSON.stringify(o)!==JSON.stringify(p); });
+            const extra = n => n>1 ? (' +'+(n-1)+' more') : '';
+            if(added.length) return 'Added page "'+(added[0].title||added[0].id)+'"'+extra(added.length);
+            if(removed.length) return 'Removed page "'+(removed[0].title||removed[0].id)+'"'+extra(removed.length);
+            if(changed.length) return 'Edited page "'+(changed[0].title||changed[0].id)+'"'+extra(changed.length);
+          }
+        }catch(e){}
+        return 'Document edited';
+      },
+      restore: async (value)=>{
+        mcmDocCache = value ? JSON.parse(value) : null;
+        await storageSet('mcm:document', value);
+        if(document.getElementById('viewMcmDoc').style.display !== 'none') renderMcmDocument(mcmCurrentPageId);
+      }
+    }
+  ];
+
+  function openUndoPanel(){
+    const sectionsHtml = UNDO_SOURCES.map(src=>{
+      const hist = SAVE_HISTORY_BY_KEY[src.key] || [];
+      const rows = [];
+      for(let i = hist.length - 2; i >= 0; i--){
+        rows.push({ key: src.key, index: i, label: src.describe(hist[i].value, hist[i+1].value), ts: hist[i+1].ts });
+      }
+      const rowsHtml = rows.length ? rows.map(r =>
+        '<div class="undo-row">' +
+          '<div class="undo-info"><div class="undo-label">Undo: '+escapeHTML(r.label)+'</div><div class="undo-time">'+escapeHTML(formatRelativeTime(r.ts))+'</div></div>' +
+          '<button type="button" class="undo-restore-btn" data-undo-key="'+escapeHTML(r.key)+'" data-undo-index="'+r.index+'">Restore this version</button>' +
+        '</div>'
+      ).join('') : '<p class="undo-empty">Nothing saved here yet this session.</p>';
+      return '<div class="undo-section"><h3>'+escapeHTML(src.title)+'</h3>'+rowsHtml+'</div>';
+    }).join('');
+
+    const html =
+      '<div class="undo-modal-backdrop" id="undoModalBackdrop">' +
+        '<div class="undo-modal">' +
+          '<button class="undo-modal-close" id="undoModalClose">&times;</button>' +
+          '<h2>Undo</h2>' +
+          '<p class="undo-sub">Restores this device\'s data to how it looked at that point. Only covers changes made this session — it resets on reload.</p>' +
+          sectionsHtml +
+          '<div class="undo-modal-footer"><button class="btn" id="undoModalCloseBtn">Close</button></div>' +
+        '</div>' +
+      '</div>';
+    const root = document.createElement('div');
+    root.id = 'undoModalRoot';
+    root.innerHTML = html;
+    document.body.appendChild(root);
+    const closeUndoModal = ()=>{ const el = document.getElementById('undoModalRoot'); if(el) el.remove(); };
+    document.getElementById('undoModalClose').onclick = closeUndoModal;
+    document.getElementById('undoModalCloseBtn').onclick = closeUndoModal;
+    document.getElementById('undoModalBackdrop').onclick = (e)=>{ if(e.target.id==='undoModalBackdrop') closeUndoModal(); };
+    document.querySelectorAll('.undo-restore-btn').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const key = btn.dataset.undoKey;
+        const idx = Number(btn.dataset.undoIndex);
+        const src = UNDO_SOURCES.find(s=>s.key===key);
+        const hist = SAVE_HISTORY_BY_KEY[key];
+        if(!src || !hist || !hist[idx]) return;
+        await src.restore(hist[idx].value);
+        closeUndoModal();
+      };
+    });
   }
 
   // ---------- Saved Forms view (search / recall / "new form from this") ----------
@@ -751,7 +926,9 @@
     function unlock(){
       gate.classList.add('hidden');
       app.style.display = 'block';
-      loadSettings().then(showHome);
+      // If the person has already tapped into some other screen by the time settings finish
+      // loading (slow/flaky connection), don't yank them back to Home out from under them.
+      loadSettings().then(()=>{ if(!userHasNavigatedFromHome) showHome(); });
       initAutoLock();
     }
 
@@ -796,7 +973,13 @@
 
   // ---------- view routing ----------
   const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','DriveShaftBalance','Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage','ToolTracker'];
+  // Tracks whether the person has clicked into any screen other than Home yet. unlock() kicks off
+  // loadSettings() in the background and only shows Home once it resolves -- on a slow/flaky
+  // connection that can take a moment, and without this flag its completion would silently yank
+  // the person back to Home even if they'd already tapped into a form in the meantime.
+  let userHasNavigatedFromHome = false;
   function showView(name){
+    if(name !== 'Home') userHasNavigatedFromHome = true;
     // ToolTracker's view div sits outside #app (see the comment where #viewToolTracker is
     // declared) to escape #app's max-width:1000px, but #app's own padding-bottom:60px still
     // applies regardless of which children are hidden -- zero it out while ToolTracker is
@@ -901,6 +1084,7 @@
   }
   document.getElementById('settingsBtn').onclick = renderSettings;
   document.getElementById('savedFormsBtn').onclick = renderSavedForms;
+  document.getElementById('undoBtn').onclick = openUndoPanel;
 
   function backButton(){
     return '<button class="back-btn" onclick="window.__formsNav.home()">‹ Back to forms</button>';
