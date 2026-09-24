@@ -378,8 +378,12 @@
   <div id="viewPilotTrainRecords" style="display:none;"></div>
   <div id="viewPilotTrainCard" style="display:none;"></div>
   <div id="viewPilotTrainManage" style="display:none;"></div>
-  <div id="viewToolTracker" style="display:none;"></div>
 </div>
+
+<!-- Rendered as a sibling of #app (not a child) so it isn't capped by #app's max-width:1000px --
+     the Tool & Calibration Tracker iframe needs the full window width to avoid an inner horizontal
+     scrollbar. showView() looks this up by id regardless of where it sits in the DOM, so this is safe. -->
+<div id="viewToolTracker" style="display:none;"></div>
 
 <div id="printArea"></div>
 
@@ -5709,9 +5713,11 @@
     showView('ToolTracker');
     const el = document.getElementById('viewToolTracker');
     el.innerHTML =
-      backToReservedBtn() +
-      '<div class="panel" style="padding:0;overflow:hidden;">' +
-        '<iframe src="./tool-calibration-tracker.html" title="Tool &amp; Calibration Tracker" style="width:100%;height:88vh;border:0;display:block;"></iframe>' +
+      '<div style="max-width:1900px;margin:0 auto;padding:20px 24px 60px;">' +
+        backToReservedBtn() +
+        '<div class="panel" style="padding:0;overflow:hidden;">' +
+          '<iframe src="./tool-calibration-tracker.html" title="Tool &amp; Calibration Tracker" style="width:100%;height:88vh;border:0;display:block;"></iframe>' +
+        '</div>' +
       '</div>';
     document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
   }
