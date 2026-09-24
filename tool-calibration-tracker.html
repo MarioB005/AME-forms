@@ -132,6 +132,14 @@
   .status-dot.bad{background:var(--bad);}
   .status-dot.holding{background:var(--hold);}
   .status-dot.nolimit{background:#a9b0a5;}
+
+  /* Assemblies (Tool & Calibration Tracker section only): a parent item ("Mobile Tank Filters
+     (On wheels) (#1)") with sub-items ("hoses", "filters", ...) nested directly beneath it. */
+  .tt-assembly-badge{display:inline-block;margin-left:7px;padding:1px 7px;border-radius:999px;background:var(--hold-bg);color:var(--hold);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;vertical-align:middle;}
+  table.wa-table tbody tr.item-row.tt-child-row td.nm{padding-left:26px;}
+  table.wa-table tbody tr.item-row.tt-child-row td.nm::before{content:'\21b3';margin-right:6px;color:var(--grey-strong);font-weight:700;}
+  table.wa-table tbody tr.item-row.tt-child-row{background:#fcfcfa;}
+  .tt-orphan-note{display:block;font-size:9.5px;font-weight:700;color:var(--grey-strong);margin-top:1px;}
   .wa-footer-count{font-size:11px;color:var(--grey-strong);padding:6px 4px 16px;text-align:right;}
 
   .wa-banner{background:#123a5e;color:#fff;font-weight:800;text-align:center;padding:8px 12px;font-size:12.5px;letter-spacing:.6px;text-transform:uppercase;border-radius:8px 8px 0 0;margin-top:18px;}
@@ -560,8 +568,15 @@
     return fmtDateNice(di.due) + ' <span style="font-weight:600;font-size:10.5px;">('+daysStr+')</span>';
   }
 
-  function renderRowActions(item, di){
+  function renderRowActions(item, di, opts){
+    opts = opts || {};
     let html = '<button type="button" class="row-icon-btn" title="Edit" data-act="edit" data-id="'+item.id+'">✏️</button>';
+    // "Add Sub-Item" -- only on a top-level (non-child) row, only in the Tool & Calibration
+    // Tracker section, and only from the active list (not holding, not a search/filter view
+    // where the parent itself might not even be showing).
+    if(!opts.tasksMode && !opts.holdingMode && !item.parentId){
+      html += '<button type="button" class="row-icon-btn" title="Add Sub-Item" data-act="add-sub" data-id="'+item.id+'">➕</button>';
+    }
     if(di.status==='holding'){
       html += '<button type="button" class="row-icon-btn primary" title="Complete / Return" data-act="complete-holding" data-id="'+item.id+'">✅</button>';
     } else {
@@ -571,17 +586,31 @@
     return html;
   }
 
+  // opts.isChild: rendered nested directly under its parent's row (indented, with a ⤷ marker).
+  // opts.childCount: for a top-level row, how many sub-items are nested under it (adds the
+  // "Assembly" badge). opts.tasksMode: hides assembly-only affordances in the Task Tracker
+  // section (defensive -- Task Tracker items never actually get a parentId, see openItemForm).
   function renderItemRow(item, opts){
     opts = opts || {};
     const tasksMode = CURRENT_SECTION === 'tasks';
+    opts.tasksMode = tasksMode;
     const di = dueInfo(item);
     const notInstalledCls = item.installed ? '' : ' notinstalled';
     const holdingCls = di.status==='holding' ? ' holding' : '';
+    const childRowCls = opts.isChild ? ' tt-child-row' : '';
+    const childCount = opts.childCount || 0;
+    // A child item is normally rendered nested (opts.isChild) right under its parent. If its
+    // parent got filtered out of the current view (a category filter, or a search match on the
+    // child only) it's rendered here instead, at the top level -- with a note pointing back to
+    // its assembly, so it never just silently vanishes from the list.
+    const orphanParent = (item.parentId && !opts.isChild) ? ITEMS.find(p=>p.id===item.parentId) : null;
     const nameCell =
       '<span class="status-dot '+di.cls+'"></span>' +
       '<span>'+escapeHTML(item.name)+'</span>' +
+      (childCount ? ' <span class="tt-assembly-badge">Assembly · '+childCount+' item'+(childCount===1?'':'s')+'</span>' : '') +
       (item.notes ? ' <span title="'+escapeHTML(item.notes)+'" style="cursor:help;">📝</span>' : '') +
-      (!item.installed ? ' <span style="font-size:9.5px;font-weight:800;color:var(--grey-strong);">(NOT INSTALLED)</span>' : '');
+      (!item.installed ? ' <span style="font-size:9.5px;font-weight:800;color:var(--grey-strong);">(NOT INSTALLED)</span>' : '') +
+      (orphanParent ? '<span class="tt-orphan-note">⤷ Part of '+escapeHTML(orphanParent.name)+'</span>' : '');
 
     if(opts.holdingMode){
       let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.category||'')+'</td>';
@@ -592,8 +621,8 @@
       cells += '<td class="num">'+(item.holding&&item.holding.sentDate?fmtDateNice(item.holding.sentDate):'—')+'</td>' +
         '<td>'+escapeHTML((item.holding&&item.holding.note)||'')+'</td>' +
         '<td class="num">'+attIconStr(item)+'</td>' +
-        '<td class="act-cell">'+renderRowActions(item, di)+'</td>';
-      return '<tr class="item-row'+holdingCls+'" data-id="'+item.id+'">'+cells+'</tr>';
+        '<td class="act-cell">'+renderRowActions(item, di, opts)+'</td>';
+      return '<tr class="item-row'+holdingCls+childRowCls+'" data-id="'+item.id+'">'+cells+'</tr>';
     }
 
     let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.action||'')+'</td>';
@@ -607,8 +636,8 @@
       '<td class="num">'+fmtDateNice(item.lastPerformed)+'</td>' +
       '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>' +
       '<td class="num">'+attIconStr(item)+'</td>' +
-      '<td class="act-cell">'+renderRowActions(item, di)+'</td>';
-    return '<tr class="item-row'+notInstalledCls+holdingCls+'" data-id="'+item.id+'">'+cells+'</tr>';
+      '<td class="act-cell">'+renderRowActions(item, di, opts)+'</td>';
+    return '<tr class="item-row'+notInstalledCls+holdingCls+childRowCls+'" data-id="'+item.id+'">'+cells+'</tr>';
   }
 
   function activeHead(tasksMode){
@@ -636,24 +665,51 @@
       return;
     }
 
+    // Assemblies: a sub-item (item.parentId set) nests directly under its parent's row instead
+    // of appearing in its own sorted/grouped position -- but only when that parent is still part
+    // of this same filtered pool. A sub-item whose parent got filtered out (a category filter,
+    // or a search match on the sub-item only) still needs to show up somewhere, so renderItemRow
+    // falls back to showing it as a normal row with a "Part of <assembly>" note.
+    const poolIds = new Set(pool.map(i=>i.id));
+    const childrenByParent = {};
+    pool.forEach(i=>{
+      if(i.parentId && poolIds.has(i.parentId)){
+        (childrenByParent[i.parentId] = childrenByParent[i.parentId] || []).push(i);
+      }
+    });
+    Object.keys(childrenByParent).forEach(pid=>{ childrenByParent[pid] = sortItemsByDue(childrenByParent[pid]); });
+    const nestedChildIds = new Set();
+    Object.values(childrenByParent).forEach(arr=>arr.forEach(c=>nestedChildIds.add(c.id)));
+
+    function renderWithChildren(item, baseOpts){
+      let html = renderItemRow(item, Object.assign({}, baseOpts, { childCount: (childrenByParent[item.id]||[]).length }));
+      (childrenByParent[item.id]||[]).forEach(child=>{
+        html += renderItemRow(child, Object.assign({}, baseOpts, { isChild:true }));
+      });
+      return html;
+    }
+
     let bodyRows;
     let head;
     if(VIEW_TAB === 'holding'){
       head = holdingHead(tasksMode);
-      bodyRows = sortItemsByDue(pool).map(i=>renderItemRow(i,{holdingMode:true})).join('');
+      const visible = sortItemsByDue(pool).filter(i=>!nestedChildIds.has(i.id));
+      bodyRows = visible.map(i=>renderWithChildren(i, {holdingMode:true})).join('');
     } else if(SORT_MODE === 'due'){
       head = activeHead(tasksMode);
-      bodyRows = sortItemsByDue(pool).map(i=>renderItemRow(i)).join('');
+      const visible = sortItemsByDue(pool).filter(i=>!nestedChildIds.has(i.id));
+      bodyRows = visible.map(i=>renderWithChildren(i, {})).join('');
     } else {
       head = activeHead(tasksMode);
       const cats = sortedCategories(pool);
       let rows = '';
       const colCount = activeColCount(tasksMode);
       cats.forEach(cat=>{
-        const inCat = sortItemsByDue(pool.filter(i => (i.category||'Uncategorized') === cat));
+        const inCatAll = pool.filter(i => (i.category||'Uncategorized') === cat);
+        const inCat = sortItemsByDue(inCatAll.filter(i=>!nestedChildIds.has(i.id)));
         if(!inCat.length) return;
-        rows += '<tr class="grp-row"><td colspan="'+colCount+'">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCat.length+' item'+(inCat.length===1?'':'s')+')</span></td></tr>';
-        rows += inCat.map(i=>renderItemRow(i)).join('');
+        rows += '<tr class="grp-row"><td colspan="'+colCount+'">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCatAll.length+' item'+(inCatAll.length===1?'':'s')+')</span></td></tr>';
+        inCat.forEach(i=>{ rows += renderWithChildren(i, {}); });
       });
       bodyRows = rows;
     }
@@ -677,6 +733,7 @@
     const item = ITEMS.find(i=>i.id===id);
     if(!item) return;
     if(act === 'edit') openItemForm(item);
+    else if(act === 'add-sub') openItemForm(null, item);
     else if(act === 'delete') openDeleteConfirm(item);
     else if(act === 'send-holding') openSendToHolding(item);
     else if(act === 'complete-holding') openCompleteHolding(item);
@@ -728,19 +785,30 @@
   // ---------- item form (add/edit) ----------
   let FORM_STATE = null;
 
-  function openItemForm(item){
+  function openItemForm(item, presetParent){
     const editing = !!item;
     FORM_STATE = editing ? JSON.parse(JSON.stringify(item)) : {
-      id: uid(), name:'', category:'', action:'Calibration', makeModel:'', partNo:'', serialNo:'', trackingNo:'',
+      id: uid(), name:'', category: presetParent ? presetParent.category : '', action:'Calibration', makeModel:'', partNo:'', serialNo:'', trackingNo:'',
       installed:true, limitMonths:null, lastPerformed:null, manualNextDue:null, warningDays:30, notes:'',
-      photoAttachments:[], calReportAttachments:[], holding:null
+      photoAttachments:[], calReportAttachments:[], holding:null, parentId: presetParent ? presetParent.id : null
     };
     if(FORM_STATE.warningDays == null) FORM_STATE.warningDays = 30;
+    if(FORM_STATE.parentId === undefined) FORM_STATE.parentId = null;
     const cats = sortedCategories(ITEMS.length ? ITEMS : SEED_ITEMS);
     // Task Tracker items (recurring checks) don't have make/model/part/serial/tracking numbers, so
     // those fields start hidden when the item's category (or, for a new item, the section currently
     // open) belongs to Task Tracker -- and the Category field below toggles them live as it's edited.
     const hideDetailFields = FORM_STATE.category ? (getCategorySection(FORM_STATE.category) === 'tasks') : (CURRENT_SECTION === 'tasks');
+    // Assemblies (a parent item with sub-items nested under it) only make sense for physical
+    // tools/equipment, so this only ever offers choices -- and only shows at all -- in the Tool &
+    // Calibration Tracker section, same as the make/model/part/serial/tracking fields above.
+    // Eligible parents: any tools-section item that isn't itself already a child (keeps nesting to
+    // one level) and isn't this item being edited (can't be its own parent).
+    const parentCandidates = ITEMS.filter(i =>
+      i.id !== FORM_STATE.id &&
+      !i.parentId &&
+      getCategorySection(i.category) === 'tools'
+    ).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
 
     const html =
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
@@ -759,6 +827,10 @@
               '<div class="field"><label>Part No.</label><input id="fPartNo" value="'+escapeHTML(FORM_STATE.partNo)+'"></div>' +
               '<div class="field"><label>Serial No.</label><input id="fSerialNo" value="'+escapeHTML(FORM_STATE.serialNo)+'"></div>' +
               '<div class="field"><label>Tracking No.</label><input id="fTrackingNo" value="'+escapeHTML(FORM_STATE.trackingNo)+'"></div>' +
+              '<div class="field span2"><label>Part of Assembly</label><select id="fParentId">' +
+                '<option value="">— None (top-level item / its own assembly) —</option>' +
+                parentCandidates.map(p=>'<option value="'+p.id+'"'+(FORM_STATE.parentId===p.id?' selected':'')+'>'+escapeHTML(p.name)+' ('+escapeHTML(p.category||'')+')</option>').join('') +
+              '</select></div>' +
             '</div>' +
           '</div>' +
 
@@ -860,6 +932,17 @@
         FORM_STATE.partNo = document.getElementById('fPartNo').value.trim();
         FORM_STATE.serialNo = document.getElementById('fSerialNo').value.trim();
         FORM_STATE.trackingNo = document.getElementById('fTrackingNo').value.trim();
+        const selectedParentId = document.getElementById('fParentId').value || null;
+        // An assembly that already has sub-items of its own can't also become a sub-item of
+        // another assembly -- that would nest three levels deep, which the list/report
+        // rendering doesn't support. Move or remove its sub-items first.
+        if(selectedParentId && ITEMS.some(i=>i.parentId===FORM_STATE.id)){
+          alert('"'+FORM_STATE.name+'" already has sub-items under it, so it can\'t also be made a sub-item of another assembly. Move or remove its sub-items first.');
+          return;
+        }
+        FORM_STATE.parentId = selectedParentId;
+      } else {
+        FORM_STATE.parentId = null;
       }
       if(!CATEGORY_META[FORM_STATE.category]){
         CATEGORY_META[FORM_STATE.category] = { section: fieldsHidden ? 'tasks' : 'tools' };
@@ -951,11 +1034,17 @@
   }
 
   function openDeleteConfirm(item){
+    // Deleting an assembly doesn't take its sub-items down with it -- they're promoted back to
+    // top-level items (parentId cleared) rather than silently deleted along with their parent.
+    const childCount = ITEMS.filter(i=>i.parentId===item.id).length;
+    const childNote = childCount
+      ? ' This item has '+childCount+' sub-item'+(childCount===1?'':'s')+' under it -- '+(childCount===1?'it':'they')+' will be kept, moved back to being top-level item'+(childCount===1?'':'s')+' instead of being deleted.'
+      : '';
     const html =
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
         '<div class="tt-modal" style="max-width:420px;">' +
           '<h2>Delete "'+escapeHTML(item.name)+'"?</h2>' +
-          '<p class="sub">This removes the item and its attachments permanently. This can\'t be undone.</p>' +
+          '<p class="sub">This removes the item and its attachments permanently. This can\'t be undone.'+childNote+'</p>' +
           '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
             '<button class="btn" id="ttDelCancel">Cancel</button>' +
             '<button class="btn danger" id="ttDelConfirm">Delete</button>' +
@@ -965,6 +1054,7 @@
     document.getElementById('ttModalRoot').innerHTML = html;
     document.getElementById('ttDelCancel').onclick = closeModal;
     document.getElementById('ttDelConfirm').onclick = async ()=>{
+      ITEMS.forEach(i=>{ if(i.parentId===item.id) i.parentId = null; });
       ITEMS = ITEMS.filter(i=>i.id!==item.id);
       closeModal();
       renderAll();
