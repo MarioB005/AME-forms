@@ -140,6 +140,15 @@
   table.wa-table tbody tr.item-row.tt-child-row td.nm::before{content:'\21b3';margin-right:6px;color:var(--grey-strong);font-weight:700;}
   table.wa-table tbody tr.item-row.tt-child-row{background:#fcfcfa;}
   .tt-orphan-note{display:block;font-size:9.5px;font-weight:700;color:var(--grey-strong);margin-top:1px;}
+
+  /* "My Order" drag-to-reorder (Tool & Calibration Tracker, active list only). */
+  table.wa-table tbody tr.item-row.tt-draggable{cursor:grab;}
+  table.wa-table tbody tr.item-row.tt-draggable td.nm{padding-left:4px;}
+  .tt-drag-handle{display:inline-block;width:16px;text-align:center;color:var(--grey-strong);opacity:.6;margin-right:4px;cursor:grab;user-select:none;vertical-align:middle;}
+  table.wa-table tbody tr.item-row.tt-dragging{opacity:.4;}
+  table.wa-table tbody tr.item-row.tt-drag-over-before{box-shadow:inset 0 2px 0 0 var(--accent);}
+  table.wa-table tbody tr.item-row.tt-drag-over-after{box-shadow:inset 0 -2px 0 0 var(--accent);}
+  table.wa-table tbody tr.item-row.tt-drag-reject{cursor:not-allowed;}
   .wa-footer-count{font-size:11px;color:var(--grey-strong);padding:6px 4px 16px;text-align:right;}
 
   .wa-banner{background:#123a5e;color:#fff;font-weight:800;text-align:center;padding:8px 12px;font-size:12.5px;letter-spacing:.6px;text-transform:uppercase;border-radius:8px 8px 0 0;margin-top:18px;}
@@ -231,6 +240,7 @@
       <select id="ttSortMode">
         <option value="group">Grouped by category</option>
         <option value="due">Flat — by time limit / due date</option>
+        <option value="custom">My Order (drag to reorder)</option>
       </select>
       <select id="ttCategoryFilter"><option value="">All categories</option></select>
       <label class="wa-check"><input type="checkbox" id="ttInstalledOnly"> Show installed item(s) only</label>
@@ -409,7 +419,13 @@
   let CATEGORY_META = {}; // { [categoryName]: { section: 'tasks'|'tools' } }
   let CURRENT_SECTION = 'tools'; // 'tasks' (Task Tracker) | 'tools' (Tool & Calibration Tracker)
   let VIEW_TAB = 'active'; // active | holding
-  let SORT_MODE = 'group'; // group | due
+  let SORT_MODE = 'group'; // group | due | custom
+  // "My Order" drag state -- which row is being dragged, and which row it's currently hovering
+  // over (plus above/below that row), so drop() knows exactly where to insert it.
+  let DRAG_ITEM_ID = null;
+  let DRAG_ITEM_GROUP_KEY = null;
+  let DRAG_OVER_ID = null;
+  let DRAG_OVER_POS = null; // 'before' | 'after'
   let SEARCH_Q = '';
   let CATEGORY_FILTER = '';
   let INSTALLED_ONLY = false;
@@ -420,12 +436,70 @@
     if(raw){
       try{
         ITEMS = JSON.parse(raw);
+        if(ensureSortIndexes()) await persist();
         return;
       }catch(e){ console.error('bad stored data, falling back to seed', e); }
     }
     // first run — seed from the parsed tool crib list, then persist immediately
     ITEMS = JSON.parse(JSON.stringify(SEED_ITEMS));
+    ensureSortIndexes();
     await persist();
+  }
+
+  // "My Order" reordering is scoped to siblings -- a child item can only be dragged among the
+  // other children of the same assembly, and a top-level item only among the other top-level
+  // items in the same category. This is what a drag is validated against, and what a drop
+  // renumbers.
+  function sortGroupKey(item){
+    return item.parentId ? ('child:'+item.parentId) : ('top:'+(item.category||'Uncategorized'));
+  }
+
+  // Gives every item a sortIndex if it doesn't already have one -- both for the very first load
+  // (55 seed items, none of which have ever needed a manual order before) and for any item added
+  // since. New/never-ordered items are numbered after whatever's already in their group, in
+  // whatever order they're currently in, so nothing jumps around the first time "My Order" is
+  // opened -- it starts out looking exactly like the grouped view already did.
+  function ensureSortIndexes(){
+    let changed = false;
+    const counters = {};
+    ITEMS.forEach(item=>{
+      if(typeof item.sortIndex === 'number') return;
+      const key = sortGroupKey(item);
+      const next = (counters[key] == null) ? nextSortIndexFor(key) : counters[key];
+      item.sortIndex = next;
+      counters[key] = next + 1;
+      changed = true;
+    });
+    return changed;
+  }
+
+  function nextSortIndexFor(groupKey){
+    let max = -1;
+    ITEMS.forEach(i=>{
+      if(sortGroupKey(i) === groupKey && typeof i.sortIndex === 'number' && i.sortIndex > max) max = i.sortIndex;
+    });
+    return max + 1;
+  }
+
+  function sortItemsByCustomOrder(items){
+    return items.slice().sort((a,b)=>{
+      const ai = (typeof a.sortIndex === 'number') ? a.sortIndex : 999999;
+      const bi = (typeof b.sortIndex === 'number') ? b.sortIndex : 999999;
+      if(ai !== bi) return ai - bi;
+      return (a.name||'').localeCompare(b.name||'');
+    });
+  }
+
+  // Renumbers an entire sibling group 0..N-1 to match the order the caller hands in, and marks
+  // every item whose position actually changed. Always renumbering the whole group (rather than
+  // patching just the moved item) keeps sortIndex values small and gap-free, and sidesteps any
+  // edge case around ties or stale values left over from ensureSortIndexes().
+  function applyCustomOrder(orderedItems){
+    let changed = false;
+    orderedItems.forEach((item, idx)=>{
+      if(item.sortIndex !== idx){ item.sortIndex = idx; changed = true; }
+    });
+    return changed;
   }
 
   function getCategorySection(cat){
@@ -605,13 +679,22 @@
     // child only) it's rendered here instead, at the top level -- with a note pointing back to
     // its assembly, so it never just silently vanishes from the list.
     const orphanParent = (item.parentId && !opts.isChild) ? ITEMS.find(p=>p.id===item.parentId) : null;
+    // "My Order" dragging is scoped to siblings (sortGroupKey), so a row only becomes draggable
+    // when it's actually rendered in its real sibling group -- an orphaned sub-item (parent
+    // filtered out of view, see above) is shown flat among a different group's rows and can't
+    // meaningfully be dragged there.
+    const draggableRow = !!opts.draggable && !opts.holdingMode && !orphanParent;
+    const dragHandle = draggableRow ? '<span class="tt-drag-handle" title="Drag to reorder">⠿</span>' : '';
     const nameCell =
+      dragHandle +
       '<span class="status-dot '+di.cls+'"></span>' +
       '<span>'+escapeHTML(item.name)+'</span>' +
       (childCount ? ' <span class="tt-assembly-badge">Assembly · '+childCount+' item'+(childCount===1?'':'s')+'</span>' : '') +
       (item.notes ? ' <span title="'+escapeHTML(item.notes)+'" style="cursor:help;">📝</span>' : '') +
       (!item.installed ? ' <span style="font-size:9.5px;font-weight:800;color:var(--grey-strong);">(NOT INSTALLED)</span>' : '') +
       (orphanParent ? '<span class="tt-orphan-note">⤷ Part of '+escapeHTML(orphanParent.name)+'</span>' : '');
+    const dragAttrs = draggableRow ? ' draggable="true" data-group-key="'+escapeHTML(sortGroupKey(item))+'"' : '';
+    const dragRowCls = draggableRow ? ' tt-draggable' : '';
 
     if(opts.holdingMode){
       let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.category||'')+'</td>';
@@ -623,7 +706,7 @@
         '<td>'+escapeHTML((item.holding&&item.holding.note)||'')+'</td>' +
         '<td class="num">'+attIconStr(item)+'</td>' +
         '<td class="act-cell">'+renderRowActions(item, di, opts)+'</td>';
-      return '<tr class="item-row'+holdingCls+childRowCls+'" data-id="'+item.id+'">'+cells+'</tr>';
+      return '<tr class="item-row'+holdingCls+childRowCls+dragRowCls+'" data-id="'+item.id+'"'+dragAttrs+'>'+cells+'</tr>';
     }
 
     let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.action||'')+'</td>';
@@ -638,7 +721,7 @@
       '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>' +
       '<td class="num">'+attIconStr(item)+'</td>' +
       '<td class="act-cell">'+renderRowActions(item, di, opts)+'</td>';
-    return '<tr class="item-row'+notInstalledCls+holdingCls+childRowCls+'" data-id="'+item.id+'">'+cells+'</tr>';
+    return '<tr class="item-row'+notInstalledCls+holdingCls+childRowCls+dragRowCls+'" data-id="'+item.id+'"'+dragAttrs+'>'+cells+'</tr>';
   }
 
   function activeHead(tasksMode){
@@ -671,6 +754,12 @@
     // of this same filtered pool. A sub-item whose parent got filtered out (a category filter,
     // or a search match on the sub-item only) still needs to show up somewhere, so renderItemRow
     // falls back to showing it as a normal row with a "Part of <assembly>" note.
+    // Dragging (SORT_MODE === 'custom') needs a real, deliberate order for children too, not
+    // the usual due-date sort -- everywhere else (due / group modes) children still sort by due
+    // date same as before.
+    const isCustomMode = SORT_MODE === 'custom' && VIEW_TAB !== 'holding';
+    const childSort = isCustomMode ? sortItemsByCustomOrder : sortItemsByDue;
+
     const poolIds = new Set(pool.map(i=>i.id));
     const childrenByParent = {};
     pool.forEach(i=>{
@@ -678,7 +767,7 @@
         (childrenByParent[i.parentId] = childrenByParent[i.parentId] || []).push(i);
       }
     });
-    Object.keys(childrenByParent).forEach(pid=>{ childrenByParent[pid] = sortItemsByDue(childrenByParent[pid]); });
+    Object.keys(childrenByParent).forEach(pid=>{ childrenByParent[pid] = childSort(childrenByParent[pid]); });
     const nestedChildIds = new Set();
     Object.values(childrenByParent).forEach(arr=>arr.forEach(c=>nestedChildIds.add(c.id)));
 
@@ -701,23 +790,29 @@
       const visible = sortItemsByDue(pool).filter(i=>!nestedChildIds.has(i.id));
       bodyRows = visible.map(i=>renderWithChildren(i, {})).join('');
     } else {
+      // Both "Grouped by category" and "My Order" share this same category-grouped shape --
+      // "My Order" just orders each group by sortIndex instead of due date, and makes its rows
+      // draggable.
       head = activeHead(tasksMode);
       const cats = sortedCategories(pool);
       let rows = '';
       const colCount = activeColCount(tasksMode);
+      const groupOrder = isCustomMode ? sortItemsByCustomOrder : sortItemsByDue;
       cats.forEach(cat=>{
         const inCatAll = pool.filter(i => (i.category||'Uncategorized') === cat);
-        const inCat = sortItemsByDue(inCatAll.filter(i=>!nestedChildIds.has(i.id)));
+        const inCat = groupOrder(inCatAll.filter(i=>!nestedChildIds.has(i.id)));
         if(!inCat.length) return;
         rows += '<tr class="grp-row"><td colspan="'+colCount+'">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCatAll.length+' item'+(inCatAll.length===1?'':'s')+')</span></td></tr>';
-        inCat.forEach(i=>{ rows += renderWithChildren(i, {}); });
+        inCat.forEach(i=>{ rows += renderWithChildren(i, { draggable: isCustomMode }); });
       });
       bodyRows = rows;
     }
 
     area.innerHTML =
       '<div class="wa-table-wrap"><table class="wa-table"><thead>'+head+'</thead><tbody>'+bodyRows+'</tbody></table></div>' +
-      '<div class="wa-footer-count">'+pool.length+' item'+(pool.length===1?'':'s')+' found</div>';
+      '<div class="wa-footer-count">'+pool.length+' item'+(pool.length===1?'':'s')+' found'+(isCustomMode?' — drag a row (⠿) to reorder it within its category or assembly':'')+'</div>';
+
+    if(isCustomMode) wireDragReorder(area);
 
     area.querySelectorAll('[data-act]').forEach(btn=>{
       btn.onclick = (e)=>{ e.stopPropagation(); handleCardAction(btn.dataset.act, btn.dataset.id); };
@@ -728,6 +823,83 @@
         if(item) openItemForm(item);
       };
     });
+  }
+
+  // "My Order" drag-to-reorder. Native HTML5 drag events on the whole row (not just the ⠿
+  // handle) -- a plain click (no pointer movement) still opens the edit form same as always,
+  // since the browser only fires drag events once the pointer actually moves, and doesn't fire
+  // a click on the source element after a real drag.
+  function clearDragIndicators(area){
+    area.querySelectorAll('.tt-drag-over-before,.tt-drag-over-after,.tt-drag-reject').forEach(el=>{
+      el.classList.remove('tt-drag-over-before','tt-drag-over-after','tt-drag-reject');
+    });
+  }
+
+  function wireDragReorder(area){
+    area.querySelectorAll('tr.item-row.tt-draggable').forEach(tr=>{
+      tr.addEventListener('dragstart', (e)=>{
+        DRAG_ITEM_ID = tr.dataset.id;
+        DRAG_ITEM_GROUP_KEY = tr.dataset.groupKey;
+        DRAG_OVER_ID = null;
+        DRAG_OVER_POS = null;
+        tr.classList.add('tt-dragging');
+        try{ e.dataTransfer.setData('text/plain', tr.dataset.id); }catch(err){}
+        if(e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      });
+      tr.addEventListener('dragend', ()=>{
+        tr.classList.remove('tt-dragging');
+        clearDragIndicators(area);
+        DRAG_ITEM_ID = null; DRAG_ITEM_GROUP_KEY = null; DRAG_OVER_ID = null; DRAG_OVER_POS = null;
+      });
+      tr.addEventListener('dragover', (e)=>{
+        if(!DRAG_ITEM_ID || DRAG_ITEM_ID === tr.dataset.id) return;
+        const sameGroup = DRAG_ITEM_GROUP_KEY && tr.dataset.groupKey === DRAG_ITEM_GROUP_KEY;
+        if(!sameGroup){
+          // Not calling preventDefault() here is deliberate -- it tells the browser this row
+          // isn't a valid drop target, which shows the "no drop" cursor on its own.
+          clearDragIndicators(area);
+          tr.classList.add('tt-drag-reject');
+          return;
+        }
+        e.preventDefault();
+        if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const rect = tr.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < (rect.height/2);
+        clearDragIndicators(area);
+        tr.classList.add(before ? 'tt-drag-over-before' : 'tt-drag-over-after');
+        DRAG_OVER_ID = tr.dataset.id;
+        DRAG_OVER_POS = before ? 'before' : 'after';
+      });
+      tr.addEventListener('dragleave', ()=>{
+        tr.classList.remove('tt-drag-over-before','tt-drag-over-after','tt-drag-reject');
+      });
+      tr.addEventListener('drop', async (e)=>{
+        e.preventDefault();
+        clearDragIndicators(area);
+        if(!DRAG_ITEM_ID || !DRAG_OVER_ID || DRAG_ITEM_ID === DRAG_OVER_ID) return;
+        await performReorder(DRAG_ITEM_ID, DRAG_OVER_ID, DRAG_OVER_POS);
+      });
+    });
+  }
+
+  async function performReorder(draggedId, overId, pos){
+    const draggedItem = ITEMS.find(i=>i.id===draggedId);
+    const overItem = ITEMS.find(i=>i.id===overId);
+    if(!draggedItem || !overItem) return;
+    const groupKey = sortGroupKey(draggedItem);
+    if(sortGroupKey(overItem) !== groupKey) return; // safety net -- dragover already gates this
+
+    const siblings = sortItemsByCustomOrder(ITEMS.filter(i=>sortGroupKey(i)===groupKey));
+    const without = siblings.filter(i=>i.id!==draggedId);
+    const overIdx = without.findIndex(i=>i.id===overId);
+    if(overIdx === -1) return;
+    const insertAt = pos === 'before' ? overIdx : overIdx + 1;
+    without.splice(insertAt, 0, draggedItem);
+
+    if(applyCustomOrder(without)){
+      renderAll();
+      await persist();
+    }
   }
 
   function handleCardAction(act, id){
@@ -988,6 +1160,14 @@
       FORM_STATE.notes = document.getElementById('fNotes').value.trim();
 
       const idx = ITEMS.findIndex(i=>i.id===FORM_STATE.id);
+      // A brand-new item, or one that just moved to a different category or assembly, goes to
+      // the end of its (new) group rather than keeping a sortIndex left over from wherever it
+      // used to be -- otherwise it could land in the middle of an unrelated group's "My Order".
+      const oldGroupKey = item ? sortGroupKey(item) : null;
+      const newGroupKey = sortGroupKey(FORM_STATE);
+      if(idx < 0 || oldGroupKey !== newGroupKey || typeof FORM_STATE.sortIndex !== 'number'){
+        FORM_STATE.sortIndex = nextSortIndexFor(newGroupKey);
+      }
       if(idx >= 0) ITEMS[idx] = FORM_STATE; else ITEMS.push(FORM_STATE);
       closeModal();
       renderAll();
@@ -1084,7 +1264,14 @@
     document.getElementById('ttModalRoot').innerHTML = html;
     document.getElementById('ttDelCancel').onclick = closeModal;
     document.getElementById('ttDelConfirm').onclick = async ()=>{
-      ITEMS.forEach(i=>{ if(i.parentId===item.id) i.parentId = null; });
+      ITEMS.forEach(i=>{
+        if(i.parentId===item.id){
+          i.parentId = null;
+          // Promoted to top-level, so its old sortIndex (relative to its old sibling
+          // sub-items) no longer means anything in its new group -- send it to the end.
+          i.sortIndex = nextSortIndexFor(sortGroupKey(i));
+        }
+      });
       ITEMS = ITEMS.filter(i=>i.id!==item.id);
       closeModal();
       renderAll();
