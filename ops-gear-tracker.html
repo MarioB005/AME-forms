@@ -118,6 +118,9 @@
   table.wa-table tbody tr.item-row.holding{background:var(--hold-bg);}
   table.wa-table td{padding:7px 10px;vertical-align:middle;}
   table.wa-table tr.grp-row td{background:#eef1ea;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink);}
+  .grp-files-btn{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:3px 10px;cursor:pointer;font-size:10.5px;font-weight:700;text-transform:none;letter-spacing:normal;color:var(--grey-strong);white-space:nowrap;}
+  .grp-files-btn:hover{border-color:var(--accent);color:var(--ink);}
+  .grp-files-btn.has-files{color:#123a5e;border-color:#123a5e;}
   table.wa-table td.nm{font-weight:700;white-space:nowrap;}
   table.wa-table td.nm span{white-space:nowrap;}
   table.wa-table td.num{white-space:nowrap;}
@@ -910,7 +913,15 @@
         const inCatAll = pool.filter(i => (i.category||'Uncategorized') === cat);
         const inCat = groupOrder(inCatAll.filter(i=>!nestedChildIds.has(i.id)));
         if(!inCat.length) return;
-        rows += '<tr class="grp-row"><td colspan="'+colCount+'">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCatAll.length+' item'+(inCatAll.length===1?'':'s')+')</span></td></tr>';
+        const catMeta = CATEGORY_META[cat] || {};
+        const fileCount = Array.isArray(catMeta.attachments) ? catMeta.attachments.length : 0;
+        const filesBtnLabel = fileCount ? ('📎 '+fileCount+' file'+(fileCount===1?'':'s')) : '📎 Attach file';
+        rows += '<tr class="grp-row"><td colspan="'+colCount+'">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+            '<div>'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCatAll.length+' item'+(inCatAll.length===1?'':'s')+')</span></div>' +
+            '<button type="button" class="grp-files-btn'+(fileCount?' has-files':'')+'" data-cat-files="'+escapeHTML(cat)+'">'+filesBtnLabel+'</button>' +
+          '</div>' +
+        '</td></tr>';
         inCat.forEach(i=>{ rows += renderWithChildren(i, { draggable: isCustomMode }); });
       });
       bodyRows = rows;
@@ -924,6 +935,9 @@
 
     area.querySelectorAll('[data-act]').forEach(btn=>{
       btn.onclick = (e)=>{ e.stopPropagation(); handleCardAction(btn.dataset.act, btn.dataset.id); };
+    });
+    area.querySelectorAll('[data-cat-files]').forEach(btn=>{
+      btn.onclick = (e)=>{ e.stopPropagation(); openCategoryFilesModal(btn.dataset.catFiles); };
     });
     area.querySelectorAll('tr.item-row').forEach(tr=>{
       tr.onclick = ()=>{
@@ -1117,6 +1131,61 @@
         e.target.value = '';
       };
     });
+  }
+
+  // Persists a category's attachment list right away (unlike the batch Save in Manage
+  // Categories) and re-renders the list/filter so the 📎 badge on the category row -- and in
+  // the category filter dropdown -- updates immediately.
+  async function saveCategoryFiles(cat, files){
+    if(!CATEGORY_META[cat]) CATEGORY_META[cat] = { section: getCategorySection(cat) };
+    CATEGORY_META[cat].attachments = files;
+    await persistCategoryMeta();
+    renderList();
+    renderCategoryFilter();
+  }
+
+  // Quick-attach modal opened directly from a category's row in the item list (grp-row) -- a
+  // lighter-weight alternative to "Manage Categories" for just adding/removing files on one
+  // category, with no separate Save step: every add/remove persists right away.
+  function openCategoryFilesModal(cat){
+    const meta = CATEGORY_META[cat] || {};
+    let files = (Array.isArray(meta.attachments) ? meta.attachments : []).slice();
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:480px;">' +
+          '<h2>'+escapeHTML(cat)+' — Files</h2>' +
+          '<p class="sub">Reference files (manuals, spec sheets, photos) attached to this whole category.</p>' +
+          '<div class="mc-files-list" id="catFilesList"></div>' +
+          '<label class="btn small" style="cursor:pointer;display:inline-block;">📎 Attach file<input type="file" id="catFilesInput" multiple style="display:none;"></label>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn primary" id="ttCatFilesDone">Done</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalBackdrop').onclick = (e)=>{ if(e.target.id==='ttModalBackdrop') closeModal(); };
+    document.getElementById('ttCatFilesDone').onclick = closeModal;
+
+    const refresh = ()=>{
+      document.getElementById('catFilesList').innerHTML = renderCategoryFileChips(files);
+      document.querySelectorAll('#catFilesList .rm[data-rm-kind="catfile"]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          files.splice(Number(btn.dataset.rmIdx), 1);
+          await saveCategoryFiles(cat, files);
+          refresh();
+        };
+      });
+    };
+    refresh();
+    document.getElementById('catFilesInput').onchange = async (e)=>{
+      const picked = Array.from(e.target.files || []);
+      for(const f of picked){
+        try{ files.push(await readFileSmart(f, 2000, 0.85)); }catch(err){ console.error(err); }
+      }
+      await saveCategoryFiles(cat, files);
+      refresh();
+      e.target.value = '';
+    };
   }
 
   // ---------- item form (add/edit) ----------
