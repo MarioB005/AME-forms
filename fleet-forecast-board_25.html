@@ -128,6 +128,7 @@
   .field input[type="date"]{ width:150px; }
   .field input[type="text"]{ width:190px; }
   .field input:focus{ outline:2px solid var(--accent-soft); border-color:var(--accent); }
+  .field input:read-only{ background:var(--surface-2); color:var(--text-2); cursor:default; }
   .checkfield{ display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--text-2); cursor:pointer; user-select:none; }
   .checkfield input[type="checkbox"]{ accent-color:var(--accent); width:14px; height:14px; }
   .checkfield input[type="number"]{
@@ -333,8 +334,8 @@
         <input type="text" id="flyingReportLabel" placeholder="e.g. ALL 12 A/C (Jul 1, 2026 To Aug 25, 2026)">
       </div>
       <div class="field">
-        <label for="flyingReportPeriod">Period — Airframe (hrs)</label>
-        <input type="number" id="flyingReportPeriod" step="0.1" placeholder="e.g. 19.0">
+        <label for="flyingReportPeriod">Period — Airframe (days)</label>
+        <input type="number" id="flyingReportPeriod" step="1" placeholder="e.g. 19" readonly title="Auto-calculated: the number of days between the two dates in the Report field above.">
       </div>
       <span style="align-self:flex-end; color:var(--text-3); font-size:12px;">Reference only — shown here, not on the print</span>
     </div>
@@ -1253,6 +1254,7 @@
           if (flyingRes.reportLabel){
             settings.flyingReportLabel = flyingRes.reportLabel;
             flyingReportLabelEl.value = flyingRes.reportLabel;
+            syncFlyingReportPeriod();
             saveSettings();
           }
           save();
@@ -1332,6 +1334,17 @@
   var flyingReportLabelEl = document.getElementById('flyingReportLabel');
   var flyingReportPeriodEl = document.getElementById('flyingReportPeriod');
 
+  // "Period — Airframe (days)" is derived, not typed in: it's just the number of days between the
+  // two dates parsed out of the Report field above (same parser reportRangeDays() already uses for
+  // the "for the last N days of flight" wording on the print header), so the two fields can never
+  // drift apart. Called whenever the Report label changes -- by hand, by a fresh paste, or by a
+  // settings pull from another station.
+  function syncFlyingReportPeriod(){
+    var days = reportRangeDays();
+    settings.flyingReportPeriod = days;
+    flyingReportPeriodEl.value = days != null ? days : '';
+  }
+
   // Pushes the current `settings` values into their input fields. Run once at load, and again
   // after a fresh pull from the shared database in case another station's settings are newer than
   // whatever this browser had cached.
@@ -1343,7 +1356,7 @@
     filterIncludeTextEl.value = settings.filterIncludeText || '';
     filterExcludeTextEl.value = settings.filterExcludeText || '';
     flyingReportLabelEl.value = settings.flyingReportLabel || '';
-    flyingReportPeriodEl.value = settings.flyingReportPeriod != null ? settings.flyingReportPeriod : '';
+    syncFlyingReportPeriod();
   }
   hydrateInputsFromSettings();
 
@@ -1351,11 +1364,7 @@
 
   flyingReportLabelEl.addEventListener('input', function(){
     settings.flyingReportLabel = flyingReportLabelEl.value;
-    saveSettings();
-  });
-  flyingReportPeriodEl.addEventListener('input', function(){
-    var v = flyingReportPeriodEl.value.trim();
-    settings.flyingReportPeriod = v === '' ? null : parseFloat(v);
+    syncFlyingReportPeriod();
     saveSettings();
   });
 
@@ -1424,8 +1433,18 @@
   var pickerEl = document.getElementById('aircraftPicker');
   var selectAllEl = document.getElementById('selectAllAircraft');
 
+  // WinAir's Forecast List files some fleet-wide equipment groups under a pseudo tail-number of
+  // their own rather than a real aircraft reg. TOOL-CRIB-AND-CONSUMABLES is superseded entirely by
+  // the "Import Tool & Calibration Tracker" button/"TOOL CRIB" reg above; the rest are just clutter
+  // in the aircraft picker. Both are hidden from the picker and permanently excluded from every
+  // forecast list, same as if their checkbox were always left unchecked.
+  var HIDDEN_REGS = ['TOOL-CRIB-AND-CONSUMABLES', 'CARGO_HOOKS', 'FDC_FILTERS', 'NICAD_BATTERY', 'SHOP WORK ORDER'];
+  function isHiddenReg(reg){ return HIDDEN_REGS.indexOf(String(reg||'').trim().toUpperCase()) !== -1; }
+
   function allRegs(){
-    return Array.from(new Set(state.items.map(function(i){ return i.reg; }))).sort();
+    return Array.from(new Set(state.items.map(function(i){ return i.reg; })))
+      .filter(function(r){ return !isHiddenReg(r); })
+      .sort();
   }
   function isRegShown(reg){ return settings.excludedRegs.indexOf(reg) === -1; }
 
@@ -1475,6 +1494,7 @@
 
   function passesFilters(item){
     if (item.removed) return false;
+    if (isHiddenReg(item.reg)) return false;
     if (!isRegShown(item.reg)) return false;
     if (item.category === 'hours' && settings.filterHoursMax != null && item.remaining != null && item.remaining > settings.filterHoursMax) return false;
     if (item.category === 'cycles' && settings.filterCyclesMax != null && item.remaining != null && item.remaining > settings.filterCyclesMax) return false;
