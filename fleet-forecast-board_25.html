@@ -581,6 +581,88 @@
     nd.setHours(0,0,0,0);
     return nd.getTime();
   }
+
+  /* ================= Tool & Calibration Tracker import ================= */
+  // Pulls calibration due dates straight from the Tool & Calibration Tracker app (same shared
+  // Supabase project/table, key "tooltracker:items:v1" -- unprefixed, since that app owns it) so
+  // they show up under Forecast — By Calendar instead of being copied in by hand from Word/Excel.
+  // Imported rows are tagged reg:"TOOL CRIB" so the existing aircraft picker doubles as the filter
+  // for them too -- check/uncheck "TOOL CRIB" there exactly like any tail number.
+  var TOOL_TRACKER_KEY = 'tooltracker:items:v1';
+  var TOOL_CRIB_REG = 'TOOL CRIB';
+
+  // Same due-date logic as the Tool & Calibration Tracker's own computeDue(): a manual override
+  // wins, otherwise it's last-performed + the calibration interval; no due date at all if neither
+  // is set.
+  function dueMsForToolItem(item){
+    if (item.manualNextDue) return new Date(item.manualNextDue + 'T00:00:00').getTime();
+    if (item.lastPerformed && item.limitMonths) {
+      return addMonthsClamped(new Date(item.lastPerformed + 'T00:00:00').getTime(), item.limitMonths);
+    }
+    return null;
+  }
+
+  async function importToolTracker(){
+    var btn = document.getElementById('importToolsBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
+    try{
+      var raw = await storageGet(TOOL_TRACKER_KEY);
+      var toolItems = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(toolItems)) toolItems = [];
+
+      // Carry over a "removed" dismissal from the last import so re-importing doesn't bring back
+      // a row this station already X'd off the list, as long as it's the same underlying tool item.
+      var prevRemoved = {};
+      state.items.forEach(function(it){ if (it.source === 'tooltracker' && it.removed) prevRemoved[it.id] = true; });
+
+      var imported = [];
+      toolItems.forEach(function(ti){
+        if (ti.holding && ti.holding.active) return; // pulled from service -- not something to track as "due"
+        var dueMs = dueMsForToolItem(ti);
+        if (dueMs == null) return; // no last-performed/interval or override set yet -- nothing to forecast
+        var id = 'tool-' + ti.id;
+        var detailBits = [];
+        if (ti.serialNo) detailBits.push('S/N ' + ti.serialNo);
+        if (ti.trackingNo) detailBits.push('Tracking ' + ti.trackingNo);
+        imported.push({
+          id: id, reg: TOOL_CRIB_REG, category: 'calendar',
+          type: ti.category || 'Tool',
+          task: ti.name + (ti.action && ti.action !== 'Calibration' ? (' — ' + ti.action) : ''),
+          limit: ti.limitMonths ? (ti.limitMonths + ' mo') : '',
+          due: '', dueNum: null, dueDate: dueMs,
+          remaining: daysBetween(dueMs, todayMs()),
+          detail: detailBits.join(' · '),
+          source: 'tooltracker', dateUpdated: Date.now(),
+          removed: !!prevRemoved[id]
+        });
+      });
+
+      // Drop the previous import batch, plus any leftover TOOL-CRIB-AND-CONSUMABLES rows from the
+      // old copy-paste-from-Word/Excel workflow this button replaces, then add the fresh batch.
+      state.items = state.items.filter(function(it){
+        if (it.source === 'tooltracker') return false;
+        var txt = ((it.type||'') + ' ' + (it.task||'') + ' ' + (it.detail||'')).toUpperCase();
+        if (txt.indexOf('TOOL-CRIB') !== -1 || txt.indexOf('TOOL CRIB') !== -1 || txt.indexOf('CONSUMABLE') !== -1) return false;
+        return true;
+      });
+      state.items = state.items.concat(imported);
+      save();
+      render();
+
+      if (imported.length){
+        logMsg('ok', 'Imported ' + imported.length + ' item' + (imported.length===1?'':'s') + ' from Tool & Calibration Tracker',
+          'Under Forecast — By Calendar, filter it via the aircraft picker\'s "' + TOOL_CRIB_REG + '" chip.');
+      } else {
+        logMsg('err', 'No due-dated items found in Tool & Calibration Tracker',
+          raw ? 'It has items, but none have a calibration date + interval (or override) set yet.' : 'Nothing has been saved there yet on this account.');
+      }
+    }catch(e){
+      logMsg('err', 'Could not import Tool & Calibration Tracker data', String(e));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Import Tool & Calibration Tracker'; }
+    }
+  }
+
   function median(arr){
     if (!arr.length) return null;
     var s = arr.slice().sort(function(a,b){ return a-b; });
@@ -1427,15 +1509,19 @@
     // already names it in the title, so the chip underneath the logo just shows the readings.
     // Cycles readout dropped from the header — it never lined up with the other system's counter,
     // so only TTAF (hours) is shown up top now.
-    var chipsHTML = shownRegs.map(function(reg){
+    // "TOOL CRIB" isn't a real aircraft (it's the tag imported Tool & Calibration Tracker rows use
+    // so the aircraft picker can filter them too), so it's left out of the TTAF chips even when
+    // it's checked "on" for filtering purposes.
+    var chipRegs = shownRegs.filter(function(reg){ return reg !== TOOL_CRIB_REG; });
+    var chipsHTML = chipRegs.map(function(reg){
       var ttaf = ttafFor(reg);
       var periodAirTimeC = periodAirTimeFor(reg);
       var bitsText = (ttaf != null ? ('<b>TTAF</b> ' + fmtNum(ttaf,1)) : 'n/a') +
         (periodAirTimeC != null ? ('  /  ' + fmtNum(periodAirTimeC,1) + flightDaysSuffix()) : '');
-      var prefix = shownRegs.length > 1 ? '<b>'+ escapeHTML(reg) +'</b> — ' : '';
+      var prefix = chipRegs.length > 1 ? '<b>'+ escapeHTML(reg) +'</b> — ' : '';
       var mainChip = '<div class="ph-chip">'+ prefix + bitsText +'</div>';
       var f = state.flying[reg];
-      var subChip = (shownRegs.length > 1 && f && f.lastFlightMs != null)
+      var subChip = (chipRegs.length > 1 && f && f.lastFlightMs != null)
         ? '<div class="ph-chip ph-chip-sub">'+ escapeHTML(reg) +' - Last flight : '+ escapeHTML(fmtDateFull(f.lastFlightMs)) +'</div>'
         : '';
       return mainChip + subChip;
@@ -1444,7 +1530,7 @@
     // A pasted Flying report gets the full "Created from the following values" table; otherwise
     // fall back to the simple TTAF line(s). Only shown for a single-aircraft print — with several
     // aircraft on the page there's no single reg for the table to key off.
-    var flyingTableHTML = (shownRegs.length === 1) ? flyingValuesTable(shownRegs[0]) : null;
+    var flyingTableHTML = (chipRegs.length === 1) ? flyingValuesTable(chipRegs[0]) : null;
 
     var logoHTML =
       '<div class="ph-logo">' +
@@ -1463,7 +1549,7 @@
     // On-screen equivalent — just the reg + TTAF, no logo/title clutter. When a Flying report has
     // been pasted in for an aircraft, its "REG - Last flight : DATE" line (same wording the source
     // spreadsheet uses) is shown underneath that aircraft's TTAF.
-    document.getElementById('ttafSummary').innerHTML = shownRegs.map(function(reg){
+    document.getElementById('ttafSummary').innerHTML = chipRegs.map(function(reg){
       var ttaf = ttafFor(reg);
       var periodAirTime = periodAirTimeFor(reg);
       var mainLine = '<span class="ts-main"><b>'+ escapeHTML(reg) +'</b>'+
@@ -1496,9 +1582,16 @@
       section.className = 'section' + (rows.length ? '' : ' is-empty');
       var head = document.createElement('div');
       head.className = 'section-head';
+      // The Tool & Calibration Tracker import lives here (rather than as its own section) since its
+      // due-dated rows are calendar items -- clicking it pulls the latest calibration data straight
+      // into this same section, tagged so the aircraft picker below can filter it too.
+      var importBtnHTML = (def.key === 'calendar')
+        ? '<button class="btn small primary no-print" id="importToolsBtn" type="button" title="Pull the latest calibration due dates from the Tool &amp; Calibration Tracker">Import Tool &amp; Calibration Tracker</button>'
+        : '';
       head.innerHTML =
         '<div class="titling"><h2>'+ def.title +'</h2><span class="count-pill">'+ rows.length +' item'+(rows.length===1?'':'s')+'</span>' +
         '<span class="formula no-print">'+ escapeHTML(def.formula) +'</span></div>' +
+        importBtnHTML +
         '<button class="btn small no-print" data-copy="'+ def.key +'" type="button">Copy as text</button>';
       section.appendChild(head);
 
@@ -1612,6 +1705,9 @@
       section.appendChild(scroll);
       sectionsEl.appendChild(section);
     });
+
+    var importToolsBtnEl = document.getElementById('importToolsBtn');
+    if (importToolsBtnEl) importToolsBtnEl.addEventListener('click', importToolTracker);
 
     sectionsEl.querySelectorAll('[data-del]').forEach(function(btn){
       btn.addEventListener('click', function(){
