@@ -48,9 +48,13 @@
   .tt-section-btn.active{background:#123a5e;color:#fff;border-color:#123a5e;}
   .tt-section-btn .cnt{opacity:.85;font-weight:700;margin-left:4px;}
 
-  .mc-header{display:grid;grid-template-columns:1fr 220px;gap:10px;padding:0 0 6px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);border-bottom:1px solid var(--line);margin-bottom:4px;}
-  .mc-row{display:grid;grid-template-columns:1fr 220px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);}
+  .mc-header{display:grid;grid-template-columns:1fr 190px 260px;gap:10px;padding:0 0 6px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);border-bottom:1px solid var(--line);margin-bottom:4px;}
+  .mc-row{display:grid;grid-template-columns:1fr 190px 260px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);}
   .mc-row input, .mc-row select{padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:var(--panel);color:var(--ink);font-family:inherit;}
+  .mc-files-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+  .mc-files-list:empty{margin-bottom:0;}
+  .mc-files .tt-att-thumb{width:56px;}
+  .mc-files .tt-att-thumb img, .mc-files .tt-att-thumb .file-chip{width:56px;height:56px;}
   #mcRows{max-height:360px;overflow:auto;margin-bottom:4px;}
 
   .tt-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px;}
@@ -727,7 +731,12 @@
     const sel = document.getElementById('ttCategoryFilter');
     const cats = sortedCategories(sectionItems());
     const cur = CATEGORY_FILTER;
-    sel.innerHTML = '<option value="">All categories</option>' + cats.map(c=>'<option value="'+escapeHTML(c)+'"'+(c===cur?' selected':'')+'>'+escapeHTML(c)+'</option>').join('');
+    sel.innerHTML = '<option value="">All categories</option>' + cats.map(c=>{
+      const meta = CATEGORY_META[c] || {};
+      const hasFiles = Array.isArray(meta.attachments) && meta.attachments.length > 0;
+      const label = c + (hasFiles ? ' 📎' : ''); // paperclip -- category has reference files attached (see Manage Categories)
+      return '<option value="'+escapeHTML(c)+'"'+(c===cur?' selected':'')+'>'+escapeHTML(label)+'</option>';
+    }).join('');
   }
 
   function attIconStr(item){
@@ -1079,6 +1088,45 @@
     );
   }
 
+  // ---------- category-level file attachments (Manage Categories) ----------
+  // Reference files (manuals, spec sheets, calibration standards, photos) that apply to an
+  // entire category rather than a single item -- stored on CATEGORY_META[cat].attachments
+  // (persisted alongside each category's section via persistCategoryMeta()) rather than on
+  // every item in it.
+  function renderCategoryFileChips(files){
+    return (files||[]).map((a,i)=>renderAttThumb(a,i,'catfile')).join('');
+  }
+  function wireCategoryFileInputs(){
+    document.querySelectorAll('#mcRows .mc-files').forEach(box=>{
+      const cat = box.dataset.cat;
+      const meta = CATEGORY_META[cat] || {};
+      box.dataset.attachments = JSON.stringify(Array.isArray(meta.attachments) ? meta.attachments : []);
+      const refreshList = ()=>{
+        const files = JSON.parse(box.dataset.attachments || '[]');
+        box.querySelector('.mc-files-list').innerHTML = renderCategoryFileChips(files);
+        box.querySelectorAll('.rm[data-rm-kind="catfile"]').forEach(btn=>{
+          btn.onclick = ()=>{
+            const arr = JSON.parse(box.dataset.attachments || '[]');
+            arr.splice(Number(btn.dataset.rmIdx), 1);
+            box.dataset.attachments = JSON.stringify(arr);
+            refreshList();
+          };
+        });
+      };
+      refreshList();
+      box.querySelector('.mc-file-input').onchange = async (e)=>{
+        const files = Array.from(e.target.files || []);
+        const arr = JSON.parse(box.dataset.attachments || '[]');
+        for(const f of files){
+          try{ arr.push(await readFileSmart(f, 2000, 0.85)); }catch(err){ console.error(err); }
+        }
+        box.dataset.attachments = JSON.stringify(arr);
+        refreshList();
+        e.target.value = '';
+      };
+    });
+  }
+
   // ---------- item form (add/edit) ----------
   let FORM_STATE = null;
 
@@ -1291,21 +1339,27 @@
     const rows = cats.map(cat=>{
       const count = ITEMS.filter(i=>(i.category||'Uncategorized')===cat).length;
       const sec = getCategorySection(cat);
-      return '<div class="mc-row" data-orig-cat="'+escapeHTML(cat)+'">' +
+      const meta = CATEGORY_META[cat] || {};
+      const files = Array.isArray(meta.attachments) ? meta.attachments : [];
+      return '<div class="mc-row" data-orig-cat="'+escapeHTML(cat)+'" style="align-items:flex-start;">' +
         '<div><input class="mc-name" value="'+escapeHTML(cat)+'"> <span style="font-size:11px;color:var(--grey-strong);white-space:nowrap;">('+count+' item'+(count===1?'':'s')+')</span></div>' +
         '<select class="mc-section">' +
           '<option value="tasks"'+(sec==='tasks'?' selected':'')+'>🗓️ Task Tracker</option>' +
           '<option value="tools"'+(sec==='tools'?' selected':'')+'>🧰 Tool &amp; Calibration Tracker</option>' +
         '</select>' +
+        '<div class="mc-files" data-cat="'+escapeHTML(cat)+'">' +
+          '<div class="mc-files-list">'+renderCategoryFileChips(files)+'</div>' +
+          '<label class="btn small" style="cursor:pointer;display:inline-block;">📎 Attach file<input type="file" class="mc-file-input" multiple style="display:none;"></label>' +
+        '</div>' +
       '</div>';
     }).join('');
 
     const html =
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
-        '<div class="tt-modal" style="max-width:640px;">' +
+        '<div class="tt-modal" style="max-width:820px;">' +
           '<h2>Manage Categories</h2>' +
-          '<p class="sub">Rename a category or move it between Task Tracker and Tool &amp; Calibration Tracker. Renaming updates every item currently in that category.</p>' +
-          '<div class="mc-header"><div>Category Name</div><div>Section</div></div>' +
+          '<p class="sub">Rename a category, move it between Task Tracker and Tool &amp; Calibration Tracker, or attach reference files (manuals, spec sheets, calibration standards) that apply to the whole category. Renaming updates every item currently in that category.</p>' +
+          '<div class="mc-header"><div>Category Name</div><div>Section</div><div>Attached Files</div></div>' +
           '<div id="mcRows">'+(rows || '<p class="sub">No categories yet — add an item first.</p>')+'</div>' +
           '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
             '<button class="btn" id="ttMcCancel">Cancel</button>' +
@@ -1316,6 +1370,7 @@
     document.getElementById('ttModalRoot').innerHTML = html;
     document.getElementById('ttModalBackdrop').onclick = (e)=>{ if(e.target.id==='ttModalBackdrop') closeModal(); };
     document.getElementById('ttMcCancel').onclick = closeModal;
+    wireCategoryFileInputs();
     document.getElementById('ttMcSave').onclick = async ()=>{
       const rowEls = Array.from(document.querySelectorAll('#mcRows .mc-row'));
       const plan = [];
@@ -1331,7 +1386,9 @@
           return;
         }
         usedNames.add(key);
-        plan.push({ from: origCat, to: newName, section: section });
+        const filesEl = row.querySelector('.mc-files');
+        const attachments = JSON.parse(filesEl.dataset.attachments || '[]');
+        plan.push({ from: origCat, to: newName, section: section, attachments: attachments });
       }
       plan.forEach(p=>{
         if(p.from !== p.to){
@@ -1339,7 +1396,7 @@
         }
       });
       const newMeta = {};
-      plan.forEach(p=>{ newMeta[p.to] = { section: p.section }; });
+      plan.forEach(p=>{ newMeta[p.to] = { section: p.section, attachments: p.attachments }; });
       CATEGORY_META = newMeta;
 
       closeModal();
