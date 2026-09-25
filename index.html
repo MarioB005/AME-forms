@@ -290,21 +290,10 @@
   .ptl-sig-row{margin-bottom:10px;}   /* keeps the trainee & PRM signature lines from touching */
   .ptl-date-gap{display:inline-block;width:0.18in;}   /* ~4-5 characters of separation */
 
-  /* ---------- Undo panel (global, appended to <body>, independent of the view-routing system so
+  /* ---------- Undo toast (global, appended to <body>, independent of the view-routing system so
      it's reachable from every screen -- see the ↩️ button in the dark banner header) ---------- */
-  .undo-modal-backdrop{position:fixed;inset:0;background:rgba(20,25,20,0.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:9999;}
-  .undo-modal{background:var(--panel);border-radius:var(--radius);max-width:560px;width:100%;padding:22px 24px;position:relative;}
-  .undo-modal h2{margin:0 0 2px;font-size:18px;}
-  .undo-sub{margin:0 0 16px;color:var(--grey-strong);font-size:12px;}
-  .undo-modal-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--grey-strong);line-height:1;}
-  .undo-section{margin-bottom:16px;}
-  .undo-section h3{font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);border-bottom:1px solid var(--line);padding-bottom:5px;margin:0 0 8px;}
-  .undo-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin-bottom:8px;background:var(--paper);}
-  .undo-label{font-weight:700;font-size:13px;color:var(--ink);}
-  .undo-time{font-size:11px;color:var(--grey-strong);margin-top:2px;}
-  .undo-empty{color:var(--grey-strong);font-size:12.5px;padding:4px 0 12px;}
-  .undo-restore-btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer;font-size:12px;padding:6px 10px;white-space:nowrap;}
-  .undo-modal-footer{text-align:right;margin-top:4px;}
+  .undo-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:10000;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .undo-toast.show{opacity:1;}
 </style>
 </head>
 <body>
@@ -345,7 +334,7 @@
       <span class="db-title">Phoenix Heli-Flight — Maintenance Forms</span>
     </div>
     <div class="db-right">
-      <button class="db-icon-btn" id="undoBtn" title="Undo — see and restore your last 4 saved changes">↩️</button>
+      <button class="db-icon-btn" id="undoBtn" title="Undo the last change">↩️</button>
       <button class="db-icon-btn" id="savedFormsBtn" title="Saved Forms">🗂</button>
       <button class="db-icon-btn" id="settingsBtn" title="Settings">⚙</button>
       <button class="db-icon-btn" id="lockBtn" title="Lock">🔒</button>
@@ -615,16 +604,7 @@
     };
   }
 
-  // ---------- Undo (last 4 saved states, per storage key) ----------
-  function formatRelativeTime(ts){
-    const diffSec = Math.round((Date.now() - ts) / 1000);
-    if(diffSec < 5) return 'just now';
-    if(diffSec < 60) return diffSec + 's ago';
-    const diffMin = Math.round(diffSec/60);
-    if(diffMin < 60) return diffMin + ' min ago';
-    return new Date(ts).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-  }
-
+  // ---------- Undo (single most recent change, per storage key) ----------
   // Generic describer for a "list of records" key (forms:records, ptrain:records): compares two
   // JSON-array snapshots by their .id field and explains, in plain language, what changed between
   // them, regardless of which specific form/screen made the save.
@@ -660,7 +640,7 @@
     }catch(e){ return 'Changes saved'; }
   }
 
-  // Undo sources shown in the global Undo panel -- one section per tracked storage key. "restore"
+  // Areas the single global Undo button can revert -- one entry per tracked storage key. "restore"
   // is called with the historical raw value to write back; it should persist it and refresh
   // whatever's currently on screen so the change is actually visible.
   const UNDO_SOURCES = [
@@ -712,51 +692,47 @@
     }
   ];
 
-  function openUndoPanel(){
-    const sectionsHtml = UNDO_SOURCES.map(src=>{
-      const hist = SAVE_HISTORY_BY_KEY[src.key] || [];
-      const rows = [];
-      for(let i = hist.length - 2; i >= 0; i--){
-        rows.push({ key: src.key, index: i, label: src.describe(hist[i].value, hist[i+1].value), ts: hist[i+1].ts });
-      }
-      const rowsHtml = rows.length ? rows.map(r =>
-        '<div class="undo-row">' +
-          '<div class="undo-info"><div class="undo-label">Undo: '+escapeHTML(r.label)+'</div><div class="undo-time">'+escapeHTML(formatRelativeTime(r.ts))+'</div></div>' +
-          '<button type="button" class="undo-restore-btn" data-undo-key="'+escapeHTML(r.key)+'" data-undo-index="'+r.index+'">Restore this version</button>' +
-        '</div>'
-      ).join('') : '<p class="undo-empty">Nothing saved here yet this session.</p>';
-      return '<div class="undo-section"><h3>'+escapeHTML(src.title)+'</h3>'+rowsHtml+'</div>';
-    }).join('');
+  // Small non-blocking confirmation banner (auto-hides), used for Undo feedback so a click
+  // doesn't need a modal or dialog to confirm what just happened.
+  let undoToastTimer = null;
+  function showUndoToast(msg){
+    let el = document.getElementById('undoToast');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'undoToast';
+      el.className = 'undo-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(undoToastTimer);
+    undoToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 3000);
+  }
 
-    const html =
-      '<div class="undo-modal-backdrop" id="undoModalBackdrop">' +
-        '<div class="undo-modal">' +
-          '<button class="undo-modal-close" id="undoModalClose">&times;</button>' +
-          '<h2>Undo</h2>' +
-          '<p class="undo-sub">Restores this device\'s data to how it looked at that point. Only covers changes made this session — it resets on reload.</p>' +
-          sectionsHtml +
-          '<div class="undo-modal-footer"><button class="btn" id="undoModalCloseBtn">Close</button></div>' +
-        '</div>' +
-      '</div>';
-    const root = document.createElement('div');
-    root.id = 'undoModalRoot';
-    root.innerHTML = html;
-    document.body.appendChild(root);
-    const closeUndoModal = ()=>{ const el = document.getElementById('undoModalRoot'); if(el) el.remove(); };
-    document.getElementById('undoModalClose').onclick = closeUndoModal;
-    document.getElementById('undoModalCloseBtn').onclick = closeUndoModal;
-    document.getElementById('undoModalBackdrop').onclick = (e)=>{ if(e.target.id==='undoModalBackdrop') closeUndoModal(); };
-    document.querySelectorAll('.undo-restore-btn').forEach(btn=>{
-      btn.onclick = async ()=>{
-        const key = btn.dataset.undoKey;
-        const idx = Number(btn.dataset.undoIndex);
-        const src = UNDO_SOURCES.find(s=>s.key===key);
-        const hist = SAVE_HISTORY_BY_KEY[key];
-        if(!src || !hist || !hist[idx]) return;
-        await src.restore(hist[idx].value);
-        closeUndoModal();
-      };
-    });
+  // One click undoes just the single most recent change made anywhere in the app this session --
+  // whichever tracked area (Maintenance Forms, Pilot Training Records, MCM Document) was saved to
+  // most recently is the one that gets reverted, so an accidental delete on any screen can be
+  // reversed in one tap without picking from a list.
+  async function undoLastChange(){
+    let latest = null;
+    for(const src of UNDO_SOURCES){
+      const hist = SAVE_HISTORY_BY_KEY[src.key] || [];
+      if(hist.length < 2) continue;
+      const ts = hist[hist.length-1].ts;
+      if(!latest || ts > latest.ts) latest = { src, hist, ts };
+    }
+    if(!latest){
+      showUndoToast('Nothing to undo yet this session.');
+      return;
+    }
+    const { src, hist } = latest;
+    const current = hist[hist.length-1];
+    const prior = hist[hist.length-2];
+    const label = src.describe(prior.value, current.value);
+    await src.restore(prior.value);
+    showUndoToast('Undone: ' + label);
   }
 
   // ---------- Saved Forms view (search / recall / "new form from this") ----------
@@ -1084,7 +1060,7 @@
   }
   document.getElementById('settingsBtn').onclick = renderSettings;
   document.getElementById('savedFormsBtn').onclick = renderSavedForms;
-  document.getElementById('undoBtn').onclick = openUndoPanel;
+  document.getElementById('undoBtn').onclick = undoLastChange;
 
   function backButton(){
     return '<button class="back-btn" onclick="window.__formsNav.home()">‹ Back to forms</button>';
