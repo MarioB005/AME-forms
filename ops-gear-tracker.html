@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ops Gear Tracker</title>
+<style>
+  :root{
+    --ink:#1c2b24;
+    --paper:#fbfaf6;
+    --panel:#ffffff;
+    --line:#dfe2da;
+    --accent:#c05a2c;
+    --grey-strong:#1c2b24;
+    --radius:10px;
+    --good:#2f7d4f;
+    --good-bg:#e6f2ea;
+    --warn:#b3791b;
+    --warn-bg:#faf1de;
+    --bad:#b0281e;
+    --bad-bg:#fbe9e7;
+    --hold:#5a4aa8;
+    --hold-bg:#ece9f8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-size:14px;}
+  #app{max-width:1800px;margin:0 auto;padding:18px 24px 60px;}
+
+  h1.tt-title{margin:0 0 2px;font-size:20px;}
+  p.tt-sub{margin:0 0 16px;color:var(--grey-strong);font-size:12.5px;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px;}
+
+  .btn{
+    padding:9px 15px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+    cursor:pointer;font-size:13px;color:var(--ink);font-weight:600;
+  }
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .btn.danger{color:#b0281e;}
+  .btn.tiny{padding:3px 8px;font-size:11px;}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .tt-section-switch{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}
+  .tt-section-btn{padding:10px 18px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:13.5px;font-weight:800;color:var(--grey-strong);}
+  .tt-section-btn.active{background:#123a5e;color:#fff;border-color:#123a5e;}
+  .tt-section-btn .cnt{opacity:.85;font-weight:700;margin-left:4px;}
+
+  .mc-header{display:grid;grid-template-columns:1fr 220px;gap:10px;padding:0 0 6px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);border-bottom:1px solid var(--line);margin-bottom:4px;}
+  .mc-row{display:grid;grid-template-columns:1fr 220px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);}
+  .mc-row input, .mc-row select{padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:var(--panel);color:var(--ink);font-family:inherit;}
+  #mcRows{max-height:360px;overflow:auto;margin-bottom:4px;}
+
+  .tt-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .tt-tabs{display:flex;gap:6px;flex-wrap:wrap;}
+  .tt-tab{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:12.5px;font-weight:700;color:var(--grey-strong);}
+  .tt-tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .tt-tab .cnt{opacity:.75;font-weight:600;margin-left:3px;}
+
+  .tt-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .tt-controls input[type="search"]{padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;min-width:190px;}
+  .tt-controls select{padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;background:var(--panel);color:var(--ink);}
+
+  .tt-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .tt-stat{flex:1;min-width:110px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;}
+  .tt-stat .n{font-size:22px;font-weight:800;line-height:1.1;}
+  .tt-stat .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);font-weight:700;margin-top:2px;}
+  .tt-stat.bad .n{color:var(--bad);}
+  .tt-stat.warn .n{color:var(--warn);}
+  .tt-stat.hold .n{color:var(--hold);}
+
+  .tt-group{margin-bottom:20px;}
+  .tt-group-head{font-weight:800;font-size:13.5px;text-transform:uppercase;letter-spacing:.3px;padding-bottom:6px;border-bottom:2px solid var(--ink);margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;}
+  .tt-group-head .cnt{color:var(--grey-strong);font-weight:600;text-transform:none;font-size:11.5px;}
+
+  .tt-card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:11px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;}
+  .tt-card.ok{border-left-color:var(--good);}
+  .tt-card.warn{border-left-color:var(--warn);}
+  .tt-card.bad{border-left-color:var(--bad);}
+  .tt-card.holding{border-left-color:var(--hold);background:var(--hold-bg);}
+  .tt-card.nolimit{border-left-color:var(--line);}
+  .tt-card.notinstalled{opacity:.6;}
+  .tt-card-main{flex:1;min-width:220px;}
+  .tt-card-name{font-weight:800;font-size:14px;}
+  .tt-card-tag{display:inline-block;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:middle;}
+  .tt-card-meta{font-size:11.5px;color:var(--grey-strong);margin-top:3px;line-height:1.5;}
+  .tt-card-notes{font-size:11.5px;color:var(--ink);margin-top:4px;font-style:italic;}
+  .tt-card-due{min-width:170px;text-align:right;}
+  .tt-card-due .due-date{font-weight:800;font-size:13.5px;}
+  .tt-card-due .due-status{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.2px;}
+  .tt-card-due.ok .due-date, .tt-card-due.ok .due-status{color:var(--good);}
+  .tt-card-due.warn .due-date, .tt-card-due.warn .due-status{color:var(--warn);}
+  .tt-card-due.bad .due-date, .tt-card-due.bad .due-status{color:var(--bad);}
+  .tt-card-due.holding .due-date, .tt-card-due.holding .due-status{color:var(--hold);}
+  .tt-card-due.nolimit .due-date, .tt-card-due.nolimit .due-status{color:var(--grey-strong);}
+  .tt-card-atts{display:flex;gap:4px;margin-top:4px;font-size:11px;color:var(--grey-strong);}
+  .tt-card-actions{display:flex;flex-direction:column;gap:5px;width:100%;align-items:flex-end;margin-top:4px;}
+  @media (min-width:640px){ .tt-card-actions{width:auto;} }
+
+  .tt-empty{color:var(--grey-strong);font-size:13px;padding:20px 0;text-align:center;}
+
+  /* ---------- WinAir-style component grid + Calendar Items panel ---------- */
+  .wa-check{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--grey-strong);font-weight:600;white-space:nowrap;}
+  .wa-check input{width:15px;height:15px;}
+
+  .wa-table-wrap{border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:calc(100vh - 300px);margin-bottom:6px;background:var(--panel);}
+  table.wa-table{width:100%;border-collapse:collapse;font-size:11pt;min-width:920px;}
+  table.wa-table thead th{background:#fbf3d6;border-bottom:1px solid #e3d69a;text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:#7a6a2e;white-space:nowrap;position:sticky;top:0;z-index:5;box-shadow:0 1px 0 #e3d69a;}
+  table.wa-table tbody tr.item-row{border-bottom:1px solid var(--line);cursor:pointer;}
+  table.wa-table tbody tr.item-row:hover{background:#f4f8fb;}
+  table.wa-table tbody tr.item-row.notinstalled{opacity:.55;}
+  table.wa-table tbody tr.item-row.holding{background:var(--hold-bg);}
+  table.wa-table td{padding:7px 10px;vertical-align:middle;}
+  table.wa-table tr.grp-row td{background:#eef1ea;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink);}
+  table.wa-table td.nm{font-weight:700;white-space:nowrap;}
+  table.wa-table td.nm span{white-space:nowrap;}
+  table.wa-table td.num{white-space:nowrap;}
+  table.wa-table td.due-cell{font-weight:800;white-space:nowrap;}
+  table.wa-table td.due-cell.ok{color:var(--good);}
+  table.wa-table td.due-cell.warn{color:var(--warn);}
+  table.wa-table td.due-cell.bad{color:var(--bad);}
+  table.wa-table td.due-cell.holding{color:var(--hold);}
+  table.wa-table td.due-cell.nolimit{color:var(--grey-strong);font-weight:600;}
+  table.wa-table td.act-cell{white-space:nowrap;text-align:right;}
+  table.wa-table .row-icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:5px;cursor:pointer;font-size:12px;line-height:1;padding:4px 6px;margin-left:3px;}
+  table.wa-table .row-icon-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .status-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0;}
+  .status-dot.ok{background:var(--good);}
+  .status-dot.warn{background:var(--warn);}
+  .status-dot.bad{background:var(--bad);}
+  .status-dot.holding{background:var(--hold);}
+  .status-dot.nolimit{background:#a9b0a5;}
+
+  /* Assemblies (Ops Gear Tracker section only): a parent item ("Mobile Tank Filters
+     (On wheels) (#1)") with sub-items ("hoses", "filters", ...) nested directly beneath it. */
+  .tt-assembly-badge{display:inline-block;margin-left:7px;padding:1px 7px;border-radius:999px;background:var(--hold-bg);color:var(--hold);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;vertical-align:middle;}
+  table.wa-table tbody tr.item-row.tt-child-row td.nm{padding-left:26px;}
+  table.wa-table tbody tr.item-row.tt-child-row td.nm::before{content:'\21b3';margin-right:6px;color:var(--grey-strong);font-weight:700;}
+  table.wa-table tbody tr.item-row.tt-child-row{background:#fcfcfa;}
+  .tt-orphan-note{display:block;font-size:9.5px;font-weight:700;color:var(--grey-strong);margin-top:1px;margin-left:1ch;}
+
+  /* "My Order" drag-to-reorder (Ops Gear Tracker, active list only). */
+  table.wa-table tbody tr.item-row.tt-draggable{cursor:grab;}
+  table.wa-table tbody tr.item-row.tt-draggable td.nm{padding-left:4px;}
+  .tt-drag-handle{display:inline-block;width:16px;text-align:center;color:var(--grey-strong);opacity:.6;margin-right:4px;cursor:grab;user-select:none;vertical-align:middle;}
+  table.wa-table tbody tr.item-row.tt-dragging{opacity:.4;}
+  table.wa-table tbody tr.item-row.tt-drag-over-before{box-shadow:inset 0 2px 0 0 var(--accent);}
+  table.wa-table tbody tr.item-row.tt-drag-over-after{box-shadow:inset 0 -2px 0 0 var(--accent);}
+  table.wa-table tbody tr.item-row.tt-drag-reject{cursor:not-allowed;}
+  .wa-footer-count{font-size:11px;color:var(--grey-strong);padding:6px 4px 16px;text-align:right;}
+
+  .wa-banner{background:#123a5e;color:#fff;font-weight:800;text-align:center;padding:8px 12px;font-size:12.5px;letter-spacing:.6px;text-transform:uppercase;border-radius:8px 8px 0 0;margin-top:18px;}
+  .wa-panel{border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;background:var(--panel);padding:0 0 14px;margin-bottom:16px;}
+  .wa-cal-grid{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);}
+  .wa-cal-cell{padding:12px 14px;border-right:1px solid var(--line);}
+  .wa-cal-cell:last-child{border-right:none;}
+  .wa-cal-cell label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--grey-strong);margin-bottom:6px;}
+  .wa-cal-cell input{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:var(--panel);color:var(--ink);font-family:inherit;}
+  .wa-cal-caption{font-size:9.5px;color:var(--grey-strong);margin-top:4px;}
+  .wa-cal-caption.req{color:var(--bad);font-weight:700;}
+  .wa-flags-row{display:flex;gap:22px;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--paper);font-size:12.5px;}
+  .wa-flags-row label{display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;}
+  .wa-flags-row input{width:15px;height:15px;}
+  @media (max-width:640px){
+    .wa-cal-grid{grid-template-columns:repeat(2,1fr);}
+    .wa-cal-cell:nth-child(2){border-right:none;}
+  }
+
+  /* modal */
+  .tt-modal-backdrop{position:fixed;inset:0;background:rgba(20,25,20,.45);z-index:200;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 14px;}
+  .tt-modal{background:var(--panel);border-radius:12px;max-width:720px;width:100%;padding:22px 24px 24px;}
+  .tt-modal h2{margin:0 0 2px;font-size:18px;}
+  .tt-modal .sub{margin:0 0 16px;color:var(--grey-strong);font-size:12px;}
+  .tt-modal-close{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:var(--grey-strong);line-height:1;}
+
+  /* Item Add/Edit form: text that was grey should read black for easier reading. */
+  .tt-item-form .sub,
+  .tt-item-form .field label,
+  .tt-item-form .wa-cal-cell label,
+  .tt-item-form .wa-cal-caption:not(.req),
+  .tt-item-form .tt-att-block > label,
+  .tt-item-form .tt-att-thumb .fn,
+  .tt-item-form .tt-modal-close{
+    color:var(--ink);
+  }
+
+  .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 16px;margin-bottom:14px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:9.5px;color:var(--grey-strong);font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+  .field input, .field select, .field textarea{
+    padding:9px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:var(--panel);color:var(--ink);
+    font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:56px;}
+  .field.span2{grid-column:span 2;}
+  .field.checkline{flex-direction:row;align-items:center;gap:8px;padding-top:18px;}
+  .field.checkline label{text-transform:none;font-size:13px;font-weight:600;order:2;}
+
+  .tt-cat-multi{max-height:150px;overflow-y:auto;border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:6px 8px;display:flex;flex-direction:column;gap:2px;}
+  .tt-cat-check{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink);padding:2px 0;cursor:pointer;}
+  .tt-cat-check input{margin:0;cursor:pointer;}
+
+  .tt-undo-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:10000;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .tt-undo-toast.show{opacity:1;}
+  .field.checkline input{width:16px;height:16px;order:1;}
+
+  .tt-att-block{margin-bottom:14px;}
+  .tt-att-block > label{font-size:11px;color:var(--grey-strong);font-weight:700;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:6px;}
+  .tt-att-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+  .tt-att-thumb{position:relative;width:74px;}
+  .tt-att-thumb img{width:74px;height:74px;object-fit:cover;border:1px solid var(--line);border-radius:7px;display:block;}
+  .tt-att-thumb .file-chip{width:74px;height:74px;border:1px solid var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--paper);}
+  .tt-att-thumb .fn{font-size:9.5px;color:var(--grey-strong);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+  .tt-att-thumb .rm{position:absolute;top:-6px;right:-6px;background:#b0281e;color:#fff;border:none;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer;}
+
+  .tt-modal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:10px;}
+
+  .tt-holding-note{background:var(--hold-bg);color:var(--hold);border:1px solid #cfc6ea;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px;}
+
+  .tt-report-table{width:100%;border-collapse:collapse;font-size:11pt;}
+  .tt-report-table th{text-align:left;padding:6px 8px;color:var(--ink);font-size:10pt;text-transform:uppercase;border-bottom:2px solid var(--ink);}
+  .tt-report-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .tt-report-table tr.grp td{background:var(--paper);font-weight:800;font-size:10pt;text-transform:uppercase;letter-spacing:.3px;padding-top:12px;}
+
+  #printArea{display:none;}
+  @page{margin:12mm;size:landscape;}
+  @media print{
+    body > *:not(#printArea){display:none !important;}
+    #printArea{display:block !important;}
+  }
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1c2b24;padding-bottom:10px;margin-bottom:14px;}
+  .pr-head h1{margin:0;font-size:17.5pt;}
+  .pr-head .meta{font-size:11px;color:var(--ink);text-align:right;}
+  .pr-status-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;}
+
+  @media (max-width:600px){
+    .tt-card{flex-direction:column;}
+    .tt-card-due{text-align:left;}
+    .tt-card-actions{align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1 class="tt-title">Ops Gear Tracker</h1>
+  <p class="tt-sub">Operational gear — swivels, hooks, long lines, buckets, and more — tracked by due date. Phoenix Heli-Flight.</p>
+
+  <div id="ttSectionSwitch" class="tt-section-switch"></div>
+
+  <div id="ttSummary"></div>
+
+  <div class="tt-toolbar">
+    <div class="tt-tabs" id="ttTabs"></div>
+    <div class="tt-controls">
+      <input type="search" id="ttSearch" placeholder="Search name, serial, tracking #...">
+      <select id="ttSortMode">
+        <option value="group">Grouped by category</option>
+        <option value="due">Flat — by time limit / due date</option>
+        <option value="custom">My Order (drag to reorder)</option>
+      </select>
+      <select id="ttCategoryFilter"><option value="">All categories</option></select>
+      <label class="wa-check"><input type="checkbox" id="ttInstalledOnly"> Show installed item(s) only</label>
+      <button class="btn primary" id="ttAddBtn">+ Add Item</button>
+      <button class="btn" id="ttReportBtn">Forecast List</button>
+      <button class="btn" id="ttUndoBtn" title="Undo the last change to the item list">↩️ Undo</button>
+    </div>
+  </div>
+
+  <div id="ttSyncNote" style="display:none;" class="tt-holding-note"></div>
+
+  <div id="ttListArea"></div>
+</div>
+
+<div id="ttModalRoot"></div>
+<div id="printArea"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ---------- storage: same Supabase project/table as the main AME Forms app, own key prefix ----------
+  const SUPABASE_URL = 'https://frlehxadkvgwzyxovwua.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_ioAPLi8DWuC0HCUUYEeQ3Q_dildZYKI';
+  const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
+  const DATA_KEY = 'opsgear:items:v1';
+  const CATMETA_KEY = 'opsgear:catmeta:v1';
+  // Default section assignment for categories seen for the first time -- every Ops Gear category is
+  // physically tracked equipment (serial/tracking numbers), so nothing defaults into Task Tracker
+  // the way Tool Crib Checks/Servo Controls do in the Tool & Calibration Tracker. Mario can still
+  // move a category into Task Tracker later (and rename it) from "Manage Categories".
+  const DEFAULT_CATEGORY_SECTIONS = {};
+
+  window.__storageLastError = null;
+
+  async function storageGet(key){
+    if(SUPABASE_CONFIGURED){
+      try{
+        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?key=eq.' + encodeURIComponent(key) + '&select=value', {
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }
+        });
+        if(res.ok){
+          const rows = await res.json();
+          if(rows && rows.length){
+            try{ localStorage.setItem('cache:'+key, rows[0].value); }catch(e){}
+            return rows[0].value;
+          }
+        } else {
+          window.__storageLastError = 'GET ' + key + ': HTTP ' + res.status;
+        }
+      }catch(e){ window.__storageLastError = 'GET ' + key + ': ' + e; }
+    }
+    try{ return localStorage.getItem('cache:'+key); }catch(e){ return null; }
+  }
+
+  let __storageWriteQueue = Promise.resolve();
+  async function storageSet(key, value){
+    try{ localStorage.setItem('cache:'+key, value); }catch(e){}
+    if(!SUPABASE_CONFIGURED) return true;
+    let ok = true;
+    const doWrite = async ()=>{
+      try{
+        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?on_conflict=key', {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=minimal'
+          },
+          body: JSON.stringify({ key: key, value: value })
+        });
+        if(!res.ok){
+          ok = false;
+          let detail = '';
+          try{ detail = await res.text(); }catch(e2){}
+          window.__storageLastError = 'PUT ' + key + ': HTTP ' + res.status + (detail?(' — '+detail.slice(0,300)):'');
+          console.error('storageSet failed', key, res.status, detail);
+        }
+      }catch(e){
+        ok = false;
+        window.__storageLastError = 'PUT ' + key + ': ' + e;
+        console.error('storageSet failed', key, e);
+      }
+    };
+    __storageWriteQueue = __storageWriteQueue.then(doWrite, doWrite);
+    await __storageWriteQueue;
+    return ok;
+  }
+
+  // ---------- utils ----------
+  function escapeHTML(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function todayISO(){
+    const d = new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function fmtDateNice(iso){
+    if(!iso) return '—';
+    const [y,m,d] = iso.split('-').map(Number);
+    if(!y) return '—';
+    const dt = new Date(y, m-1, d);
+    return dt.toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'});
+  }
+  function addMonths(iso, months){
+    const [y,m,d] = iso.split('-').map(Number);
+    const totalM = (y*12 + (m-1)) + Math.round(months);
+    const ny = Math.floor(totalM/12), nm = totalM%12;
+    const dt = new Date(Date.UTC(ny, nm, 1));
+    const lastDay = new Date(Date.UTC(ny, nm+1, 0)).getUTCDate();
+    dt.setUTCDate(Math.min(d, lastDay));
+    return dt.toISOString().slice(0,10);
+  }
+  function uid(){ return 'itm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
+
+  function computeDue(item){
+    if(item.manualNextDue) return item.manualNextDue;
+    if(item.lastPerformed && item.limitMonths) return addMonths(item.lastPerformed, item.limitMonths);
+    return null;
+  }
+  function dueInfo(item){
+    if(item.holding && item.holding.active){
+      return {status:'holding', cls:'holding', label:'In Holding', due:computeDue(item), days:null};
+    }
+    const due = computeDue(item);
+    if(!due){
+      return {status:'nolimit', cls:'nolimit', label:item.limitMonths?'No last-performed date':'No limit', due:null, days:null};
+    }
+    const dueDate = new Date(due+'T00:00:00');
+    const today = new Date(); today.setHours(0,0,0,0);
+    const days = Math.round((dueDate - today)/86400000);
+    const warnDays = (item.warningDays==null) ? 30 : item.warningDays;
+    if(days < 0) return {status:'overdue', cls:'bad', label:'Overdue', due, days};
+    if(days <= warnDays) return {status:'soon', cls:'warn', label:'Due Soon', due, days};
+    return {status:'ok', cls:'ok', label:'OK', due, days};
+  }
+
+  const CATEGORY_ORDER = [
+    'Swivels',
+    'Remote Hooks',
+    'Long Lines',
+    'Cargo Nets',
+    'Water Buckets',
+    'Stretcher Kits',
+    'Harnesses',
+    'Lanyards',
+    'Grapple',
+    'Fixed Floats',
+    'Generators',
+    'Heli-Tow Cart'
+  ];
+  const ACTION_OPTIONS = ['Overhaul','Inspection','Inspect & Clean','Lubricating','Check','Replacement','Retirement','Other'];
+
+  function sortedCategories(items){
+    const present = Array.from(new Set(items.map(i=>i.category||'Uncategorized')));
+    const known = CATEGORY_ORDER.filter(c=>present.includes(c));
+    const extra = present.filter(c=>!CATEGORY_ORDER.includes(c)).sort((a,b)=>a.localeCompare(b));
+    return known.concat(extra);
+  }
+
+  function sortItemsByDue(items){
+    return items.slice().sort((a,b)=>{
+      const am = (a.limitMonths==null) ? Infinity : a.limitMonths;
+      const bm = (b.limitMonths==null) ? Infinity : b.limitMonths;
+      if(am !== bm) return am - bm;
+      const ad = computeDue(a), bd = computeDue(b);
+      if(ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+      if(ad && !bd) return -1;
+      if(!ad && bd) return 1;
+      return (a.name||'').localeCompare(b.name||'');
+    });
+  }
+
+  // ---------- state ----------
+  const SEED_ITEMS = [{"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "DART/APICAL 3000 LBS", "partNo": "SWA3", "serialNo": "AC11013", "trackingNo": "12161", "installed": true, "limitMonths": 60.0, "lastPerformed": "2023-02-22", "manualNextDue": "2028-02-22", "id": "seed-1", "photoAttachments": [], "calReportAttachments": [], "notes": "INPESTION PERFORMED I.A.W. OWNERS MANUAL APICAL CANAM SWA3 ROTARY CONTACT SWIVEL ONWERS MANUAL OM-SWA3 REV. N/C 05/14/09", "holding": null, "warningDays": 90}, {"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "DART/APICAL 3000 LBS", "partNo": "SWA3-2", "serialNo": "S113964", "trackingNo": "13143", "installed": true, "limitMonths": 60.0, "lastPerformed": "2018-12-11", "manualNextDue": "2023-10-29", "id": "seed-2", "photoAttachments": [], "calReportAttachments": [], "notes": "INSPECTION PERFORMED I.A.W. OWNERS MANULA APICAL CANAM SWA3 ROTARY CONTACT SWIVEL OM-SWA3 REV. N/C 05/14/09", "holding": null, "warningDays": 90}, {"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "DART/APICAL 3000 LBS", "partNo": "SWA3-3", "serialNo": "5450082", "trackingNo": "15295", "installed": true, "limitMonths": 60.0, "lastPerformed": "2023-02-22", "manualNextDue": "2028-02-22", "id": "seed-3", "photoAttachments": [], "calReportAttachments": [], "notes": "INPESTION PERFORMED I.A.W. OWNERS MANUAL APICAL CANAM SWA3 ROTARY CONTACT SWIVEL ONWERS MANUAL OM-SWA3 REV. N/C 05/14/09", "holding": null, "warningDays": 90}, {"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "APICAL", "partNo": "SWA3", "serialNo": "M647-02", "trackingNo": "12045", "installed": true, "limitMonths": 60.0, "lastPerformed": "2023-06-27", "manualNextDue": "2028-06-27", "id": "seed-4", "photoAttachments": [], "calReportAttachments": [], "notes": "INSPECTION PERFORMED I.A.W. OWNERS MANUAL APICAL CANAM SWA3 ROTARY CONTACT SWIVEL OM-SWA3 REV.N/C 05/14/09", "holding": null, "warningDays": 90}, {"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "DART/APICAL 3000 LBS", "partNo": "SWA3-3", "serialNo": "M647-01", "trackingNo": "2661", "installed": true, "limitMonths": 60.0, "lastPerformed": "2021-03-20", "manualNextDue": "2026-03-20", "id": "seed-5", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2017-02-21. INSPECTION PERFORMED I.A.W. OWNERS MANUAL APICAL CANAM SWA3 ROTARY CONTACT SWIVEL OM-SWA3 REV.N/C 05/14/09", "holding": null, "warningDays": 90}, {"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "DART/APICAL 3000 LBS", "partNo": "SWA3-3", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 60.0, "lastPerformed": null, "manualNextDue": "2023-07-10", "id": "seed-6", "photoAttachments": [], "calReportAttachments": [], "notes": "INPESTION PERFORMED I.A.W. OWNERS MANUAL APICAL CANAM SWA3 ROTARY CONTACT SWIVEL ONWERS MANUAL OM-SWA3 REV. N/C 05/14/09", "holding": null, "warningDays": 90}, {"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "DART/APICAL 3000 LBS", "partNo": "SWA3-3", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 60.0, "lastPerformed": null, "manualNextDue": "2023-08-31", "id": "seed-7", "photoAttachments": [], "calReportAttachments": [], "notes": "INSPECTION PERFORMED I.A.W. OWNERS MANUAL APICAL CANAM SWA3 ROTARY CONTACT SWIVEL OM-SWA3 REV.N/C 05/14/09", "holding": null, "warningDays": 90}, {"name": "CAN AM Swivels", "category": "Swivels", "action": "Overhaul", "makeModel": "DART", "partNo": "SWA3-3", "serialNo": "S055808", "trackingNo": "12875", "installed": true, "limitMonths": 60.0, "lastPerformed": "2023-06-27", "manualNextDue": "2028-06-27", "id": "seed-8", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 90}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "17-1169", "trackingNo": "", "installed": true, "limitMonths": 10.0, "lastPerformed": "2026-02-23", "manualNextDue": "2026-12-23", "id": "seed-9", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "17-1167", "trackingNo": "15572", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-03-19", "manualNextDue": "2026-03-19", "id": "seed-10", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2023-01-13.", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "17-1168", "trackingNo": "14020", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-02-23", "manualNextDue": "2027-02-23", "id": "seed-11", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-09-08.", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "17-1165", "trackingNo": "", "installed": true, "limitMonths": 10.0, "lastPerformed": "2026-02-23", "manualNextDue": "2026-12-23", "id": "seed-12", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "17-1166", "trackingNo": "", "installed": true, "limitMonths": 10.0, "lastPerformed": "2026-02-23", "manualNextDue": "2026-12-23", "id": "seed-13", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "17-1170", "trackingNo": "", "installed": true, "limitMonths": 10.0, "lastPerformed": "2026-02-23", "manualNextDue": "2026-12-23", "id": "seed-14", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "GEM4260", "trackingNo": "15022", "installed": true, "limitMonths": 8.0, "lastPerformed": "2025-03-19", "manualNextDue": "2025-11-19", "id": "seed-15", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2023-04-17.", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "08-035-02", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-22", "manualNextDue": "2027-07-22", "id": "seed-16", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "08-035-03", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-22", "manualNextDue": "2027-07-22", "id": "seed-17", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "08-035-04", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-22", "manualNextDue": "2027-07-22", "id": "seed-18", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "08-035-05", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-22", "manualNextDue": "2027-07-22", "id": "seed-19", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "08-035-01", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2026-07-22", "manualNextDue": "2027-07-22", "id": "seed-20", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "GEM4261", "trackingNo": "13762", "installed": true, "limitMonths": 8.0, "lastPerformed": "2025-04-03", "manualNextDue": "2025-12-03", "id": "seed-21", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-06-10.", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "GEM4259", "trackingNo": "15987", "installed": true, "limitMonths": 8.0, "lastPerformed": "2025-03-19", "manualNextDue": "2025-11-19", "id": "seed-22", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2023-01-13.", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "GEM4258", "trackingNo": "13722", "installed": true, "limitMonths": 8.0, "lastPerformed": "2025-03-19", "manualNextDue": "2025-11-19", "id": "seed-23", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2023-01-13.", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "08-0628", "trackingNo": "13436", "installed": true, "limitMonths": 10.0, "lastPerformed": "2026-02-23", "manualNextDue": "2026-12-23", "id": "seed-24", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2019-09-30.", "holding": null, "warningDays": 30}, {"name": "Cargo Net", "category": "Cargo Nets", "action": "Inspection", "makeModel": "", "partNo": "16X16", "serialNo": "05-0436", "trackingNo": "", "installed": true, "limitMonths": 10.0, "lastPerformed": "2026-04-30", "manualNextDue": "2027-02-28", "id": "seed-25", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Fixed Floats", "category": "Fixed Floats", "action": "Inspection", "makeModel": "APICAL", "partNo": "20331-201B", "serialNo": "005", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2020-09-14", "manualNextDue": "2021-09-14", "id": "seed-26", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2015-05-15.", "holding": null, "warningDays": 60}, {"name": "Generator", "category": "Generators", "action": "Inspection", "makeModel": "Yamaha EF2000iS", "partNo": "", "serialNo": "7PB-0205511", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-10-20", "manualNextDue": "2023-10-20", "id": "seed-27", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Generator", "category": "Generators", "action": "Inspection", "makeModel": "yamaha", "partNo": "EF2000IS", "serialNo": "7PB-0205514", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": "2022-10-20", "manualNextDue": null, "id": "seed-28", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null}, {"name": "Grapple", "category": "Grapple", "action": "Inspection", "makeModel": "IsolairHelicopter System Apr-00", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-06-02", "manualNextDue": "2023-02-10", "id": "seed-29", "photoAttachments": [], "calReportAttachments": [], "notes": "Remove Pump Motor assy., Clean inspect and re-assemble. Use AW-46 oil", "holding": null, "warningDays": 60}, {"name": "Harness Inspection", "category": "Harnesses", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "037501", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-11-08", "manualNextDue": "2023-11-08", "id": "seed-30", "photoAttachments": [], "calReportAttachments": [], "notes": "Anual inspection to be carried out as per \"\"Harness Inspection (Model 1191201C)\"\" document.", "holding": null, "warningDays": 15}, {"name": "Harness Inspection", "category": "Harnesses", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "0020047", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-11-08", "manualNextDue": "2023-11-08", "id": "seed-31", "photoAttachments": [], "calReportAttachments": [], "notes": "Anual inspection to be carried out as per \"\" (Model 1191201C)\"\" document.", "holding": null, "warningDays": 15}, {"name": "Harness Inspection", "category": "Harnesses", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "0018795", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-11-08", "manualNextDue": "2023-11-08", "id": "seed-32", "photoAttachments": [], "calReportAttachments": [], "notes": "Anual inspection to be carried out as per \"\"Harness Inspection (Model 1191201C)\"\" document.", "holding": null, "warningDays": 15}, {"name": "Heli-Tow Cart", "category": "Heli-Tow Cart", "action": "Lubricating", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 6.0, "lastPerformed": "2024-07-13", "manualNextDue": "2025-01-13", "id": "seed-33", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2013-07-30. Servise hydraulic tank, grease fittings, Check cables, Check sadles bolts for proper torque and apply Loctite 242 on the threads.", "holding": null, "warningDays": 30}, {"name": "Lanyard", "category": "Lanyards", "action": "Inspection", "makeModel": "", "partNo": "FP22129/4", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": null, "manualNextDue": "2025-04-25", "id": "seed-34", "photoAttachments": [], "calReportAttachments": [], "notes": "Anual inspection to be carried out as per \"\"Harness Inspection (Model 1191201C)\"\" document.", "holding": null, "warningDays": 15}, {"name": "Lanyard", "category": "Lanyards", "action": "Inspection", "makeModel": "", "partNo": "FP22129/4", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": null, "manualNextDue": "2025-04-25", "id": "seed-35", "photoAttachments": [], "calReportAttachments": [], "notes": "Anual inspection to be carried out as per \"\"Harness Inspection (Model 1191201C)\"\" document.", "holding": null, "warningDays": 15}, {"name": "Long Line", "category": "Long Lines", "action": "Inspection", "makeModel": "50 ft", "partNo": "", "serialNo": "PHF001", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2020-05-27", "manualNextDue": "2021-05-27", "id": "seed-36", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 60}, {"name": "Long Line", "category": "Long Lines", "action": "Inspection", "makeModel": "125 FT", "partNo": "3500LB LL", "serialNo": "18-1439", "trackingNo": "16116", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-03-23", "manualNextDue": "2026-03-23", "id": "seed-37", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2024-04-30.", "holding": null, "warningDays": 60}, {"name": "Long Line", "category": "Long Lines", "action": "Inspection", "makeModel": "100 ft", "partNo": "", "serialNo": "17-1302", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-03-25", "manualNextDue": "2026-03-25", "id": "seed-38", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 60}, {"name": "Long Line", "category": "Long Lines", "action": "Inspection", "makeModel": "125 ft", "partNo": "", "serialNo": "18-1440", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2024-03-17", "manualNextDue": "2025-03-17", "id": "seed-39", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 60}, {"name": "Long Line", "category": "Long Lines", "action": "Inspection", "makeModel": "125 ft", "partNo": "", "serialNo": "17-1303", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-03-25", "manualNextDue": "2026-03-25", "id": "seed-40", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 60}, {"name": "Long Line", "category": "Long Lines", "action": "Inspection", "makeModel": "125 ft", "partNo": "", "serialNo": "17-1304", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-03-21", "manualNextDue": "2026-03-21", "id": "seed-41", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 60}, {"name": "Long Line", "category": "Long Lines", "action": "Inspection", "makeModel": "125 ft", "partNo": "", "serialNo": "PHF002", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": null, "manualNextDue": "2020-05-25", "id": "seed-42", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Overhaul", "makeModel": "Dart", "partNo": "C3", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": 60.0, "lastPerformed": null, "manualNextDue": "2025-04-08", "id": "seed-43", "photoAttachments": [], "calReportAttachments": [], "notes": "To be overhaul as per Remote Hook PN C3 O&OPM-C3 overhaul manual with Kit P/N 648.4702.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Overhaul", "makeModel": "Dart", "partNo": "C3", "serialNo": "2924-01", "trackingNo": "5716", "installed": true, "limitMonths": 60.0, "lastPerformed": "2020-05-25", "manualNextDue": "2025-05-25", "id": "seed-44", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-04-08. To be overhaul as per Remote Hook PN C3 O&OPM-C3 overhaul manual with Kit P/N 648.4702.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Overhaul", "makeModel": "CAN AM", "partNo": "C3", "serialNo": "S120107", "trackingNo": "13851", "installed": true, "limitMonths": 60.0, "lastPerformed": "2023-04-17", "manualNextDue": "2028-04-17", "id": "seed-45", "photoAttachments": [], "calReportAttachments": [], "notes": "To be overhaul as per Remote Hook PN C3 O&OPM-C3 overhaul manual with Kit P/N 648.4702.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Inspect & Clean", "makeModel": "", "partNo": "C3", "serialNo": "-S120107-", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-04-17", "manualNextDue": "2024-04-17", "id": "seed-46", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-04-08. Annual inspection to be carried out IAW remote hook manual C3 O&OPM-C3 Section 3.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Overhaul", "makeModel": "CAN AM", "partNo": "C3", "serialNo": "S120102", "trackingNo": "13852", "installed": true, "limitMonths": 60.0, "lastPerformed": "2024-06-11", "manualNextDue": "2028-06-03", "id": "seed-47", "photoAttachments": [], "calReportAttachments": [], "notes": "To be overhaul as per Remote Hook PN C3 O&OPM-C3 overhaul manual with Kit P/N 648.4702.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Inspect & Clean", "makeModel": "", "partNo": "C3", "serialNo": "-S120102-", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-04-17", "manualNextDue": "2024-04-24", "id": "seed-48", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-04-08. Annual inspection to be carried out IAW remote hook manual C3 O&OPM-C3 Section 3.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Overhaul", "makeModel": "CAN AM", "partNo": "C3", "serialNo": "M620-01", "trackingNo": "5897", "installed": true, "limitMonths": 60.0, "lastPerformed": "2025-04-29", "manualNextDue": "2025-10-29", "id": "seed-49", "photoAttachments": [], "calReportAttachments": [], "notes": "To be overhaul as per Remote Hook PN C3 O&OPM-C3 overhaul manual with Kit P/N 648.4702.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Overhaul", "makeModel": "CAN AM", "partNo": "C3", "serialNo": "M620-02", "trackingNo": "11888", "installed": true, "limitMonths": 60.0, "lastPerformed": "2025-04-29", "manualNextDue": "2028-05-01", "id": "seed-50", "photoAttachments": [], "calReportAttachments": [], "notes": "To be overhaul as per Remote Hook PN C3 O&OPM-C3 overhaul manual with Kit P/N 648.4702.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Inspect & Clean", "makeModel": "", "partNo": "C3", "serialNo": "-2924-02-", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-05-09", "manualNextDue": "2025-04-08", "id": "seed-51", "photoAttachments": [], "calReportAttachments": [], "notes": "Annual inspection to be carried out IAW remote hook manual C3 O&OPM-C3 Section 3.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Inspect & Clean", "makeModel": "", "partNo": "C3", "serialNo": "-2924-01-", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-05-11", "manualNextDue": "2023-05-11", "id": "seed-52", "photoAttachments": [], "calReportAttachments": [], "notes": "Annual inspection to be carried out IAW remote hook manual C3 O&OPM-C3 Section 3.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Inspect & Clean", "makeModel": "", "partNo": "C3", "serialNo": "-M620-02-", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-04-17", "manualNextDue": "2025-04-15", "id": "seed-53", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-01-22. Annual inspection to be carried out IAW remote hook manual C3 O&OPM-C3 Section 3.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Overhaul", "makeModel": "Dart", "partNo": "C3", "serialNo": "AC11026", "trackingNo": "5593", "installed": true, "limitMonths": 60.0, "lastPerformed": "2020-05-22", "manualNextDue": "2025-05-22", "id": "seed-54", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-04-08. To be overhaul as per Remote Hook PN C3 O&OPM-C3 overhaul manual with Kit P/N 648.4702.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Inspect & Clean", "makeModel": "", "partNo": "C3", "serialNo": "-M620-01-", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-05-11", "manualNextDue": "2025-04-08", "id": "seed-55", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2020-01-22. Annual inspection to be carried out IAW remote hook manual C3 O&OPM-C3 Section 3.", "holding": null, "warningDays": 60}, {"name": "Remote Hook", "category": "Remote Hooks", "action": "Inspect & Clean", "makeModel": "", "partNo": "C3", "serialNo": "-AC11026-", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-05-09", "manualNextDue": "2024-05-09", "id": "seed-56", "photoAttachments": [], "calReportAttachments": [], "notes": "Annual inspection to be carried out IAW remote hook manual C3 O&OPM-C3 Section 3.", "holding": null, "warningDays": 60}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "S067456", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-05-05", "manualNextDue": "2023-08-03", "id": "seed-57", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "S082988", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-02-22", "manualNextDue": "2023-06-27", "id": "seed-58", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "AC11013", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-05-05", "manualNextDue": "2023-05-05", "id": "seed-59", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "M647-01", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-02-22", "manualNextDue": "2024-02-22", "id": "seed-60", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "S113964", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-02-22", "manualNextDue": "2024-02-22", "id": "seed-61", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "S082988", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2023-02-22", "manualNextDue": "2024-02-22", "id": "seed-62", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "M647-02", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-05-05", "manualNextDue": "2023-05-10", "id": "seed-63", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Swivel Annual Inspection", "category": "Swivels", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "S055808", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-05-06", "manualNextDue": "2023-05-31", "id": "seed-64", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Stretcher Kit", "category": "Stretcher Kits", "action": "Inspection", "makeModel": "AS350", "partNo": "350-200204", "serialNo": "07-035185", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-04-21", "manualNextDue": "2026-04-21", "id": "seed-65", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Stretcher Kit", "category": "Stretcher Kits", "action": "Inspection", "makeModel": "AS350", "partNo": "350-200204", "serialNo": "PHF0705", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-04-21", "manualNextDue": "2026-04-21", "id": "seed-66", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Stretcher Kit", "category": "Stretcher Kits", "action": "Inspection", "makeModel": "AS350", "partNo": "350-200204", "serialNo": "PHF0703", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2025-04-21", "manualNextDue": "2026-04-21", "id": "seed-67", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Stretcher Kit", "category": "Stretcher Kits", "action": "Inspection", "makeModel": "AS350", "partNo": "350-200204", "serialNo": "PHF0702", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-04-29", "manualNextDue": "2025-04-28", "id": "seed-68", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Stretcher Kit", "category": "Stretcher Kits", "action": "Inspection", "makeModel": "AS350", "partNo": "350-200204", "serialNo": "PHF0704", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-04-29", "manualNextDue": "2025-04-28", "id": "seed-69", "photoAttachments": [], "calReportAttachments": [], "notes": "", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB2024", "serialNo": "3696", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-04-18", "manualNextDue": "2023-04-18", "id": "seed-70", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB1518", "serialNo": "3164", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2021-02-07", "manualNextDue": "2022-02-07", "id": "seed-71", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES    INSPECT BEFORE AND AFTER EACH USE TO ENSURE THERE IS NO LOST TIME DUE TO DAMAGE FOUND AT WORK SITE!!!!!", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB1012", "serialNo": "2461", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2024-09-04", "manualNextDue": "2025-09-04", "id": "seed-72", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES    INSPECT BEFORE AND AFTER EACH USE TO ENSURE THERE IS NO LOST TIME DUE TO DAMAGE FOUND AT WORK SITE!!!!!", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB2024", "serialNo": "3078", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2024-09-04", "manualNextDue": "2025-09-04", "id": "seed-73", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB1518", "serialNo": "3543", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2021-02-08", "manualNextDue": "2022-02-08", "id": "seed-74", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES    INSPECT BEFORE AND AFTER EACH USE TO ENSURE THERE IS NO LOST TIME DUE TO DAMAGE FOUND AT WORK SITE!!!!!", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB1012", "serialNo": "2070", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2024-09-04", "manualNextDue": "2024-09-04", "id": "seed-75", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES    INSPECT BEFORE AND AFTER EACH USE TO ENSURE THERE IS NO LOST TIME DUE TO DAMAGE FOUND AT WORK SITE!!!!!", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB1012", "serialNo": "4047", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2024-04-15", "manualNextDue": "2025-04-15", "id": "seed-76", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES    INSPECT BEFORE AND AFTER EACH USE TO ENSURE THERE IS NO LOST TIME DUE TO DAMAGE FOUND AT WORK SITE!!!!!", "holding": null, "warningDays": 30}, {"name": "Water Bucket", "category": "Water Buckets", "action": "Inspection", "makeModel": "SEI INDUSTRIES BAMBI BUCKET", "partNo": "BB1012", "serialNo": "3542", "trackingNo": "", "installed": true, "limitMonths": 12.0, "lastPerformed": "2022-04-18", "manualNextDue": "2023-04-18", "id": "seed-77", "photoAttachments": [], "calReportAttachments": [], "notes": "REFER TO THE BAMBI BUCKET OPERATOR'S MANUAL FOR INSTRUCTIONS ON PROPER INSPECTIONS AND NORMAL PRACTICES    INSPECT BEFORE AND AFTER EACH USE TO ENSURE THERE IS NO LOST TIME DUE TO DAMAGE FOUND AT WORK SITE!!!!!", "holding": null, "warningDays": 30}, {"name": "Water Buckets", "category": "Water Buckets", "action": "Inspection", "makeModel": "", "partNo": "", "serialNo": "", "trackingNo": "", "installed": true, "limitMonths": null, "lastPerformed": null, "manualNextDue": null, "id": "seed-78", "photoAttachments": [], "calReportAttachments": [], "notes": "Initially installed: 2009-04-20.", "holding": null}];
+
+  let ITEMS = [];
+  let CATEGORY_META = {}; // { [categoryName]: { section: 'tasks'|'tools' } }
+  let CURRENT_SECTION = 'tools'; // 'tasks' (Task Tracker) | 'tools' (Ops Gear Tracker)
+  let VIEW_TAB = 'active'; // active | holding
+  let SORT_MODE = 'group'; // group | due | custom
+  // "My Order" drag state -- which row is being dragged, and which row it's currently hovering
+  // over (plus above/below that row), so drop() knows exactly where to insert it.
+  let DRAG_ITEM_ID = null;
+  let DRAG_ITEM_GROUP_KEY = null;
+  let DRAG_OVER_ID = null;
+  let DRAG_OVER_POS = null; // 'before' | 'after'
+  let SEARCH_Q = '';
+  let CATEGORY_FILTER = '';
+  let INSTALLED_ONLY = false;
+  let SAVING = false;
+  // In-memory (not persisted) history of ITEMS after each successful save, newest last, so "Undo"
+  // can offer the last few states to jump back to. Reset on page reload -- this is a short-term
+  // working-session convenience, not a durable audit trail.
+  let SAVE_HISTORY = [];
+  const SAVE_HISTORY_LIMIT = 5; // current state + up to 4 prior states to restore
+
+  async function loadData(){
+    const raw = await storageGet(DATA_KEY);
+    if(raw){
+      try{
+        ITEMS = JSON.parse(raw);
+        if(ensureSortIndexes()) await persist();
+        return;
+      }catch(e){ console.error('bad stored data, falling back to seed', e); }
+    }
+    // first run — seed from the parsed ops gear list, then persist immediately
+    ITEMS = JSON.parse(JSON.stringify(SEED_ITEMS));
+    ensureSortIndexes();
+    await persist();
+  }
+
+  // "My Order" reordering is scoped to siblings -- a child item can only be dragged among the
+  // other children of the same assembly, and a top-level item only among the other top-level
+  // items in the same category. This is what a drag is validated against, and what a drop
+  // renumbers.
+  function sortGroupKey(item){
+    return item.parentId ? ('child:'+item.parentId) : ('top:'+(item.category||'Uncategorized'));
+  }
+
+  // Gives every item a sortIndex if it doesn't already have one -- both for the very first load
+  // (55 seed items, none of which have ever needed a manual order before) and for any item added
+  // since. New/never-ordered items are numbered after whatever's already in their group, in
+  // whatever order they're currently in, so nothing jumps around the first time "My Order" is
+  // opened -- it starts out looking exactly like the grouped view already did.
+  function ensureSortIndexes(){
+    let changed = false;
+    const counters = {};
+    ITEMS.forEach(item=>{
+      if(typeof item.sortIndex === 'number') return;
+      const key = sortGroupKey(item);
+      const next = (counters[key] == null) ? nextSortIndexFor(key) : counters[key];
+      item.sortIndex = next;
+      counters[key] = next + 1;
+      changed = true;
+    });
+    return changed;
+  }
+
+  function nextSortIndexFor(groupKey){
+    let max = -1;
+    ITEMS.forEach(i=>{
+      if(sortGroupKey(i) === groupKey && typeof i.sortIndex === 'number' && i.sortIndex > max) max = i.sortIndex;
+    });
+    return max + 1;
+  }
+
+  function sortItemsByCustomOrder(items){
+    return items.slice().sort((a,b)=>{
+      const ai = (typeof a.sortIndex === 'number') ? a.sortIndex : 999999;
+      const bi = (typeof b.sortIndex === 'number') ? b.sortIndex : 999999;
+      if(ai !== bi) return ai - bi;
+      return (a.name||'').localeCompare(b.name||'');
+    });
+  }
+
+  // Renumbers an entire sibling group 0..N-1 to match the order the caller hands in, and marks
+  // every item whose position actually changed. Always renumbering the whole group (rather than
+  // patching just the moved item) keeps sortIndex values small and gap-free, and sidesteps any
+  // edge case around ties or stale values left over from ensureSortIndexes().
+  function applyCustomOrder(orderedItems){
+    let changed = false;
+    orderedItems.forEach((item, idx)=>{
+      if(item.sortIndex !== idx){ item.sortIndex = idx; changed = true; }
+    });
+    return changed;
+  }
+
+  function getCategorySection(cat){
+    cat = cat || 'Uncategorized';
+    const m = CATEGORY_META[cat];
+    return (m && m.section) ? m.section : (DEFAULT_CATEGORY_SECTIONS[cat] || 'tools');
+  }
+  // Fills in a meta entry (defaulted) for any category that doesn't have one yet -- covers both the
+  // very first load and any new category typed into the Add/Edit form later.
+  function ensureCategoryMeta(){
+    let changed = false;
+    sortedCategories(ITEMS).forEach(cat=>{
+      if(!CATEGORY_META[cat]){
+        CATEGORY_META[cat] = { section: DEFAULT_CATEGORY_SECTIONS[cat] || 'tools' };
+        changed = true;
+      }
+    });
+    return changed;
+  }
+  async function loadCategoryMeta(){
+    const raw = await storageGet(CATMETA_KEY);
+    if(raw){
+      try{ CATEGORY_META = JSON.parse(raw); }catch(e){ CATEGORY_META = {}; }
+    }
+    const changed = ensureCategoryMeta();
+    if(changed || !raw) await persistCategoryMeta();
+  }
+  async function persistCategoryMeta(){
+    await storageSet(CATMETA_KEY, JSON.stringify(CATEGORY_META));
+  }
+  function sectionItems(){
+    return ITEMS.filter(i => getCategorySection(i.category) === CURRENT_SECTION);
+  }
+  async function persist(){
+    SAVING = true;
+    renderSyncNote();
+    const itemsJSON = JSON.stringify(ITEMS);
+    const ok = await storageSet(DATA_KEY, itemsJSON);
+    SAVING = false;
+    if(!ok){
+      const note = document.getElementById('ttSyncNote');
+      note.style.display = 'block';
+      note.textContent = "Couldn't sync to the cloud just now (saved locally on this device). " + (window.__storageLastError||'');
+    } else {
+      renderSyncNote();
+    }
+    // Record this state for "Undo" regardless of cloud-sync success -- it reflects what's
+    // actually showing right now. Skip if nothing actually changed since the last save.
+    if(!SAVE_HISTORY.length || SAVE_HISTORY[SAVE_HISTORY.length-1].itemsJSON !== itemsJSON){
+      SAVE_HISTORY.push({ ts: Date.now(), itemsJSON: itemsJSON });
+      if(SAVE_HISTORY.length > SAVE_HISTORY_LIMIT) SAVE_HISTORY.shift();
+    }
+  }
+  function renderSyncNote(){
+    const note = document.getElementById('ttSyncNote');
+    if(SAVING){ note.style.display='block'; note.textContent = 'Saving…'; }
+    else if(note.textContent === 'Saving…'){ note.style.display='none'; }
+  }
+
+  // ---------- undo ----------
+  // Describes the move that turned prevJSON into nextJSON, in plain language, so someone
+  // choosing an "Undo" target can tell what they'd be reverting.
+  function describeSaveChange(prevJSON, nextJSON){
+    try{
+      const prev = prevJSON ? JSON.parse(prevJSON) : [];
+      const next = JSON.parse(nextJSON);
+      const prevById = new Map(prev.map(i=>[i.id,i]));
+      const nextById = new Map(next.map(i=>[i.id,i]));
+      const added = next.filter(i=>!prevById.has(i.id));
+      const removed = prev.filter(i=>!nextById.has(i.id));
+      if(added.length && !removed.length && next.length === prev.length + added.length){
+        return added.length === 1 ? ('Added "'+added[0].name+'"') : (added.length+' items added');
+      }
+      if(removed.length && !added.length){
+        return removed.length === 1 ? ('Deleted "'+removed[0].name+'"') : (removed.length+' items deleted');
+      }
+      if(!added.length && !removed.length && next.length === prev.length){
+        const changed = [];
+        let onlyOrderChanged = true;
+        next.forEach(n=>{
+          const p = prevById.get(n.id);
+          if(!p) return;
+          if(JSON.stringify(n) !== JSON.stringify(p)) changed.push(n);
+          const pSameOrder = Object.assign({}, p, {sortIndex: n.sortIndex});
+          if(JSON.stringify(n) !== JSON.stringify(pSameOrder)) onlyOrderChanged = false;
+        });
+        if(!changed.length) return 'No change';
+        if(onlyOrderChanged) return 'Reordered items';
+        return changed.length === 1 ? ('Edited "'+changed[0].name+'"') : (changed.length+' items edited');
+      }
+      const parts = [];
+      if(added.length) parts.push(added.length+' added');
+      if(removed.length) parts.push(removed.length+' removed');
+      return parts.length ? parts.join(', ') : 'Changes saved';
+    }catch(e){ return 'Changes saved'; }
+  }
+
+  // Small non-blocking confirmation banner (auto-hides), used for Undo feedback so a click
+  // doesn't need a modal or dialog to confirm what just happened.
+  let undoToastTimer = null;
+  function showUndoToast(msg){
+    let el = document.getElementById('ttUndoToast');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'ttUndoToast';
+      el.className = 'tt-undo-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.remove('show');
+    // Force a reflow so re-triggering the class while already visible still restarts the fade.
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(undoToastTimer);
+    undoToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 3000);
+  }
+
+  // One click undoes just the single most recent change to the item list (add/edit/delete/
+  // duplicate/reorder) -- no picker, so an accidental delete can be reversed in one tap.
+  async function undoLastChange(){
+    if(SAVE_HISTORY.length < 2){
+      showUndoToast('Nothing to undo yet this session.');
+      return;
+    }
+    const current = SAVE_HISTORY[SAVE_HISTORY.length-1];
+    const prior = SAVE_HISTORY[SAVE_HISTORY.length-2];
+    const label = describeSaveChange(prior.itemsJSON, current.itemsJSON);
+    ITEMS = JSON.parse(prior.itemsJSON);
+    await persist();
+    renderAll();
+    showUndoToast('Undone: ' + label);
+  }
+
+  // ---------- rendering ----------
+  function matchesSearch(item, q){
+    if(!q) return true;
+    q = q.toLowerCase();
+    return [item.name, item.makeModel, item.partNo, item.serialNo, item.trackingNo, item.category, item.notes]
+      .some(v => v && String(v).toLowerCase().includes(q));
+  }
+
+  function renderAll(){
+    renderSectionSwitch();
+    renderSummary();
+    renderTabs();
+    renderCategoryFilter();
+    renderList();
+  }
+
+  function renderSectionSwitch(){
+    const tasksCount = ITEMS.filter(i=>getCategorySection(i.category)==='tasks').length;
+    const toolsCount = ITEMS.filter(i=>getCategorySection(i.category)==='tools').length;
+    document.getElementById('ttSectionSwitch').innerHTML =
+      '<button class="tt-section-btn '+(CURRENT_SECTION==='tasks'?'active':'')+'" data-sec="tasks">🗓️ Task Tracker <span class="cnt">'+tasksCount+'</span></button>' +
+      '<button class="tt-section-btn '+(CURRENT_SECTION==='tools'?'active':'')+'" data-sec="tools">🎒 Ops Gear Tracker <span class="cnt">'+toolsCount+'</span></button>' +
+      '<button class="btn small" id="ttManageCatsBtn" style="margin-left:8px;">Manage Categories</button>';
+    document.querySelectorAll('.tt-section-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        if(CURRENT_SECTION === btn.dataset.sec) return;
+        CURRENT_SECTION = btn.dataset.sec;
+        CATEGORY_FILTER = '';
+        SEARCH_Q = '';
+        document.getElementById('ttSearch').value = '';
+        renderAll();
+      };
+    });
+    document.getElementById('ttManageCatsBtn').onclick = openManageCategories;
+  }
+
+  function renderSummary(){
+    const pool = sectionItems();
+    let overdue=0, soon=0, holding=0;
+    pool.forEach(i=>{
+      const di = dueInfo(i);
+      if(di.status==='overdue') overdue++;
+      else if(di.status==='soon') soon++;
+      else if(di.status==='holding') holding++;
+    });
+    document.getElementById('ttSummary').innerHTML =
+      '<div class="tt-summary">' +
+        '<div class="tt-stat"><div class="n">'+pool.length+'</div><div class="l">Total Items</div></div>' +
+        '<div class="tt-stat bad"><div class="n">'+overdue+'</div><div class="l">Overdue</div></div>' +
+        '<div class="tt-stat warn"><div class="n">'+soon+'</div><div class="l">Due Within 30 Days</div></div>' +
+        '<div class="tt-stat hold"><div class="n">'+holding+'</div><div class="l">In Holding</div></div>' +
+      '</div>';
+  }
+
+  function renderTabs(){
+    const pool = sectionItems();
+    const activeCount = pool.filter(i=>!(i.holding && i.holding.active)).length;
+    const holdCount = pool.filter(i=>i.holding && i.holding.active).length;
+    document.getElementById('ttTabs').innerHTML =
+      '<button class="tt-tab '+(VIEW_TAB==='active'?'active':'')+'" data-tab="active">Active <span class="cnt">'+activeCount+'</span></button>' +
+      '<button class="tt-tab '+(VIEW_TAB==='holding'?'active':'')+'" data-tab="holding">Holding <span class="cnt">'+holdCount+'</span></button>';
+    document.getElementById('ttTabs').querySelectorAll('.tt-tab').forEach(btn=>{
+      btn.onclick = ()=>{ VIEW_TAB = btn.dataset.tab; renderAll(); };
+    });
+  }
+
+  function renderCategoryFilter(){
+    const sel = document.getElementById('ttCategoryFilter');
+    const cats = sortedCategories(sectionItems());
+    const cur = CATEGORY_FILTER;
+    sel.innerHTML = '<option value="">All categories</option>' + cats.map(c=>'<option value="'+escapeHTML(c)+'"'+(c===cur?' selected':'')+'>'+escapeHTML(c)+'</option>').join('');
+  }
+
+  function attIconStr(item){
+    const p = (item.photoAttachments||[]).length, c = (item.calReportAttachments||[]).length;
+    let parts = [];
+    if(p) parts.push('📷'+p);
+    if(c) parts.push('📄'+c);
+    return parts.join(' ');
+  }
+
+  function dueCellContent(item, di){
+    if(di.status==='holding'){
+      return item.holding && item.holding.sentDate ? ('Since ' + fmtDateNice(item.holding.sentDate)) : 'In Holding';
+    }
+    if(di.status==='nolimit') return di.label;
+    const daysStr = di.status==='overdue' ? (Math.abs(di.days)+'d overdue') : ('in '+di.days+'d');
+    return fmtDateNice(di.due) + ' <span style="font-weight:600;font-size:10.5px;">('+daysStr+')</span>';
+  }
+
+  function renderRowActions(item, di, opts){
+    opts = opts || {};
+    // Edit and Delete each have their own dedicated row/modal buttons elsewhere (clicking
+    // anywhere on the row opens Edit; the edit form itself has its own Delete button), so they
+    // aren't duplicated here as separate row icons.
+    let html = '<button type="button" class="row-icon-btn" title="Duplicate (clears Serial No., Tracking No. &amp; Date Performed)" data-act="duplicate" data-id="'+item.id+'">📋</button>';
+    // "Add Sub-Item" -- only on a top-level (non-child) row, only in the Tool & Calibration
+    // Tracker section, and only from the active list (not holding, not a search/filter view
+    // where the parent itself might not even be showing).
+    if(!opts.tasksMode && !opts.holdingMode && !item.parentId){
+      html += '<button type="button" class="row-icon-btn" title="Add Sub-Item" data-act="add-sub" data-id="'+item.id+'">➕</button>';
+    }
+    if(di.status==='holding'){
+      html += '<button type="button" class="row-icon-btn primary" title="Complete / Return" data-act="complete-holding" data-id="'+item.id+'">✅</button>';
+    } else {
+      html += '<button type="button" class="row-icon-btn" title="Send to Holding" data-act="send-holding" data-id="'+item.id+'">📦</button>';
+    }
+    return html;
+  }
+
+  // opts.isChild: rendered nested directly under its parent's row (indented, with a ⤷ marker).
+  // opts.childCount: for a top-level row, how many sub-items are nested under it (adds the
+  // "Assembly" badge). opts.tasksMode: hides assembly-only affordances in the Task Tracker
+  // section (defensive -- Task Tracker items never actually get a parentId, see openItemForm).
+  function renderItemRow(item, opts){
+    opts = opts || {};
+    const tasksMode = CURRENT_SECTION === 'tasks';
+    opts.tasksMode = tasksMode;
+    const di = dueInfo(item);
+    const notInstalledCls = item.installed ? '' : ' notinstalled';
+    const holdingCls = di.status==='holding' ? ' holding' : '';
+    const childRowCls = opts.isChild ? ' tt-child-row' : '';
+    const childCount = opts.childCount || 0;
+    // A child item is normally rendered nested (opts.isChild) right under its parent. If its
+    // parent got filtered out of the current view (a category filter, or a search match on the
+    // child only) it's rendered here instead, at the top level -- with a note pointing back to
+    // its assembly, so it never just silently vanishes from the list.
+    const orphanParent = (item.parentId && !opts.isChild) ? ITEMS.find(p=>p.id===item.parentId) : null;
+    // "My Order" dragging is scoped to siblings (sortGroupKey), so a row only becomes draggable
+    // when it's actually rendered in its real sibling group -- an orphaned sub-item (parent
+    // filtered out of view, see above) is shown flat among a different group's rows and can't
+    // meaningfully be dragged there.
+    const draggableRow = !!opts.draggable && !opts.holdingMode && !orphanParent;
+    const dragHandle = draggableRow ? '<span class="tt-drag-handle" title="Drag to reorder">⠿</span>' : '';
+    const nameCell =
+      dragHandle +
+      '<span class="status-dot '+di.cls+'"></span>' +
+      '<span>'+escapeHTML(item.name)+'</span>' +
+      (childCount ? ' <span class="tt-assembly-badge">Assembly · '+childCount+' item'+(childCount===1?'':'s')+'</span>' : '') +
+      (item.notes ? ' <span title="'+escapeHTML(item.notes)+'" style="cursor:help;">📝</span>' : '') +
+      (!item.installed ? ' <span style="font-size:9.5px;font-weight:800;color:var(--grey-strong);">(NOT INSTALLED)</span>' : '') +
+      (orphanParent ? '<span class="tt-orphan-note">⤷ Part of '+escapeHTML(orphanParent.name)+'</span>' : '');
+    const dragAttrs = draggableRow ? ' draggable="true" data-group-key="'+escapeHTML(sortGroupKey(item))+'"' : '';
+    const dragRowCls = draggableRow ? ' tt-draggable' : '';
+
+    if(opts.holdingMode){
+      let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.category||'')+'</td>';
+      if(!tasksMode){
+        cells += '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+          '<td class="num">'+escapeHTML(item.serialNo||item.trackingNo||'')+'</td>';
+      }
+      cells += '<td class="num">'+(item.holding&&item.holding.sentDate?fmtDateNice(item.holding.sentDate):'—')+'</td>' +
+        '<td>'+escapeHTML((item.holding&&item.holding.note)||'')+'</td>' +
+        '<td class="num">'+attIconStr(item)+'</td>' +
+        '<td class="act-cell">'+renderRowActions(item, di, opts)+'</td>';
+      return '<tr class="item-row'+holdingCls+childRowCls+dragRowCls+'" data-id="'+item.id+'"'+dragAttrs+'>'+cells+'</tr>';
+    }
+
+    let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.action||'')+'</td>';
+    if(!tasksMode){
+      cells += '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+        '<td class="num">'+escapeHTML(item.partNo||'')+'</td>' +
+        '<td class="num">'+escapeHTML(item.serialNo||'')+'</td>' +
+        '<td class="num">'+escapeHTML(item.trackingNo||'')+'</td>';
+    }
+    cells += '<td class="num">'+(item.limitMonths?item.limitMonths+' mo':'No limit')+'</td>' +
+      '<td class="num">'+fmtDateNice(item.lastPerformed)+'</td>' +
+      '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>' +
+      '<td class="num">'+attIconStr(item)+'</td>' +
+      '<td class="act-cell">'+renderRowActions(item, di, opts)+'</td>';
+    return '<tr class="item-row'+notInstalledCls+holdingCls+childRowCls+dragRowCls+'" data-id="'+item.id+'"'+dragAttrs+'>'+cells+'</tr>';
+  }
+
+  function activeHead(tasksMode){
+    return tasksMode
+      ? '<tr><th>Name</th><th>Action</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>'
+      : '<tr><th>Name</th><th>Action</th><th>Make / Model</th><th>Part No.</th><th>Serial No.</th><th>Tracking No.</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>';
+  }
+  function holdingHead(tasksMode){
+    return tasksMode
+      ? '<tr><th>Name</th><th>Category</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>'
+      : '<tr><th>Name</th><th>Category</th><th>Make / Model</th><th>Serial / Tracking</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>';
+  }
+  function activeColCount(tasksMode){ return tasksMode ? 7 : 11; }
+
+  function renderList(){
+    const area = document.getElementById('ttListArea');
+    const tasksMode = CURRENT_SECTION === 'tasks';
+    let pool = sectionItems().filter(i => VIEW_TAB==='holding' ? (i.holding && i.holding.active) : !(i.holding && i.holding.active));
+    if(CATEGORY_FILTER) pool = pool.filter(i => (i.category||'Uncategorized') === CATEGORY_FILTER);
+    if(INSTALLED_ONLY) pool = pool.filter(i => i.installed);
+    pool = pool.filter(i => matchesSearch(i, SEARCH_Q));
+
+    if(pool.length === 0){
+      area.innerHTML = '<div class="tt-empty">No items match.</div>';
+      return;
+    }
+
+    // Assemblies: a sub-item (item.parentId set) nests directly under its parent's row instead
+    // of appearing in its own sorted/grouped position -- but only when that parent is still part
+    // of this same filtered pool. A sub-item whose parent got filtered out (a category filter,
+    // or a search match on the sub-item only) still needs to show up somewhere, so renderItemRow
+    // falls back to showing it as a normal row with a "Part of <assembly>" note.
+    // Dragging (SORT_MODE === 'custom') needs a real, deliberate order for children too, not
+    // the usual due-date sort -- everywhere else (due / group modes) children still sort by due
+    // date same as before.
+    const isCustomMode = SORT_MODE === 'custom' && VIEW_TAB !== 'holding';
+    const childSort = isCustomMode ? sortItemsByCustomOrder : sortItemsByDue;
+
+    const poolIds = new Set(pool.map(i=>i.id));
+    const childrenByParent = {};
+    pool.forEach(i=>{
+      if(i.parentId && poolIds.has(i.parentId)){
+        (childrenByParent[i.parentId] = childrenByParent[i.parentId] || []).push(i);
+      }
+    });
+    Object.keys(childrenByParent).forEach(pid=>{ childrenByParent[pid] = childSort(childrenByParent[pid]); });
+    const nestedChildIds = new Set();
+    Object.values(childrenByParent).forEach(arr=>arr.forEach(c=>nestedChildIds.add(c.id)));
+
+    function renderWithChildren(item, baseOpts){
+      let html = renderItemRow(item, Object.assign({}, baseOpts, { childCount: (childrenByParent[item.id]||[]).length }));
+      (childrenByParent[item.id]||[]).forEach(child=>{
+        html += renderItemRow(child, Object.assign({}, baseOpts, { isChild:true }));
+      });
+      return html;
+    }
+
+    let bodyRows;
+    let head;
+    if(VIEW_TAB === 'holding'){
+      head = holdingHead(tasksMode);
+      const visible = sortItemsByDue(pool).filter(i=>!nestedChildIds.has(i.id));
+      bodyRows = visible.map(i=>renderWithChildren(i, {holdingMode:true})).join('');
+    } else if(SORT_MODE === 'due'){
+      head = activeHead(tasksMode);
+      const visible = sortItemsByDue(pool).filter(i=>!nestedChildIds.has(i.id));
+      bodyRows = visible.map(i=>renderWithChildren(i, {})).join('');
+    } else {
+      // Both "Grouped by category" and "My Order" share this same category-grouped shape --
+      // "My Order" just orders each group by sortIndex instead of due date, and makes its rows
+      // draggable.
+      head = activeHead(tasksMode);
+      const cats = sortedCategories(pool);
+      let rows = '';
+      const colCount = activeColCount(tasksMode);
+      const groupOrder = isCustomMode ? sortItemsByCustomOrder : sortItemsByDue;
+      cats.forEach(cat=>{
+        const inCatAll = pool.filter(i => (i.category||'Uncategorized') === cat);
+        const inCat = groupOrder(inCatAll.filter(i=>!nestedChildIds.has(i.id)));
+        if(!inCat.length) return;
+        rows += '<tr class="grp-row"><td colspan="'+colCount+'">'+escapeHTML(cat)+' <span style="font-weight:600;text-transform:none;color:var(--grey-strong);">('+inCatAll.length+' item'+(inCatAll.length===1?'':'s')+')</span></td></tr>';
+        inCat.forEach(i=>{ rows += renderWithChildren(i, { draggable: isCustomMode }); });
+      });
+      bodyRows = rows;
+    }
+
+    area.innerHTML =
+      '<div class="wa-table-wrap"><table class="wa-table"><thead>'+head+'</thead><tbody>'+bodyRows+'</tbody></table></div>' +
+      '<div class="wa-footer-count">'+pool.length+' item'+(pool.length===1?'':'s')+' found'+(isCustomMode?' — drag a row (⠿) to reorder it within its category or assembly':'')+'</div>';
+
+    if(isCustomMode) wireDragReorder(area);
+
+    area.querySelectorAll('[data-act]').forEach(btn=>{
+      btn.onclick = (e)=>{ e.stopPropagation(); handleCardAction(btn.dataset.act, btn.dataset.id); };
+    });
+    area.querySelectorAll('tr.item-row').forEach(tr=>{
+      tr.onclick = ()=>{
+        const item = ITEMS.find(i=>i.id===tr.dataset.id);
+        if(item) openItemForm(item);
+      };
+    });
+  }
+
+  // "My Order" drag-to-reorder. Native HTML5 drag events on the whole row (not just the ⠿
+  // handle) -- a plain click (no pointer movement) still opens the edit form same as always,
+  // since the browser only fires drag events once the pointer actually moves, and doesn't fire
+  // a click on the source element after a real drag.
+  function clearDragIndicators(area){
+    area.querySelectorAll('.tt-drag-over-before,.tt-drag-over-after,.tt-drag-reject').forEach(el=>{
+      el.classList.remove('tt-drag-over-before','tt-drag-over-after','tt-drag-reject');
+    });
+  }
+
+  function wireDragReorder(area){
+    area.querySelectorAll('tr.item-row.tt-draggable').forEach(tr=>{
+      tr.addEventListener('dragstart', (e)=>{
+        DRAG_ITEM_ID = tr.dataset.id;
+        DRAG_ITEM_GROUP_KEY = tr.dataset.groupKey;
+        DRAG_OVER_ID = null;
+        DRAG_OVER_POS = null;
+        tr.classList.add('tt-dragging');
+        try{ e.dataTransfer.setData('text/plain', tr.dataset.id); }catch(err){}
+        if(e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      });
+      tr.addEventListener('dragend', ()=>{
+        tr.classList.remove('tt-dragging');
+        clearDragIndicators(area);
+        DRAG_ITEM_ID = null; DRAG_ITEM_GROUP_KEY = null; DRAG_OVER_ID = null; DRAG_OVER_POS = null;
+      });
+      tr.addEventListener('dragover', (e)=>{
+        if(!DRAG_ITEM_ID || DRAG_ITEM_ID === tr.dataset.id) return;
+        const sameGroup = DRAG_ITEM_GROUP_KEY && tr.dataset.groupKey === DRAG_ITEM_GROUP_KEY;
+        if(!sameGroup){
+          // Not calling preventDefault() here is deliberate -- it tells the browser this row
+          // isn't a valid drop target, which shows the "no drop" cursor on its own.
+          clearDragIndicators(area);
+          tr.classList.add('tt-drag-reject');
+          return;
+        }
+        e.preventDefault();
+        if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const rect = tr.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < (rect.height/2);
+        clearDragIndicators(area);
+        tr.classList.add(before ? 'tt-drag-over-before' : 'tt-drag-over-after');
+        DRAG_OVER_ID = tr.dataset.id;
+        DRAG_OVER_POS = before ? 'before' : 'after';
+      });
+      tr.addEventListener('dragleave', ()=>{
+        tr.classList.remove('tt-drag-over-before','tt-drag-over-after','tt-drag-reject');
+      });
+      tr.addEventListener('drop', async (e)=>{
+        e.preventDefault();
+        clearDragIndicators(area);
+        if(!DRAG_ITEM_ID || !DRAG_OVER_ID || DRAG_ITEM_ID === DRAG_OVER_ID) return;
+        await performReorder(DRAG_ITEM_ID, DRAG_OVER_ID, DRAG_OVER_POS);
+      });
+    });
+  }
+
+  async function performReorder(draggedId, overId, pos){
+    const draggedItem = ITEMS.find(i=>i.id===draggedId);
+    const overItem = ITEMS.find(i=>i.id===overId);
+    if(!draggedItem || !overItem) return;
+    const groupKey = sortGroupKey(draggedItem);
+    if(sortGroupKey(overItem) !== groupKey) return; // safety net -- dragover already gates this
+
+    const siblings = sortItemsByCustomOrder(ITEMS.filter(i=>sortGroupKey(i)===groupKey));
+    const without = siblings.filter(i=>i.id!==draggedId);
+    const overIdx = without.findIndex(i=>i.id===overId);
+    if(overIdx === -1) return;
+    const insertAt = pos === 'before' ? overIdx : overIdx + 1;
+    without.splice(insertAt, 0, draggedItem);
+
+    if(applyCustomOrder(without)){
+      renderAll();
+      await persist();
+    }
+  }
+
+  function handleCardAction(act, id){
+    const item = ITEMS.find(i=>i.id===id);
+    if(!item) return;
+    if(act === 'edit') openItemForm(item);
+    else if(act === 'add-sub') openItemForm(null, { category: item.category, parentId: item.id });
+    else if(act === 'duplicate') duplicateItem(item);
+    else if(act === 'delete') openDeleteConfirm(item);
+    else if(act === 'send-holding') openSendToHolding(item);
+    else if(act === 'complete-holding') openCompleteHolding(item);
+  }
+
+  // Opens the Add-Item form pre-filled with a copy of an existing item -- everything is carried
+  // over (make/model, part no., category, action, limit/warning, notes, attachments, assembly
+  // membership) EXCEPT Serial No., Tracking No., and Date Performed, which are blanked out since
+  // a duplicate is a distinct physical item/record that hasn't been serialed or calibrated yet.
+  // It's also never left "in holding" -- the duplicate itself was never actually sent out.
+  // Nothing is added to the list until the form is saved, same as any other new item.
+  function duplicateItem(item){
+    const draft = JSON.parse(JSON.stringify(item));
+    delete draft.id;
+    draft.serialNo = '';
+    draft.trackingNo = '';
+    draft.lastPerformed = null;
+    draft.holding = null;
+    draft.__isDuplicate = true;
+    openItemForm(null, draft);
+  }
+
+  // ---------- attachments ----------
+  function readFileSmart(file, maxDim, quality){
+    maxDim = maxDim || 1600; quality = quality || 0.82;
+    return new Promise((resolve, reject)=>{
+      if(!file.type || !file.type.startsWith('image/')){
+        const r = new FileReader();
+        r.onload = ()=> resolve({name:file.name, type:file.type||'application/octet-stream', dataUrl:r.result});
+        r.onerror = reject;
+        r.readAsDataURL(file);
+        return;
+      }
+      const r = new FileReader();
+      r.onload = ()=>{
+        const img = new Image();
+        img.onload = ()=>{
+          let w = img.width, h = img.height;
+          if(w > maxDim || h > maxDim){
+            if(w > h){ h = Math.round(h*maxDim/w); w = maxDim; } else { w = Math.round(w*maxDim/h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve({name:file.name, type:'image/jpeg', dataUrl: canvas.toDataURL('image/jpeg', quality)});
+        };
+        img.onerror = reject;
+        img.src = r.result;
+      };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
+  function renderAttThumb(att, idx, kind){
+    const isImg = att.type && att.type.startsWith('image/');
+    return (
+      '<div class="tt-att-thumb" data-kind="'+kind+'" data-idx="'+idx+'">' +
+        (isImg ? '<img src="'+att.dataUrl+'">' : '<div class="file-chip">📄</div>') +
+        '<div class="fn">'+escapeHTML(att.name||'file')+'</div>' +
+        '<button type="button" class="rm" data-rm-kind="'+kind+'" data-rm-idx="'+idx+'">×</button>' +
+      '</div>'
+    );
+  }
+
+  // ---------- item form (add/edit) ----------
+  let FORM_STATE = null;
+
+  // draftOverrides pre-fills a brand-new (non-editing) form -- used for both "Add Sub-Item"
+  // (just {category, parentId}) and "Duplicate" (a full copy of another item's fields, with
+  // serialNo/trackingNo/lastPerformed/holding already stripped out by duplicateItem() below).
+  // draftOverrides.__isDuplicate is only a UI hint (title/subtitle text) and is never itself
+  // stored on the item.
+  function openItemForm(item, draftOverrides){
+    const editing = !!item;
+    const isDuplicate = !editing && !!(draftOverrides && draftOverrides.__isDuplicate);
+    const defaults = {
+      id: uid(), name:'', category:'', action:'Calibration', makeModel:'', partNo:'', serialNo:'', trackingNo:'',
+      installed:true, limitMonths:null, lastPerformed:null, manualNextDue:null, warningDays:30, notes:'',
+      photoAttachments:[], calReportAttachments:[], holding:null, parentId: null
+    };
+    FORM_STATE = editing ? JSON.parse(JSON.stringify(item)) : Object.assign({}, defaults, draftOverrides || {});
+    if(!editing){ FORM_STATE.id = uid(); delete FORM_STATE.__isDuplicate; }
+    if(FORM_STATE.warningDays == null) FORM_STATE.warningDays = 30;
+    if(FORM_STATE.parentId === undefined) FORM_STATE.parentId = null;
+    const cats = sortedCategories(ITEMS.length ? ITEMS : SEED_ITEMS);
+    const actionOptions = ACTION_OPTIONS.slice();
+    if(FORM_STATE.action && !actionOptions.includes(FORM_STATE.action)) actionOptions.push(FORM_STATE.action);
+    // Task Tracker items (recurring checks) don't have make/model/part/serial/tracking numbers, so
+    // those fields start hidden when the item's category (or, for a new item, the section currently
+    // open) belongs to Task Tracker -- and the Category field below toggles them live as it's edited.
+    const hideDetailFields = FORM_STATE.category ? (getCategorySection(FORM_STATE.category) === 'tasks') : (CURRENT_SECTION === 'tasks');
+    // Assemblies (a parent item with sub-items nested under it) only make sense for physical
+    // tools/equipment, so this only ever offers choices -- and only shows at all -- in the Ops
+    // Gear Tracker section, same as the make/model/part/serial/tracking fields above.
+    // Eligible parents: any tools-section item that isn't itself already a child (keeps nesting to
+    // one level) and isn't this item being edited (can't be its own parent).
+    const parentCandidates = ITEMS.filter(i =>
+      i.id !== FORM_STATE.id &&
+      !i.parentId &&
+      getCategorySection(i.category) === 'tools'
+    ).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal tt-item-form">' +
+          '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
+          '<h2>'+(editing?'Edit Item':(isDuplicate?'Duplicate Item':'Add Item'))+'</h2>' +
+          '<p class="sub">'+(editing?'Update the details, interval, or due-date override for this item.':(isDuplicate?'This is a copy -- Serial No., Tracking No., and Date Performed were cleared. Fill those in and Save when ready.':'Add a new tool, piece of equipment, or recurring check to track.'))+'</p>' +
+          '<div class="field-grid">' +
+            '<div class="field span2"><label>Name</label><input id="fName" value="'+escapeHTML(FORM_STATE.name)+'" placeholder="e.g. Torque Wrench"></div>' +
+            '<div class="field"><label>Category</label><input id="fCategory" list="ttCatList" value="'+escapeHTML(FORM_STATE.category)+'" placeholder="e.g. Torque Wrenches"></div>' +
+            '<datalist id="ttCatList">'+cats.map(c=>'<option value="'+escapeHTML(c)+'">').join('')+'</datalist>' +
+            '<div class="field"><label>Action</label><select id="fAction">' +
+              actionOptions.map(a=>'<option value="'+escapeHTML(a)+'"'+(FORM_STATE.action===a?' selected':'')+'>'+escapeHTML(a)+'</option>').join('') +
+            '</select></div>' +
+            '<div id="fDetailFieldsWrap" style="display:'+(hideDetailFields?'none':'contents')+';">' +
+              '<div class="field"><label>Make / Model</label><input id="fMakeModel" value="'+escapeHTML(FORM_STATE.makeModel)+'"></div>' +
+              '<div class="field"><label>Part No.</label><input id="fPartNo" value="'+escapeHTML(FORM_STATE.partNo)+'"></div>' +
+              '<div class="field"><label>Serial No.</label><input id="fSerialNo" value="'+escapeHTML(FORM_STATE.serialNo)+'"></div>' +
+              '<div class="field"><label>Tracking No.</label><input id="fTrackingNo" value="'+escapeHTML(FORM_STATE.trackingNo)+'"></div>' +
+              '<div class="field span2"><label>Part of Assembly</label><select id="fParentId">' +
+                '<option value="">— None (top-level item / its own assembly) —</option>' +
+                parentCandidates.map(p=>'<option value="'+p.id+'"'+(FORM_STATE.parentId===p.id?' selected':'')+'>'+escapeHTML(p.name)+' ('+escapeHTML(p.category||'')+')</option>').join('') +
+              '</select></div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="wa-banner">Calendar Items</div>' +
+          '<div class="wa-panel">' +
+            '<div class="wa-cal-grid">' +
+              '<div class="wa-cal-cell"><label>Limit</label><input id="fLimitMonths" type="number" min="0" step="1" value="'+(FORM_STATE.limitMonths==null?'':FORM_STATE.limitMonths)+'" placeholder="blank = no limit"><div class="wa-cal-caption">(Number of Months)</div></div>' +
+              '<div class="wa-cal-cell"><label>Performed</label><input id="fLastPerformed" type="date" value="'+(FORM_STATE.lastPerformed||'')+'"><div class="wa-cal-caption">Last time completed</div></div>' +
+              '<div class="wa-cal-cell"><label>Warning</label><input id="fWarningDays" type="number" min="0" step="1" value="'+(FORM_STATE.warningDays==null?30:FORM_STATE.warningDays)+'"><div class="wa-cal-caption">(Number of Days before due)</div></div>' +
+              '<div class="wa-cal-cell"><label>Manual Next Due</label><input id="fManualNextDue" type="date" value="'+(FORM_STATE.manualNextDue||'')+'"><div class="wa-cal-caption req">Overrides the calculated due date</div></div>' +
+            '</div>' +
+            '<div class="wa-flags-row">' +
+              '<label><input id="fInstalled" type="checkbox" '+(FORM_STATE.installed?'checked':'')+'> Component is installed / in service</label>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="field-grid">' +
+            '<div class="field span2"><label>Remarks</label><textarea id="fNotes">'+escapeHTML(FORM_STATE.notes)+'</textarea></div>' +
+          '</div>' +
+
+          '<div class="tt-att-block">' +
+            '<label>Photo Attachments</label>' +
+            '<div class="tt-att-list" id="ttPhotoList">'+FORM_STATE.photoAttachments.map((a,i)=>renderAttThumb(a,i,'photo')).join('')+'</div>' +
+            '<input type="file" id="fPhotoFile" accept="image/*" multiple>' +
+          '</div>' +
+          '<div class="tt-att-block">' +
+            '<label>Calibration Receiving Report / Certificate</label>' +
+            '<div class="tt-att-list" id="ttCalList">'+FORM_STATE.calReportAttachments.map((a,i)=>renderAttThumb(a,i,'cal')).join('')+'</div>' +
+            '<input type="file" id="fCalFile" accept="image/*,application/pdf" multiple>' +
+          '</div>' +
+
+          '<div class="tt-modal-footer">' +
+            '<div>'+(editing?'<button class="btn danger" id="ttFormDelete">Delete Item</button>':'')+'</div>' +
+            '<div class="btn-row">' +
+              '<button class="btn" id="ttFormCancel">Cancel</button>' +
+              '<button class="btn primary" id="ttFormSave">Save</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalClose').onclick = closeModal;
+    document.getElementById('ttFormCancel').onclick = closeModal;
+    document.getElementById('ttModalBackdrop').onclick = (e)=>{ if(e.target.id==='ttModalBackdrop') closeModal(); };
+
+    document.getElementById('fCategory').oninput = ()=>{
+      const sec = getCategorySection(document.getElementById('fCategory').value.trim());
+      document.getElementById('fDetailFieldsWrap').style.display = (sec==='tasks') ? 'none' : 'contents';
+    };
+
+    document.getElementById('fPhotoFile').onchange = async (e)=>{
+      const files = Array.from(e.target.files||[]);
+      for(const f of files){
+        try{ FORM_STATE.photoAttachments.push(await readFileSmart(f)); }catch(err){ console.error(err); }
+      }
+      refreshAttLists();
+      e.target.value = '';
+    };
+    document.getElementById('fCalFile').onchange = async (e)=>{
+      const files = Array.from(e.target.files||[]);
+      for(const f of files){
+        try{ FORM_STATE.calReportAttachments.push(await readFileSmart(f, 2000, 0.85)); }catch(err){ console.error(err); }
+      }
+      refreshAttLists();
+      e.target.value = '';
+    };
+
+    function refreshAttLists(){
+      document.getElementById('ttPhotoList').innerHTML = FORM_STATE.photoAttachments.map((a,i)=>renderAttThumb(a,i,'photo')).join('');
+      document.getElementById('ttCalList').innerHTML = FORM_STATE.calReportAttachments.map((a,i)=>renderAttThumb(a,i,'cal')).join('');
+      wireRemoveButtons();
+    }
+    function wireRemoveButtons(){
+      document.querySelectorAll('#ttModalRoot [data-rm-kind]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const kind = btn.dataset.rmKind, idx = parseInt(btn.dataset.rmIdx,10);
+          const arr = kind==='photo' ? FORM_STATE.photoAttachments : FORM_STATE.calReportAttachments;
+          arr.splice(idx,1);
+          refreshAttLists();
+        };
+      });
+    }
+    wireRemoveButtons();
+
+    if(editing){
+      document.getElementById('ttFormDelete').onclick = ()=>{ closeModal(); openDeleteConfirm(item); };
+    }
+
+    document.getElementById('ttFormSave').onclick = async ()=>{
+      const name = document.getElementById('fName').value.trim();
+      if(!name){ alert('Please enter a name for this item.'); return; }
+      FORM_STATE.name = name;
+      FORM_STATE.category = document.getElementById('fCategory').value.trim() || 'Uncategorized';
+      FORM_STATE.action = document.getElementById('fAction').value.trim() || 'Check';
+      const fieldsHidden = document.getElementById('fDetailFieldsWrap').style.display === 'none';
+      if(!fieldsHidden){
+        FORM_STATE.makeModel = document.getElementById('fMakeModel').value.trim();
+        FORM_STATE.partNo = document.getElementById('fPartNo').value.trim();
+        FORM_STATE.serialNo = document.getElementById('fSerialNo').value.trim();
+        FORM_STATE.trackingNo = document.getElementById('fTrackingNo').value.trim();
+        const selectedParentId = document.getElementById('fParentId').value || null;
+        // An assembly that already has sub-items of its own can't also become a sub-item of
+        // another assembly -- that would nest three levels deep, which the list/report
+        // rendering doesn't support. Move or remove its sub-items first.
+        if(selectedParentId && ITEMS.some(i=>i.parentId===FORM_STATE.id)){
+          alert('"'+FORM_STATE.name+'" already has sub-items under it, so it can\'t also be made a sub-item of another assembly. Move or remove its sub-items first.');
+          return;
+        }
+        FORM_STATE.parentId = selectedParentId;
+      } else {
+        FORM_STATE.parentId = null;
+      }
+      if(!CATEGORY_META[FORM_STATE.category]){
+        CATEGORY_META[FORM_STATE.category] = { section: fieldsHidden ? 'tasks' : 'tools' };
+        persistCategoryMeta();
+      }
+      const lm = document.getElementById('fLimitMonths').value;
+      FORM_STATE.limitMonths = lm === '' ? null : Number(lm);
+      FORM_STATE.lastPerformed = document.getElementById('fLastPerformed').value || null;
+      FORM_STATE.manualNextDue = document.getElementById('fManualNextDue').value || null;
+      const wd = document.getElementById('fWarningDays').value;
+      FORM_STATE.warningDays = wd === '' ? 30 : Number(wd);
+      FORM_STATE.installed = document.getElementById('fInstalled').checked;
+      FORM_STATE.notes = document.getElementById('fNotes').value.trim();
+
+      const idx = ITEMS.findIndex(i=>i.id===FORM_STATE.id);
+      // A brand-new item, or one that just moved to a different category or assembly, goes to
+      // the end of its (new) group rather than keeping a sortIndex left over from wherever it
+      // used to be -- otherwise it could land in the middle of an unrelated group's "My Order".
+      const oldGroupKey = item ? sortGroupKey(item) : null;
+      const newGroupKey = sortGroupKey(FORM_STATE);
+      if(idx < 0 || oldGroupKey !== newGroupKey || typeof FORM_STATE.sortIndex !== 'number'){
+        FORM_STATE.sortIndex = nextSortIndexFor(newGroupKey);
+      }
+      if(idx >= 0) ITEMS[idx] = FORM_STATE; else ITEMS.push(FORM_STATE);
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  function closeModal(){
+    document.getElementById('ttModalRoot').innerHTML = '';
+    FORM_STATE = null;
+  }
+
+  function openManageCategories(){
+    const cats = sortedCategories(ITEMS);
+    const rows = cats.map(cat=>{
+      const count = ITEMS.filter(i=>(i.category||'Uncategorized')===cat).length;
+      const sec = getCategorySection(cat);
+      return '<div class="mc-row" data-orig-cat="'+escapeHTML(cat)+'">' +
+        '<div><input class="mc-name" value="'+escapeHTML(cat)+'"> <span style="font-size:11px;color:var(--grey-strong);white-space:nowrap;">('+count+' item'+(count===1?'':'s')+')</span></div>' +
+        '<select class="mc-section">' +
+          '<option value="tasks"'+(sec==='tasks'?' selected':'')+'>🗓️ Task Tracker</option>' +
+          '<option value="tools"'+(sec==='tools'?' selected':'')+'>🎒 Ops Gear Tracker</option>' +
+        '</select>' +
+      '</div>';
+    }).join('');
+
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:640px;">' +
+          '<h2>Manage Categories</h2>' +
+          '<p class="sub">Rename a category or move it between Task Tracker and Ops Gear Tracker. Renaming updates every item currently in that category.</p>' +
+          '<div class="mc-header"><div>Category Name</div><div>Section</div></div>' +
+          '<div id="mcRows">'+(rows || '<p class="sub">No categories yet — add an item first.</p>')+'</div>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttMcCancel">Cancel</button>' +
+            '<button class="btn primary" id="ttMcSave">Save</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalBackdrop').onclick = (e)=>{ if(e.target.id==='ttModalBackdrop') closeModal(); };
+    document.getElementById('ttMcCancel').onclick = closeModal;
+    document.getElementById('ttMcSave').onclick = async ()=>{
+      const rowEls = Array.from(document.querySelectorAll('#mcRows .mc-row'));
+      const plan = [];
+      const usedNames = new Set();
+      for(const row of rowEls){
+        const origCat = row.dataset.origCat;
+        let newName = row.querySelector('.mc-name').value.trim();
+        if(!newName) newName = origCat;
+        const section = row.querySelector('.mc-section').value === 'tasks' ? 'tasks' : 'tools';
+        const key = newName.toLowerCase();
+        if(usedNames.has(key)){
+          alert('Category name "'+newName+'" is used more than once. Please make category names unique, or delete the duplicate row by renaming items to a single category from the item edit form.');
+          return;
+        }
+        usedNames.add(key);
+        plan.push({ from: origCat, to: newName, section: section });
+      }
+      plan.forEach(p=>{
+        if(p.from !== p.to){
+          ITEMS.forEach(i=>{ if((i.category||'Uncategorized') === p.from) i.category = p.to; });
+        }
+      });
+      const newMeta = {};
+      plan.forEach(p=>{ newMeta[p.to] = { section: p.section }; });
+      CATEGORY_META = newMeta;
+
+      closeModal();
+      renderAll();
+      await persist();
+      await persistCategoryMeta();
+    };
+  }
+
+  function openDeleteConfirm(item){
+    // Deleting an assembly doesn't take its sub-items down with it -- they're promoted back to
+    // top-level items (parentId cleared) rather than silently deleted along with their parent.
+    const childCount = ITEMS.filter(i=>i.parentId===item.id).length;
+    const childNote = childCount
+      ? ' This item has '+childCount+' sub-item'+(childCount===1?'':'s')+' under it -- '+(childCount===1?'it':'they')+' will be kept, moved back to being top-level item'+(childCount===1?'':'s')+' instead of being deleted.'
+      : '';
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:420px;">' +
+          '<h2>Delete "'+escapeHTML(item.name)+'"?</h2>' +
+          '<p class="sub">This removes the item and its attachments permanently. This can\'t be undone.'+childNote+'</p>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttDelCancel">Cancel</button>' +
+            '<button class="btn danger" id="ttDelConfirm">Delete</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttDelCancel').onclick = closeModal;
+    document.getElementById('ttDelConfirm').onclick = async ()=>{
+      ITEMS.forEach(i=>{
+        if(i.parentId===item.id){
+          i.parentId = null;
+          // Promoted to top-level, so its old sortIndex (relative to its old sibling
+          // sub-items) no longer means anything in its new group -- send it to the end.
+          i.sortIndex = nextSortIndexFor(sortGroupKey(i));
+        }
+      });
+      ITEMS = ITEMS.filter(i=>i.id!==item.id);
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  function openSendToHolding(item){
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:460px;">' +
+          '<h2>Send "'+escapeHTML(item.name)+'" to Holding</h2>' +
+          '<p class="sub">Use this when the item is pulled out of service and sent out for calibration.</p>' +
+          '<div class="field-grid">' +
+            '<div class="field"><label>Date Sent</label><input id="hSentDate" type="date" value="'+todayISO()+'"></div>' +
+            '<div class="field span2"><label>Note (vendor, PO#, etc.)</label><input id="hNote" placeholder="optional"></div>' +
+          '</div>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttHoldCancel">Cancel</button>' +
+            '<button class="btn primary" id="ttHoldConfirm">Send to Holding</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttHoldCancel').onclick = closeModal;
+    document.getElementById('ttHoldConfirm').onclick = async ()=>{
+      item.holding = { active:true, sentDate: document.getElementById('hSentDate').value || todayISO(), note: document.getElementById('hNote').value.trim() };
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  function openCompleteHolding(item){
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal" style="max-width:520px;">' +
+          '<h2>Complete Calibration — "'+escapeHTML(item.name)+'"</h2>' +
+          '<p class="sub">Record the completion, attach the receiving report / certificate, and this item returns to Active with a fresh due date.</p>' +
+          '<div class="field-grid">' +
+            '<div class="field"><label>Completion Date</label><input id="cDate" type="date" value="'+todayISO()+'"></div>' +
+            '<div class="field"><label>Update Time Limit (months)</label><input id="cLimit" type="number" min="0" step="1" value="'+(item.limitMonths==null?'':item.limitMonths)+'"></div>' +
+          '</div>' +
+          '<div class="tt-att-block">' +
+            '<label>Calibration Receiving Report / Certificate</label>' +
+            '<div class="tt-att-list" id="ttCalListH">'+(item.calReportAttachments||[]).map((a,i)=>renderAttThumb(a,i,'cal')).join('')+'</div>' +
+            '<input type="file" id="cCalFile" accept="image/*,application/pdf" multiple>' +
+          '</div>' +
+          '<div class="tt-modal-footer">' +
+            '<div><button class="btn" id="ttHoldReturn">Return Without Completing</button></div>' +
+            '<div class="btn-row">' +
+              '<button class="btn" id="ttCompleteCancel">Cancel</button>' +
+              '<button class="btn primary" id="ttCompleteConfirm">Mark Complete</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttCompleteCancel').onclick = closeModal;
+
+    document.getElementById('cCalFile').onchange = async (e)=>{
+      const files = Array.from(e.target.files||[]);
+      for(const f of files){
+        try{ item.calReportAttachments = item.calReportAttachments || []; item.calReportAttachments.push(await readFileSmart(f, 2000, 0.85)); }catch(err){ console.error(err); }
+      }
+      document.getElementById('ttCalListH').innerHTML = (item.calReportAttachments||[]).map((a,i)=>renderAttThumb(a,i,'cal')).join('');
+      wireRemoveH();
+      e.target.value = '';
+    };
+    function wireRemoveH(){
+      document.querySelectorAll('#ttCalListH [data-rm-kind]').forEach(btn=>{
+        btn.onclick = ()=>{
+          const idx = parseInt(btn.dataset.rmIdx,10);
+          item.calReportAttachments.splice(idx,1);
+          document.getElementById('ttCalListH').innerHTML = (item.calReportAttachments||[]).map((a,i)=>renderAttThumb(a,i,'cal')).join('');
+          wireRemoveH();
+        };
+      });
+    }
+    wireRemoveH();
+
+    document.getElementById('ttHoldReturn').onclick = async ()=>{
+      item.holding = null;
+      closeModal();
+      renderAll();
+      await persist();
+    };
+    document.getElementById('ttCompleteConfirm').onclick = async ()=>{
+      const cDate = document.getElementById('cDate').value || todayISO();
+      const cLimit = document.getElementById('cLimit').value;
+      item.lastPerformed = cDate;
+      if(cLimit !== '') item.limitMonths = Number(cLimit);
+      item.manualNextDue = null;
+      item.holding = null;
+      closeModal();
+      renderAll();
+      await persist();
+    };
+  }
+
+  // ---------- auditor report ----------
+  function openPrint(bodyHTML){
+    document.getElementById('printArea').innerHTML = bodyHTML;
+    setTimeout(()=>window.print(), 50);
+  }
+
+  function openReportModal(){
+    const cats = sortedCategories(ITEMS);
+    const html =
+      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
+        '<div class="tt-modal">' +
+          '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
+          '<h2>Forecast List</h2>' +
+          '<p class="sub">Choose what to include, then generate a printable report (Save as PDF from the print dialog).</p>' +
+          '<div class="field-grid">' +
+            '<div class="field"><label>Categories</label>' +
+              '<div class="tt-cat-multi" id="rCategoryList">' +
+                cats.map(c=>'<label class="tt-cat-check"><input type="checkbox" value="'+escapeHTML(c)+'" checked> '+escapeHTML(c)+'</label>').join('') +
+              '</div>' +
+              '<div class="btn-row" style="margin-top:6px;">' +
+                '<button type="button" class="btn tiny" id="rCatAll">All</button>' +
+                '<button type="button" class="btn tiny" id="rCatNone">None</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="field"><label>Status</label><select id="rStatus">' +
+              '<option value="">All statuses</option>' +
+              '<option value="overdue">Overdue only</option>' +
+              '<option value="soon">Due within 30 days</option>' +
+              '<option value="ok">OK</option>' +
+              '<option value="nolimit">No limit</option>' +
+              '<option value="holding">In Holding</option>' +
+            '</select></div>' +
+          '</div>' +
+          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
+            '<button class="btn" id="ttReportCancel">Cancel</button>' +
+            '<button class="btn primary" id="ttReportGenerate">Generate &amp; Print</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('ttModalRoot').innerHTML = html;
+    document.getElementById('ttModalClose').onclick = closeModal;
+    document.getElementById('ttReportCancel').onclick = closeModal;
+    document.getElementById('rCatAll').onclick = ()=>{
+      document.querySelectorAll('#rCategoryList input[type="checkbox"]').forEach(el=>{ el.checked = true; });
+    };
+    document.getElementById('rCatNone').onclick = ()=>{
+      document.querySelectorAll('#rCategoryList input[type="checkbox"]').forEach(el=>{ el.checked = false; });
+    };
+    document.getElementById('ttReportGenerate').onclick = ()=>{
+      const checked = Array.from(document.querySelectorAll('#rCategoryList input[type="checkbox"]:checked')).map(el=>el.value);
+      const status = document.getElementById('rStatus').value;
+      generateReport(checked, status);
+      closeModal();
+    };
+  }
+
+  function generateReport(catFilters, statusFilter){
+    let pool = ITEMS.slice();
+    const allCats = sortedCategories(ITEMS);
+    // Only actually filter by category when the person narrowed the selection -- if every
+    // category is checked (or, as a safety net, none are), treat it the same as "all categories".
+    const catFilterActive = Array.isArray(catFilters) && catFilters.length > 0 && catFilters.length < allCats.length;
+    if(catFilterActive){
+      const catSet = new Set(catFilters);
+      pool = pool.filter(i => catSet.has(i.category||'Uncategorized'));
+    }
+    if(statusFilter) pool = pool.filter(i => dueInfo(i).status === statusFilter);
+
+    const cats = sortedCategories(pool);
+    let rows = '';
+    cats.forEach(cat=>{
+      const inCat = sortItemsByDue(pool.filter(i => (i.category||'Uncategorized') === cat));
+      if(!inCat.length) return;
+      rows += '<tr class="grp"><td colspan="9">'+escapeHTML(cat)+'</td></tr>';
+      inCat.forEach(item=>{
+        const di = dueInfo(item);
+        const certOnFile = (item.calReportAttachments||[]).length > 0 ? 'Yes ('+item.calReportAttachments.length+')' : 'No';
+        const holdStr = (item.holding && item.holding.active) ? ('Yes, since '+fmtDateNice(item.holding.sentDate)) : 'No';
+        const chipColor = di.status==='overdue' ? '#fbe9e7;color:#b0281e' : di.status==='soon' ? '#faf1de;color:#b3791b' : di.status==='holding' ? '#ece9f8;color:#5a4aa8' : di.status==='nolimit' ? '#eee;color:#666' : '#e6f2ea;color:#2f7d4f';
+        rows += '<tr>' +
+          '<td>'+escapeHTML(item.name)+'</td>' +
+          '<td>'+escapeHTML(item.action||'')+'</td>' +
+          '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
+          '<td>'+escapeHTML(item.serialNo||item.trackingNo||'')+'</td>' +
+          '<td>'+(item.limitMonths?item.limitMonths+' mo':'No limit')+'</td>' +
+          '<td>'+fmtDateNice(item.lastPerformed)+'</td>' +
+          '<td>'+(di.due?fmtDateNice(di.due):'—')+'</td>' +
+          '<td><span class="pr-status-chip" style="background:'+chipColor+'">'+escapeHTML(di.label)+'</span></td>' +
+          '<td>'+certOnFile+'</td>' +
+        '</tr>';
+      });
+    });
+
+    const genDate = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
+    const html =
+      '<div class="pr-head">' +
+        '<h1>Phoenix Heli-Flight — Tool &amp; Calibration Tracking Report</h1>' +
+        '<div class="meta">Generated ' + genDate + '<br>' + pool.length + ' item(s)' + (catFilterActive?(' · '+escapeHTML(catFilters.join(', '))):'') + (statusFilter?(' · '+statusFilter):'') + '</div>' +
+      '</div>' +
+      '<table class="tt-report-table"><thead><tr>' +
+        '<th>Name</th><th>Action</th><th>Make/Model</th><th>Serial/Tracking</th><th>Interval</th><th>Last Performed</th><th>Due Date</th><th>Status</th><th>Cert on File</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+    openPrint(html);
+  }
+
+  // ---------- init ----------
+  async function init(){
+    await loadData();
+    await loadCategoryMeta();
+    document.getElementById('ttAddBtn').onclick = ()=>openItemForm(null);
+    document.getElementById('ttReportBtn').onclick = openReportModal;
+    document.getElementById('ttUndoBtn').onclick = undoLastChange;
+    document.getElementById('ttSearch').oninput = (e)=>{ SEARCH_Q = e.target.value; renderList(); };
+    document.getElementById('ttSortMode').onchange = (e)=>{ SORT_MODE = e.target.value; renderList(); };
+    document.getElementById('ttCategoryFilter').onchange = (e)=>{ CATEGORY_FILTER = e.target.value; renderList(); };
+    document.getElementById('ttInstalledOnly').onchange = (e)=>{ INSTALLED_ONLY = e.target.checked; renderList(); };
+    renderAll();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
