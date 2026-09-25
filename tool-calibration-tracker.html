@@ -202,10 +202,8 @@
   .tt-cat-check{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink);padding:2px 0;cursor:pointer;}
   .tt-cat-check input{margin:0;cursor:pointer;}
 
-  .tt-undo-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;max-height:320px;overflow-y:auto;}
-  .tt-undo-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--panel);}
-  .tt-undo-label{font-weight:700;font-size:13px;}
-  .tt-undo-time{font-size:11px;color:var(--grey-strong);margin-top:2px;}
+  .tt-undo-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:10000;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .tt-undo-toast.show{opacity:1;}
   .field.checkline input{width:16px;height:16px;order:1;}
 
   .tt-att-block{margin-bottom:14px;}
@@ -222,9 +220,9 @@
   .tt-holding-note{background:var(--hold-bg);color:var(--hold);border:1px solid #cfc6ea;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px;}
 
   .tt-report-table{width:100%;border-collapse:collapse;font-size:11pt;}
-  .tt-report-table th{text-align:left;padding:6px 8px;color:var(--ink);font-size:10.5px;text-transform:uppercase;border-bottom:2px solid var(--ink);}
+  .tt-report-table th{text-align:left;padding:6px 8px;color:var(--ink);font-size:10pt;text-transform:uppercase;border-bottom:2px solid var(--ink);}
   .tt-report-table td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
-  .tt-report-table tr.grp td{background:var(--paper);font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding-top:12px;}
+  .tt-report-table tr.grp td{background:var(--paper);font-weight:800;font-size:10pt;text-transform:uppercase;letter-spacing:.3px;padding-top:12px;}
 
   #printArea{display:none;}
   @page{margin:12mm;size:landscape;}
@@ -233,7 +231,7 @@
     #printArea{display:block !important;}
   }
   .pr-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1c2b24;padding-bottom:10px;margin-bottom:14px;}
-  .pr-head h1{margin:0;font-size:18px;}
+  .pr-head h1{margin:0;font-size:17.5pt;}
   .pr-head .meta{font-size:11px;color:var(--ink);text-align:right;}
   .pr-status-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;}
 
@@ -266,7 +264,7 @@
       <label class="wa-check"><input type="checkbox" id="ttInstalledOnly"> Show installed item(s) only</label>
       <button class="btn primary" id="ttAddBtn">+ Add Item</button>
       <button class="btn" id="ttReportBtn">Forecast List</button>
-      <button class="btn" id="ttUndoBtn" title="See and restore the last 4 saved states">↩️ Undo</button>
+      <button class="btn" id="ttUndoBtn" title="Undo the last change to the item list">↩️ Undo</button>
     </div>
   </div>
 
@@ -586,15 +584,6 @@
   }
 
   // ---------- undo ----------
-  function formatRelativeTime(ts){
-    const diffSec = Math.round((Date.now() - ts) / 1000);
-    if(diffSec < 5) return 'just now';
-    if(diffSec < 60) return diffSec + 's ago';
-    const diffMin = Math.round(diffSec/60);
-    if(diffMin < 60) return diffMin + ' min ago';
-    return new Date(ts).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
-  }
-
   // Describes the move that turned prevJSON into nextJSON, in plain language, so someone
   // choosing an "Undo" target can tell what they'd be reverting.
   function describeSaveChange(prevJSON, nextJSON){
@@ -632,46 +621,40 @@
     }catch(e){ return 'Changes saved'; }
   }
 
-  function openUndoPanel(){
-    // SAVE_HISTORY's last entry is the current state -- everything before it is something to
-    // offer restoring back to. Newest-first for display.
-    const restorable = [];
-    for(let i = SAVE_HISTORY.length - 2; i >= 0; i--){
-      restorable.push({ index: i, label: describeSaveChange(SAVE_HISTORY[i].itemsJSON, SAVE_HISTORY[i+1].itemsJSON), ts: SAVE_HISTORY[i+1].ts });
+  // Small non-blocking confirmation banner (auto-hides), used for Undo feedback so a click
+  // doesn't need a modal or dialog to confirm what just happened.
+  let undoToastTimer = null;
+  function showUndoToast(msg){
+    let el = document.getElementById('ttUndoToast');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'ttUndoToast';
+      el.className = 'tt-undo-toast';
+      document.body.appendChild(el);
     }
-    const rowsHtml = restorable.length ? restorable.map(r =>
-      '<div class="tt-undo-row">' +
-        '<div class="tt-undo-info"><div class="tt-undo-label">Undo: '+escapeHTML(r.label)+'</div><div class="tt-undo-time">'+escapeHTML(formatRelativeTime(r.ts))+'</div></div>' +
-        '<button type="button" class="btn small" data-undo-index="'+r.index+'">Restore this version</button>' +
-      '</div>'
-    ).join('') : '<p class="tt-empty">No saved changes yet to undo in this session.</p>';
+    el.textContent = msg;
+    el.classList.remove('show');
+    // Force a reflow so re-triggering the class while already visible still restarts the fade.
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(undoToastTimer);
+    undoToastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 3000);
+  }
 
-    const html =
-      '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
-        '<div class="tt-modal">' +
-          '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
-          '<h2>Undo</h2>' +
-          '<p class="sub">Restores this device\'s list to how it looked at that point. Only covers changes made this session -- it resets on reload.</p>' +
-          '<div class="tt-undo-list">' + rowsHtml + '</div>' +
-          '<div class="tt-modal-footer"><div></div><div class="btn-row">' +
-            '<button class="btn" id="ttUndoCancel">Close</button>' +
-          '</div></div>' +
-        '</div>' +
-      '</div>';
-    document.getElementById('ttModalRoot').innerHTML = html;
-    document.getElementById('ttModalClose').onclick = closeModal;
-    document.getElementById('ttUndoCancel').onclick = closeModal;
-    document.querySelectorAll('[data-undo-index]').forEach(btn=>{
-      btn.onclick = async ()=>{
-        const idx = Number(btn.dataset.undoIndex);
-        const entry = SAVE_HISTORY[idx];
-        if(!entry) return;
-        ITEMS = JSON.parse(entry.itemsJSON);
-        closeModal();
-        await persist();
-        renderAll();
-      };
-    });
+  // One click undoes just the single most recent change to the item list (add/edit/delete/
+  // duplicate/reorder) -- no picker, so an accidental delete can be reversed in one tap.
+  async function undoLastChange(){
+    if(SAVE_HISTORY.length < 2){
+      showUndoToast('Nothing to undo yet this session.');
+      return;
+    }
+    const current = SAVE_HISTORY[SAVE_HISTORY.length-1];
+    const prior = SAVE_HISTORY[SAVE_HISTORY.length-2];
+    const label = describeSaveChange(prior.itemsJSON, current.itemsJSON);
+    ITEMS = JSON.parse(prior.itemsJSON);
+    await persist();
+    renderAll();
+    showUndoToast('Undone: ' + label);
   }
 
   // ---------- rendering ----------
@@ -1607,7 +1590,7 @@
     await loadCategoryMeta();
     document.getElementById('ttAddBtn').onclick = ()=>openItemForm(null);
     document.getElementById('ttReportBtn').onclick = openReportModal;
-    document.getElementById('ttUndoBtn').onclick = openUndoPanel;
+    document.getElementById('ttUndoBtn').onclick = undoLastChange;
     document.getElementById('ttSearch').oninput = (e)=>{ SEARCH_Q = e.target.value; renderList(); };
     document.getElementById('ttSortMode').onchange = (e)=>{ SORT_MODE = e.target.value; renderList(); };
     document.getElementById('ttCategoryFilter').onchange = (e)=>{ CATEGORY_FILTER = e.target.value; renderList(); };
