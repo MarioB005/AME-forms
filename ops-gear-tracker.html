@@ -265,7 +265,7 @@
       <select id="ttSortMode">
         <option value="group">Grouped by category</option>
         <option value="due">Flat — by time limit / due date</option>
-        <option value="custom">My Order (drag to reorder)</option>
+        <option value="custom" selected>My Order (drag to reorder)</option>
       </select>
       <select id="ttCategoryFilter"><option value="">All categories</option></select>
       <label class="wa-check"><input type="checkbox" id="ttInstalledOnly"> Show installed item(s) only</label>
@@ -447,7 +447,7 @@
   let CATEGORY_META = {}; // { [categoryName]: { section: 'tasks'|'tools' } }
   let CURRENT_SECTION = 'tools'; // 'tasks' (Task Tracker) | 'tools' (Ops Gear Tracker)
   let VIEW_TAB = 'active'; // active | holding
-  let SORT_MODE = 'group'; // group | due | custom
+  let SORT_MODE = 'custom'; // group | due | custom -- "My Order (drag to reorder)" is the default view
   // "My Order" drag state -- which row is being dragged, and which row it's currently hovering
   // over (plus above/below that row), so drop() knows exactly where to insert it.
   let DRAG_ITEM_ID = null;
@@ -1246,7 +1246,7 @@
               '<div class="field"><label>Tracking No.</label><input id="fTrackingNo" value="'+escapeHTML(FORM_STATE.trackingNo)+'"></div>' +
               '<div class="field span2"><label>Part of Assembly</label><select id="fParentId">' +
                 '<option value="">— None (top-level item / its own assembly) —</option>' +
-                parentCandidates.map(p=>'<option value="'+p.id+'"'+(FORM_STATE.parentId===p.id?' selected':'')+'>'+escapeHTML(p.name)+' ('+escapeHTML(p.category||'')+')</option>').join('') +
+                parentCandidates.map(p=>'<option value="'+p.id+'"'+(FORM_STATE.parentId===p.id?' selected':'')+'>'+escapeHTML(p.name)+(p.serialNo?' — SN '+escapeHTML(p.serialNo):'')+' ('+escapeHTML(p.category||'')+')</option>').join('') +
               '</select></div>' +
             '</div>' +
           '</div>' +
@@ -1269,14 +1269,9 @@
           '</div>' +
 
           '<div class="tt-att-block">' +
-            '<label>Photo Attachments</label>' +
-            '<div class="tt-att-list" id="ttPhotoList">'+FORM_STATE.photoAttachments.map((a,i)=>renderAttThumb(a,i,'photo')).join('')+'</div>' +
-            '<input type="file" id="fPhotoFile" accept="image/*" multiple>' +
-          '</div>' +
-          '<div class="tt-att-block">' +
-            '<label>Calibration Receiving Report / Certificate</label>' +
+            '<label>Documents / Certificates</label>' +
             '<div class="tt-att-list" id="ttCalList">'+FORM_STATE.calReportAttachments.map((a,i)=>renderAttThumb(a,i,'cal')).join('')+'</div>' +
-            '<input type="file" id="fCalFile" accept="image/*,application/pdf" multiple>' +
+            '<input type="file" id="fCalFile" multiple>' +
           '</div>' +
 
           '<div class="tt-modal-footer">' +
@@ -1299,14 +1294,17 @@
       document.getElementById('fDetailFieldsWrap').style.display = (sec==='tasks') ? 'none' : 'contents';
     };
 
-    document.getElementById('fPhotoFile').onchange = async (e)=>{
-      const files = Array.from(e.target.files||[]);
-      for(const f of files){
-        try{ FORM_STATE.photoAttachments.push(await readFileSmart(f)); }catch(err){ console.error(err); }
+    // Entering a new Performed date means the item was just done again -- a leftover Manual Next
+    // Due from before would silently keep overriding the freshly-calculated due date, so clear it
+    // the moment Performed is changed to something different from what it was.
+    const originalLastPerformed = FORM_STATE.lastPerformed || '';
+    document.getElementById('fLastPerformed').addEventListener('change', ()=>{
+      const newVal = document.getElementById('fLastPerformed').value;
+      if(newVal && newVal !== originalLastPerformed){
+        document.getElementById('fManualNextDue').value = '';
       }
-      refreshAttLists();
-      e.target.value = '';
-    };
+    });
+
     document.getElementById('fCalFile').onchange = async (e)=>{
       const files = Array.from(e.target.files||[]);
       for(const f of files){
@@ -1317,16 +1315,14 @@
     };
 
     function refreshAttLists(){
-      document.getElementById('ttPhotoList').innerHTML = FORM_STATE.photoAttachments.map((a,i)=>renderAttThumb(a,i,'photo')).join('');
       document.getElementById('ttCalList').innerHTML = FORM_STATE.calReportAttachments.map((a,i)=>renderAttThumb(a,i,'cal')).join('');
       wireRemoveButtons();
     }
     function wireRemoveButtons(){
       document.querySelectorAll('#ttModalRoot [data-rm-kind]').forEach(btn=>{
         btn.onclick = ()=>{
-          const kind = btn.dataset.rmKind, idx = parseInt(btn.dataset.rmIdx,10);
-          const arr = kind==='photo' ? FORM_STATE.photoAttachments : FORM_STATE.calReportAttachments;
-          arr.splice(idx,1);
+          const idx = parseInt(btn.dataset.rmIdx,10);
+          FORM_STATE.calReportAttachments.splice(idx,1);
           refreshAttLists();
         };
       });
@@ -1534,9 +1530,9 @@
             '<div class="field"><label>Update Time Limit (months)</label><input id="cLimit" type="number" min="0" step="1" value="'+(item.limitMonths==null?'':item.limitMonths)+'"></div>' +
           '</div>' +
           '<div class="tt-att-block">' +
-            '<label>Calibration Receiving Report / Certificate</label>' +
+            '<label>Documents / Certificates</label>' +
             '<div class="tt-att-list" id="ttCalListH">'+(item.calReportAttachments||[]).map((a,i)=>renderAttThumb(a,i,'cal')).join('')+'</div>' +
-            '<input type="file" id="cCalFile" accept="image/*,application/pdf" multiple>' +
+            '<input type="file" id="cCalFile" multiple>' +
           '</div>' +
           '<div class="tt-modal-footer">' +
             '<div><button class="btn" id="ttHoldReturn">Return Without Completing</button></div>' +
