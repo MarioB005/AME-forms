@@ -337,6 +337,7 @@
       <button class="db-icon-btn" id="undoBtn" title="Undo the last change">↩️</button>
       <button class="db-icon-btn" id="savedFormsBtn" title="Saved Forms">🗂</button>
       <button class="db-icon-btn" id="settingsBtn" title="Settings">⚙</button>
+      <button class="db-icon-btn" id="dbBackupBtn" title="Backup All Data" style="display:none;">💾</button>
       <button class="db-icon-btn" id="lockBtn" title="Lock">🔒</button>
     </div>
   </div>
@@ -948,9 +949,14 @@
   window.addEventListener('focus', checkStaleOnReturn);
   function initAutoLock(){ resetInactivityTimer(); }
   document.getElementById('lockBtn').onclick = ()=> location.reload();
+  document.getElementById('dbBackupBtn').onclick = ()=> backupAllData();
 
   // ---------- view routing ----------
   const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','DriveShaftBalance','Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage','ToolTracker','OpsGearTracker'];
+  // Screens reachable only from behind the Reserved gate -- the 💾 Backup All Data button in the
+  // dark banner (dbBackupBtn) is kept hidden everywhere else, since backing up is an internal-use
+  // action that belongs alongside the rest of Reserved, not on every everyday form screen.
+  const RESERVED_VIEWS = ['Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage','ToolTracker','OpsGearTracker'];
   // Tracks whether the person has clicked into any screen other than Home yet. unlock() kicks off
   // loadSettings() in the background and only shows Home once it resolves -- on a slow/flaky
   // connection that can take a moment, and without this flag its completion would silently yank
@@ -978,6 +984,8 @@
       // bugs later.
       if(!isTarget && v!=='Home') el.innerHTML = '';
     });
+    const backupBtn = document.getElementById('dbBackupBtn');
+    if(backupBtn) backupBtn.style.display = RESERVED_VIEWS.includes(name) ? 'flex' : 'none';
     window.scrollTo(0,0);
   }
   function showHome(){ showView('Home'); }
@@ -5871,8 +5879,11 @@
           '<button class="home-btn" id="resNotesBtn"><span class="hb-icon">📝</span>Notes</button>' +
           '<button class="home-btn" id="resToolTrackerBtn"><span class="hb-icon">🧰</span>Tool &amp; Calibration Tracker</button>' +
           '<button class="home-btn" id="resOpsGearBtn"><span class="hb-icon">🎒</span>Ops Gear Tracker</button>' +
-          '<button class="home-btn" id="resBackupBtn"><span class="hb-icon">💾</span>Backup All Data</button>' +
         '</div>' +
+        // Backup All Data now lives as the 💾 button in the dark banner up top (see dbBackupBtn --
+        // it only shows while somewhere inside Reserved) rather than as a grid tile here. This
+        // status line stays so a backup triggered from right here still gets an inline message;
+        // triggered from any other Reserved sub-screen it falls back to the Undo-style toast.
         '<div id="resBackupStatus" style="font-size:12px;color:var(--grey-strong);min-height:16px;margin:-4px 0 4px;"></div>' +
         '<div class="btn-row" style="margin-top:14px;"><button type="button" class="btn" id="resLockBtn">🔒 Lock</button></div>' +
       '</div>';
@@ -5883,24 +5894,30 @@
     document.getElementById('resNotesBtn').onclick = ()=> renderNotesForm();
     document.getElementById('resToolTrackerBtn').onclick = ()=> renderToolTracker();
     document.getElementById('resOpsGearBtn').onclick = ()=> renderOpsGearTracker();
-    document.getElementById('resBackupBtn').onclick = ()=> backupAllData();
     document.getElementById('resLockBtn').onclick = ptrainLock;
   }
 
   // Every key this app (forms:, mcm:, notes:, ptrain:) and its embedded Tool & Calibration
-  // Tracker (tooltracker:) write live in the same shared Supabase app_data table as a couple of
-  // Mario's other apps (Fleet Forecast Board, AME Work Schedule) -- those use their own key
-  // prefixes and are deliberately left out, so this only ever backs up "Phoenix Heli-Flight —
-  // Maintenance Forms" itself. Downloads a single JSON file with every matching key/value pair,
-  // exactly as stored, so it could be restored (or just inspected) later if ever needed.
-  const BACKUP_KEY_PREFIXES = ['forms:', 'mcm:', 'notes:', 'ptrain:', 'tooltracker:'];
+  // Tracker (tooltracker:) and Ops Gear Tracker (opsgear:) write live in the same shared
+  // Supabase app_data table as a couple of Mario's other apps (Fleet Forecast Board, AME Work
+  // Schedule) -- those use their own key prefixes and are deliberately left out, so this only
+  // ever backs up "Phoenix Heli-Flight — Maintenance Forms" itself, in full. Downloads a single
+  // JSON file with every matching key/value pair, exactly as stored, so it could be restored
+  // (or just inspected) later if ever needed.
+  const BACKUP_KEY_PREFIXES = ['forms:', 'mcm:', 'notes:', 'ptrain:', 'tooltracker:', 'opsgear:'];
 
   async function backupAllData(){
+    // The status line only exists on the Reserved menu screen itself -- the banner button (see
+    // dbBackupBtn) can be clicked from any Reserved sub-screen, so fall back to the same toast
+    // used for Undo feedback whenever that line isn't on screen to write into.
     const statusEl = document.getElementById('resBackupStatus');
     const setStatus = (msg, kind)=>{
-      if(!statusEl) return;
-      statusEl.style.color = kind==='bad' ? 'var(--bad)' : kind==='good' ? 'var(--good)' : 'var(--grey-strong)';
-      statusEl.textContent = msg;
+      if(statusEl){
+        statusEl.style.color = kind==='bad' ? 'var(--bad)' : kind==='good' ? 'var(--good)' : 'var(--grey-strong)';
+        statusEl.textContent = msg;
+      } else {
+        showUndoToast(msg);
+      }
     };
     setStatus('Preparing backup…');
 
