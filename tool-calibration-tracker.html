@@ -221,6 +221,10 @@
   .tt-att-thumb .file-chip{width:74px;height:74px;border:1px solid var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--paper);}
   .tt-att-thumb .fn{font-size:9.5px;color:var(--grey-strong);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
   .tt-att-thumb .rm{position:absolute;top:-6px;right:-6px;background:#b0281e;color:#fff;border:none;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer;}
+  .tt-att-thumb a.tt-att-open{display:block;text-decoration:none;color:inherit;cursor:pointer;}
+  .tt-att-thumb a.tt-att-open:hover img,
+  .tt-att-thumb a.tt-att-open:hover .file-chip{opacity:.8;}
+  .tt-att-thumb a.tt-att-open:hover .fn{text-decoration:underline;}
 
   .tt-modal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:10px;}
 
@@ -1093,10 +1097,17 @@
 
   function renderAttThumb(att, idx, kind){
     const isImg = att.type && att.type.startsWith('image/');
+    const fname = escapeHTML(att.name||'file');
     return (
       '<div class="tt-att-thumb" data-kind="'+kind+'" data-idx="'+idx+'">' +
-        (isImg ? '<img src="'+att.dataUrl+'">' : '<div class="file-chip">📄</div>') +
-        '<div class="fn">'+escapeHTML(att.name||'file')+'</div>' +
+        // The thumbnail/filename is a real link to the file's own data URL, with `download` set so
+        // clicking it always saves the file under its original name (rather than doing nothing, or
+        // trying to navigate the whole tab to a giant base64 URL) -- this is what actually lets
+        // someone open a saved photo, PDF, or any other attached file afterwards.
+        '<a class="tt-att-open" href="'+att.dataUrl+'" download="'+fname+'" target="_blank" rel="noopener" title="Open / download '+fname+'">' +
+          (isImg ? '<img src="'+att.dataUrl+'">' : '<div class="file-chip">📄</div>') +
+          '<div class="fn">'+fname+'</div>' +
+        '</a>' +
         '<button type="button" class="rm" data-rm-kind="'+kind+'" data-rm-idx="'+idx+'">×</button>' +
       '</div>'
     );
