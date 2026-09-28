@@ -158,6 +158,12 @@
   table.wa-table tbody tr.item-row.tt-drag-reject{cursor:not-allowed;}
   .wa-footer-count{font-size:11px;color:var(--grey-strong);padding:6px 4px 16px;text-align:right;}
 
+  /* Column drag-to-reorder (active list header -- Name/Files/action columns stay pinned in place). */
+  table.wa-table thead th.tt-col-drag{cursor:grab;}
+  table.wa-table thead th.tt-col-dragging{opacity:.4;}
+  table.wa-table thead th.tt-col-drag-over-before{box-shadow:inset 2px 0 0 0 var(--accent);}
+  table.wa-table thead th.tt-col-drag-over-after{box-shadow:inset -2px 0 0 0 var(--accent);}
+
   .wa-banner{background:#123a5e;color:#fff;font-weight:800;text-align:center;padding:8px 12px;font-size:12.5px;letter-spacing:.6px;text-transform:uppercase;border-radius:8px 8px 0 0;margin-top:18px;}
   .wa-panel{border:1px solid var(--line);border-top:none;border-radius:0 0 8px 8px;background:var(--panel);padding:0 0 14px;margin-bottom:16px;}
   .wa-cal-grid{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);}
@@ -221,6 +227,10 @@
   .tt-att-thumb .file-chip{width:74px;height:74px;border:1px solid var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--paper);}
   .tt-att-thumb .fn{font-size:9.5px;color:var(--grey-strong);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
   .tt-att-thumb .rm{position:absolute;top:-6px;right:-6px;background:#b0281e;color:#fff;border:none;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer;}
+  .tt-att-thumb a.tt-att-open{display:block;text-decoration:none;color:inherit;cursor:pointer;}
+  .tt-att-thumb a.tt-att-open:hover img,
+  .tt-att-thumb a.tt-att-open:hover .file-chip{opacity:.8;}
+  .tt-att-thumb a.tt-att-open:hover .fn{text-decoration:underline;}
 
   .tt-modal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:10px;}
 
@@ -448,6 +458,34 @@
   let CURRENT_SECTION = 'tools'; // 'tasks' (Task Tracker) | 'tools' (Ops Gear Tracker)
   let VIEW_TAB = 'active'; // active | holding
   let SORT_MODE = 'custom'; // group | due | custom -- "My Order (drag to reorder)" is the default view
+
+  // ---------- active-list column order (drag a header cell to rearrange columns) ----------
+  // Name (with the row drag-handle ⠿) and the trailing Files/action columns are pinned in place;
+  // everything else can be dragged left/right. Persisted per section (tools vs. tasks have
+  // different column sets) so the layout sticks around next time the tracker is opened. Serial
+  // No. starts right next to Name/Action by default; drag any header to rearrange further.
+  const TOOLS_COLUMNS = [
+    { key:'action',        label:'Action' },
+    { key:'makeModel',     label:'Make / Model' },
+    { key:'partNo',        label:'Part No.' },
+    { key:'serialNo',      label:'Serial No.' },
+    { key:'trackingNo',    label:'Tracking No.' },
+    { key:'limit',         label:'Limit' },
+    { key:'lastPerformed', label:'Last Performed' },
+    { key:'due',           label:'Due' }
+  ];
+  const TASKS_COLUMNS = [
+    { key:'action',        label:'Action' },
+    { key:'limit',         label:'Limit' },
+    { key:'lastPerformed', label:'Last Performed' },
+    { key:'due',           label:'Due' }
+  ];
+  const DEFAULT_COLUMN_ORDER = {
+    tools: ['serialNo','action','makeModel','partNo','trackingNo','limit','lastPerformed','due'],
+    tasks: ['action','limit','lastPerformed','due']
+  };
+  const COLUMN_ORDER_KEY = 'opsgear:colorder:v1';
+  let COLUMN_ORDER = { tools: DEFAULT_COLUMN_ORDER.tools.slice(), tasks: DEFAULT_COLUMN_ORDER.tasks.slice() };
   // "My Order" drag state -- which row is being dragged, and which row it's currently hovering
   // over (plus above/below that row), so drop() knows exactly where to insert it.
   let DRAG_ITEM_ID = null;
@@ -562,6 +600,49 @@
   }
   async function persistCategoryMeta(){
     await storageSet(CATMETA_KEY, JSON.stringify(CATEGORY_META));
+  }
+
+  function columnsFor(tasksMode){ return tasksMode ? TASKS_COLUMNS : TOOLS_COLUMNS; }
+
+  // Column defs for a section in the currently-saved order. Falls back to (and repairs) the
+  // default order for any key that's missing or no longer recognized -- covers both the very
+  // first load and this file later adding/renaming a column out from under a saved order.
+  function orderedColumns(tasksMode){
+    const modeKey = tasksMode ? 'tasks' : 'tools';
+    const defs = columnsFor(tasksMode);
+    const byKey = {}; defs.forEach(c=>{ byKey[c.key]=c; });
+    let order = (COLUMN_ORDER[modeKey]||[]).filter(k=>byKey[k]);
+    defs.forEach(c=>{ if(!order.includes(c.key)) order.push(c.key); });
+    COLUMN_ORDER[modeKey] = order;
+    return order.map(k=>byKey[k]);
+  }
+  async function loadColumnOrder(){
+    const raw = await storageGet(COLUMN_ORDER_KEY);
+    if(raw){
+      try{
+        const parsed = JSON.parse(raw);
+        if(parsed && Array.isArray(parsed.tools)) COLUMN_ORDER.tools = parsed.tools;
+        if(parsed && Array.isArray(parsed.tasks)) COLUMN_ORDER.tasks = parsed.tasks;
+      }catch(e){}
+    }
+  }
+  async function persistColumnOrder(){
+    await storageSet(COLUMN_ORDER_KEY, JSON.stringify(COLUMN_ORDER));
+  }
+  function columnCellClass(col){
+    return (col.key === 'action' || col.key === 'makeModel') ? '' : 'num';
+  }
+  function columnCellHTML(col, item){
+    switch(col.key){
+      case 'action': return escapeHTML(item.action||'');
+      case 'makeModel': return escapeHTML(item.makeModel||'');
+      case 'partNo': return escapeHTML(item.partNo||'');
+      case 'serialNo': return escapeHTML(item.serialNo||'');
+      case 'trackingNo': return escapeHTML(item.trackingNo||'');
+      case 'limit': return item.limitMonths ? item.limitMonths+' mo' : 'No limit';
+      case 'lastPerformed': return fmtDateNice(item.lastPerformed);
+      default: return '';
+    }
   }
   function sectionItems(){
     return ITEMS.filter(i => getCategorySection(i.category) === CURRENT_SECTION);
@@ -820,32 +901,28 @@
       return '<tr class="item-row'+holdingCls+childRowCls+dragRowCls+'" data-id="'+item.id+'"'+dragAttrs+'>'+cells+'</tr>';
     }
 
-    let cells = '<td class="nm">'+nameCell+'</td><td>'+escapeHTML(item.action||'')+'</td>';
-    if(!tasksMode){
-      cells += '<td>'+escapeHTML(item.makeModel||'')+'</td>' +
-        '<td class="num">'+escapeHTML(item.partNo||'')+'</td>' +
-        '<td class="num">'+escapeHTML(item.serialNo||'')+'</td>' +
-        '<td class="num">'+escapeHTML(item.trackingNo||'')+'</td>';
-    }
-    cells += '<td class="num">'+(item.limitMonths?item.limitMonths+' mo':'No limit')+'</td>' +
-      '<td class="num">'+fmtDateNice(item.lastPerformed)+'</td>' +
-      '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>' +
-      '<td class="num">'+attIconStr(item)+'</td>' +
+    let cells = '<td class="nm">'+nameCell+'</td>';
+    cells += orderedColumns(tasksMode).map(col=>{
+      if(col.key === 'due') return '<td class="due-cell '+di.cls+'">'+dueCellContent(item, di)+'</td>';
+      const cls = columnCellClass(col);
+      return '<td'+(cls?' class="'+cls+'"':'')+'>'+columnCellHTML(col, item)+'</td>';
+    }).join('');
+    cells += '<td class="num">'+attIconStr(item)+'</td>' +
       '<td class="act-cell">'+renderRowActions(item, di, opts)+'</td>';
     return '<tr class="item-row'+notInstalledCls+holdingCls+childRowCls+dragRowCls+'" data-id="'+item.id+'"'+dragAttrs+'>'+cells+'</tr>';
   }
 
   function activeHead(tasksMode){
-    return tasksMode
-      ? '<tr><th>Name</th><th>Action</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>'
-      : '<tr><th>Name</th><th>Action</th><th>Make / Model</th><th>Part No.</th><th>Serial No.</th><th>Tracking No.</th><th>Limit</th><th>Last Performed</th><th>Due</th><th>Files</th><th></th></tr>';
+    const cols = orderedColumns(tasksMode);
+    const th = cols.map(c=>'<th class="tt-col-drag" draggable="true" data-col-key="'+c.key+'" title="Drag to reorder this column">'+escapeHTML(c.label)+'</th>').join('');
+    return '<tr><th>Name</th>'+th+'<th>Files</th><th></th></tr>';
   }
   function holdingHead(tasksMode){
     return tasksMode
       ? '<tr><th>Name</th><th>Category</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>'
       : '<tr><th>Name</th><th>Category</th><th>Make / Model</th><th>Serial / Tracking</th><th>Sent</th><th>Note</th><th>Files</th><th></th></tr>';
   }
-  function activeColCount(tasksMode){ return tasksMode ? 7 : 11; }
+  function activeColCount(tasksMode){ return 3 + orderedColumns(tasksMode).length; }
 
   function renderList(){
     const area = document.getElementById('ttListArea');
@@ -932,6 +1009,7 @@
       '<div class="wa-footer-count">'+pool.length+' item'+(pool.length===1?'':'s')+' found'+(isCustomMode?' — drag a row (⠿) to reorder it within its category or assembly':'')+'</div>';
 
     if(isCustomMode) wireDragReorder(area);
+    if(VIEW_TAB !== 'holding') wireColumnDragReorder(area, tasksMode);
 
     area.querySelectorAll('[data-act]').forEach(btn=>{
       btn.onclick = (e)=>{ e.stopPropagation(); handleCardAction(btn.dataset.act, btn.dataset.id); };
@@ -954,6 +1032,60 @@
   function clearDragIndicators(area){
     area.querySelectorAll('.tt-drag-over-before,.tt-drag-over-after,.tt-drag-reject').forEach(el=>{
       el.classList.remove('tt-drag-over-before','tt-drag-over-after','tt-drag-reject');
+    });
+  }
+
+  // Column drag-to-reorder: drag a header cell left/right past another to swap their order.
+  // Same before/after-midpoint approach as row reordering above, just on the horizontal axis, and
+  // it reorders COLUMN_ORDER[tools|tasks] (persisted) rather than the items themselves. Available
+  // in every sort mode -- column layout is a display preference, independent of row order.
+  let COL_DRAG_KEY = null;
+  function wireColumnDragReorder(area, tasksMode){
+    const modeKey = tasksMode ? 'tasks' : 'tools';
+    const heads = area.querySelectorAll('thead th.tt-col-drag');
+    const clearColIndicators = ()=> heads.forEach(h=>h.classList.remove('tt-col-drag-over-before','tt-col-drag-over-after'));
+    heads.forEach(th=>{
+      th.addEventListener('dragstart', (e)=>{
+        COL_DRAG_KEY = th.dataset.colKey;
+        th.classList.add('tt-col-dragging');
+        try{ e.dataTransfer.setData('text/plain', th.dataset.colKey); }catch(err){}
+        if(e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      });
+      th.addEventListener('dragend', ()=>{
+        th.classList.remove('tt-col-dragging');
+        clearColIndicators();
+        COL_DRAG_KEY = null;
+      });
+      th.addEventListener('dragover', (e)=>{
+        if(!COL_DRAG_KEY || COL_DRAG_KEY === th.dataset.colKey) return;
+        e.preventDefault();
+        if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const rect = th.getBoundingClientRect();
+        const before = (e.clientX - rect.left) < (rect.width/2);
+        clearColIndicators();
+        th.classList.add(before ? 'tt-col-drag-over-before' : 'tt-col-drag-over-after');
+      });
+      th.addEventListener('dragleave', ()=>{
+        th.classList.remove('tt-col-drag-over-before','tt-col-drag-over-after');
+      });
+      th.addEventListener('drop', async (e)=>{
+        e.preventDefault();
+        const overKey = th.dataset.colKey;
+        const before = th.classList.contains('tt-col-drag-over-before');
+        clearColIndicators();
+        if(!COL_DRAG_KEY || !overKey || COL_DRAG_KEY === overKey) return;
+        const order = (COLUMN_ORDER[modeKey]||[]).slice();
+        const fromIdx = order.indexOf(COL_DRAG_KEY);
+        if(fromIdx === -1) return;
+        order.splice(fromIdx, 1);
+        let toIdx = order.indexOf(overKey);
+        if(toIdx === -1) return;
+        if(!before) toIdx += 1;
+        order.splice(toIdx, 0, COL_DRAG_KEY);
+        COLUMN_ORDER[modeKey] = order;
+        await persistColumnOrder();
+        renderList();
+      });
     });
   }
 
@@ -1086,10 +1218,17 @@
 
   function renderAttThumb(att, idx, kind){
     const isImg = att.type && att.type.startsWith('image/');
+    const fname = escapeHTML(att.name||'file');
     return (
       '<div class="tt-att-thumb" data-kind="'+kind+'" data-idx="'+idx+'">' +
-        (isImg ? '<img src="'+att.dataUrl+'">' : '<div class="file-chip">📄</div>') +
-        '<div class="fn">'+escapeHTML(att.name||'file')+'</div>' +
+        // The thumbnail/filename is a real link to the file's own data URL, with `download` set so
+        // clicking it always saves the file under its original name (rather than doing nothing, or
+        // trying to navigate the whole tab to a giant base64 URL) -- this is what actually lets
+        // someone open a saved photo, PDF, or any other attached file afterwards.
+        '<a class="tt-att-open" href="'+att.dataUrl+'" download="'+fname+'" target="_blank" rel="noopener" title="Open / download '+fname+'">' +
+          (isImg ? '<img src="'+att.dataUrl+'">' : '<div class="file-chip">📄</div>') +
+          '<div class="fn">'+fname+'</div>' +
+        '</a>' +
         '<button type="button" class="rm" data-rm-kind="'+kind+'" data-rm-idx="'+idx+'">×</button>' +
       '</div>'
     );
@@ -1696,6 +1835,7 @@
   async function init(){
     await loadData();
     await loadCategoryMeta();
+    await loadColumnOrder();
     document.getElementById('ttAddBtn').onclick = ()=>openItemForm(null);
     document.getElementById('ttReportBtn').onclick = openReportModal;
     document.getElementById('ttUndoBtn').onclick = undoLastChange;
