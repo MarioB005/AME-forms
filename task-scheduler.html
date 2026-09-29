@@ -161,14 +161,14 @@
   }
   .pr-head{text-align:center;margin-bottom:10px;}
   .pr-head img{height:52px;display:block;margin:0 auto 8px;}
-  .pr-head h1{margin:0 0 3px;font-size:16pt;font-weight:800;color:#111;}
-  .pr-head .stamp{font-size:9.5pt;color:#666;margin-bottom:4px;}
-  .pr-head .stats{font-size:10pt;font-weight:800;color:#111;}
-  .ts-report-table{width:100%;border-collapse:collapse;font-size:9.5pt;}
-  .ts-report-table thead th{text-align:left;padding:7px 9px;color:#fff;background:#14213d;font-size:8.5pt;font-weight:800;text-transform:none;border:1px solid #14213d;}
-  .ts-report-table td{padding:6px 9px;border:1px solid #d8d8d8;vertical-align:top;}
-  .ts-report-table td.pr-prio{font-weight:800;}
-  .pr-footer{margin-top:18px;text-align:center;font-size:8.5pt;color:#999;}
+  .pr-head h1{margin:0 0 3px;font-size:17pt;font-weight:800;color:#000;}
+  .pr-head .stamp{font-size:10.5pt;color:#000;margin-bottom:4px;}
+  .pr-head .stats{font-size:11pt;font-weight:800;color:#000;}
+  .ts-report-table{width:100%;border-collapse:collapse;font-size:10.5pt;color:#000;}
+  .ts-report-table thead th{text-align:left;padding:7px 9px;color:#fff;background:#14213d;font-size:9.5pt;font-weight:800;text-transform:none;border:1px solid #14213d;}
+  .ts-report-table td{padding:6px 9px;border:1px solid #d8d8d8;vertical-align:top;color:#000;}
+  .ts-report-table td.pr-prio{font-weight:800;color:#000;}
+  .pr-footer{margin-top:18px;text-align:center;font-size:9.5pt;color:#000;}
 
   @media (max-width:640px){
     .ts-controls{width:100%;}
@@ -1011,17 +1011,10 @@
   }
 
   // ---------- print ----------
-  // Row tint + priority text colour match the original app's print report exactly: red tint for
-  // an overdue, not-completed row; blue tint for a top-priority ("M") not-completed row; priority
-  // text itself red/blue/amber/grey by value. Nothing completed or silenced ever reaches this
-  // list (see printableTasks()), so there's no green "completed" tint and no Completed column.
-  function prioPrintColor(p){
-    const s = String(p);
-    if(s === 'M') return '#2563eb';
-    if(s === '1') return '#ef4444';
-    if(s === '2') return '#f59e0b';
-    return '#64748b';
-  }
+  // Row tint still marks an overdue, not-completed row (red) or a top-priority ("M") not-completed
+  // row (blue) -- all text, priority column included, prints in plain black. Nothing completed or
+  // silenced ever reaches this list (see printableTasks()), so there's no green "completed" tint
+  // and no Completed column.
   function printList(){
     const list = printableTasks();
     const now = new Date();
@@ -1041,7 +1034,7 @@
       const topPriority = !t.completed && String(t.priority) === 'M';
       const bg = topPriority ? '#eff6ff' : (overdueRow ? '#fce4e4' : '#ffffff');
       return '<tr style="background:'+bg+';">' +
-        '<td class="pr-prio" style="color:'+prioPrintColor(t.priority)+';">'+escapeHTML(String(t.priority==null?'':t.priority))+'</td>' +
+        '<td class="pr-prio">'+escapeHTML(String(t.priority==null?'':t.priority))+'</td>' +
         '<td>'+escapeHTML(t.ameAssigned||'')+'</td>' +
         '<td>'+escapeHTML(t.registration||'')+'</td>' +
         '<td>'+escapeHTML(t.description||'')+'</td>' +
