@@ -395,6 +395,9 @@
 <!-- Same max-width-escape as #viewToolTracker above, for the Ops Gear Tracker iframe. -->
 <div id="viewOpsGearTracker" style="display:none;"></div>
 
+<!-- Same max-width-escape as #viewToolTracker above, for the Task Scheduler iframe. -->
+<div id="viewTaskScheduler" style="display:none;"></div>
+
 <div id="printArea"></div>
 
 <script>
@@ -952,11 +955,11 @@
   document.getElementById('dbBackupBtn').onclick = ()=> backupAllData();
 
   // ---------- view routing ----------
-  const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','DriveShaftBalance','Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage','ToolTracker','OpsGearTracker'];
+  const VIEWS = ['Home','Settings','SavedForms','FleetForecast','Forms','Checks','Balancing','Tolerance','TrackBalance','MajorMod','MinorMod','Anticipation','Powercheck','PowercheckTrend','Ec135pc','Ec135Trend','BleedValve','BleedValveTrend','TailRotorBalance','Ec120TailRotorBalance','Ec135TailRotorBalance','DriveShaftBalance','Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage','ToolTracker','OpsGearTracker','TaskScheduler'];
   // Screens reachable only from behind the Reserved gate -- the 💾 Backup All Data button in the
   // dark banner (dbBackupBtn) is kept hidden everywhere else, since backing up is an internal-use
   // action that belongs alongside the rest of Reserved, not on every everyday form screen.
-  const RESERVED_VIEWS = ['Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage','ToolTracker','OpsGearTracker'];
+  const RESERVED_VIEWS = ['Reserved','Notes','MpmRevision','McmRevision','McmDoc','PilotTraining','PilotTrainRecords','PilotTrainCard','PilotTrainManage','ToolTracker','OpsGearTracker','TaskScheduler'];
   // Tracks whether the person has clicked into any screen other than Home yet. unlock() kicks off
   // loadSettings() in the background and only shows Home once it resolves -- on a slow/flaky
   // connection that can take a moment, and without this flag its completion would silently yank
@@ -970,7 +973,7 @@
     // while either is showing so its own wrapper padding is the only spacing in play, and
     // restore it for every other view.
     const appEl = document.getElementById('app');
-    if(appEl) appEl.style.paddingBottom = (name === 'ToolTracker' || name === 'OpsGearTracker') ? '0px' : '';
+    if(appEl) appEl.style.paddingBottom = (name === 'ToolTracker' || name === 'OpsGearTracker' || name === 'TaskScheduler') ? '0px' : '';
     VIEWS.forEach(v=>{
       const el = document.getElementById('view'+v);
       if(!el) return;
@@ -5879,6 +5882,7 @@
           '<button class="home-btn" id="resNotesBtn"><span class="hb-icon">📝</span>Notes</button>' +
           '<button class="home-btn" id="resToolTrackerBtn"><span class="hb-icon">🧰</span>Tool &amp; Calibration Tracker</button>' +
           '<button class="home-btn" id="resOpsGearBtn"><span class="hb-icon">🎒</span>Ops Gear Tracker</button>' +
+          '<button class="home-btn" id="resTaskSchedulerBtn"><span class="hb-icon">🗓️</span>Task Scheduler</button>' +
         '</div>' +
         // Backup All Data now lives as the 💾 button in the dark banner up top (see dbBackupBtn --
         // it only shows while somewhere inside Reserved) rather than as a grid tile here. This
@@ -5894,17 +5898,19 @@
     document.getElementById('resNotesBtn').onclick = ()=> renderNotesForm();
     document.getElementById('resToolTrackerBtn').onclick = ()=> renderToolTracker();
     document.getElementById('resOpsGearBtn').onclick = ()=> renderOpsGearTracker();
+    document.getElementById('resTaskSchedulerBtn').onclick = ()=> renderTaskScheduler();
     document.getElementById('resLockBtn').onclick = ptrainLock;
   }
 
   // Every key this app (forms:, mcm:, notes:, ptrain:) and its embedded Tool & Calibration
-  // Tracker (tooltracker:) and Ops Gear Tracker (opsgear:) write live in the same shared
-  // Supabase app_data table as a couple of Mario's other apps (Fleet Forecast Board, AME Work
-  // Schedule) -- those use their own key prefixes and are deliberately left out, so this only
+  // Tracker (tooltracker:), Ops Gear Tracker (opsgear:), and Task Scheduler (scheduler:) write
+  // live in the same shared Supabase app_data table as a couple of Mario's other apps (Fleet
+  // Forecast Board, AME Work Schedule) -- those use their own key prefixes and are deliberately
+  // left out, so this only
   // ever backs up "Phoenix Heli-Flight — Maintenance Forms" itself, in full. Downloads a single
   // JSON file with every matching key/value pair, exactly as stored, so it could be restored
   // (or just inspected) later if ever needed.
-  const BACKUP_KEY_PREFIXES = ['forms:', 'mcm:', 'notes:', 'ptrain:', 'tooltracker:', 'opsgear:'];
+  const BACKUP_KEY_PREFIXES = ['forms:', 'mcm:', 'notes:', 'ptrain:', 'tooltracker:', 'opsgear:', 'scheduler:'];
 
   async function backupAllData(){
     // The status line only exists on the Reserved menu screen itself -- the banner button (see
@@ -6017,6 +6023,19 @@
         backToReservedBtn() +
         '<div class="panel" style="padding:0;overflow:hidden;">' +
           '<iframe src="./ops-gear-tracker.html" title="Ops Gear Tracker" style="width:100%;height:88vh;border:0;display:block;"></iframe>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
+  }
+
+  function renderTaskScheduler(){
+    showView('TaskScheduler');
+    const el = document.getElementById('viewTaskScheduler');
+    el.innerHTML =
+      '<div style="max-width:1900px;margin:0 auto;padding:0 24px 60px;">' +
+        backToReservedBtn() +
+        '<div class="panel" style="padding:0;overflow:hidden;">' +
+          '<iframe src="./task-scheduler.html" title="Task Scheduler" style="width:100%;height:88vh;border:0;display:block;"></iframe>' +
         '</div>' +
       '</div>';
     document.getElementById('resBackBtn').onclick = ()=> renderReservedMenu();
