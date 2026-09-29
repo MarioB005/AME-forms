@@ -154,6 +154,15 @@
   .ts-set-add input{flex:1;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;font-family:inherit;}
 
   #printArea{display:none;}
+  /* Without this, some browsers silently drop background-colors (and can dull text colors along
+     with them) when the person's print dialog has "Background graphics" switched off -- that's
+     what was turning the navy header grey and washing out other colours on print. This forces
+     every colour on the printed page to come out exactly as styled, regardless of that setting. */
+  #printArea, #printArea *{
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
   @page{margin:0.25in;size:landscape;}
   @media print{
     body > *:not(#printArea){display:none !important;}
@@ -1054,7 +1063,21 @@
         '<th>Priority</th><th>' + COL_LABEL[CURRENT_TAB] + '</th><th>Registration</th><th>Task Description</th><th>Due Date</th><th>Date Entered</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>' +
       '<div class="pr-footer">Confidential — Aircraft Maintenance Records</div>';
-    window.print();
+
+    // The logo is a data: URI, so it never hits the network, but the browser still decodes it
+    // asynchronously -- calling window.print() immediately after setting innerHTML could open
+    // the print dialog before that decode finishes, which is exactly what made the logo miss on
+    // an otherwise-fresh page (the browser hadn't decoded any image yet). Wait for it explicitly.
+    const logoImg = document.querySelector('#printArea .pr-head img');
+    const go = ()=> window.print();
+    if(logoImg && logoImg.decode){
+      logoImg.decode().then(go, go);
+    } else if(logoImg && !logoImg.complete){
+      logoImg.addEventListener('load', go, { once:true });
+      logoImg.addEventListener('error', go, { once:true });
+    } else {
+      go();
+    }
   }
 
   // ---------- wire up static controls ----------
