@@ -1633,11 +1633,24 @@
   }
 
   function openSendToHolding(item){
+    // An assembly (top-level item with sub-items) physically travels as one unit -- if the
+    // assembly itself goes out for its own action (e.g. Overhaul), whatever's bolted to it
+    // (e.g. a sub-item due for Inspection) goes with it, whether or not that sub-item is
+    // actually due yet. A child item being sent on its own (item.parentId set) never cascades
+    // further -- nesting only goes one level deep. A sub-item already in Holding on its own
+    // (sent earlier, independently) is left alone rather than having its original sent
+    // date/note overwritten.
+    const children = item.parentId ? [] : ITEMS.filter(i => i.parentId === item.id);
+    const cascadeChildren = children.filter(c => !(c.holding && c.holding.active));
+    const cascadeNote = cascadeChildren.length
+      ? '<p class="sub">This assembly has '+cascadeChildren.length+' sub-item'+(cascadeChildren.length===1?'':'s')+' that will be sent to Holding with it: '+cascadeChildren.map(c=>escapeHTML(c.name)).join(', ')+'.</p>'
+      : '';
     const html =
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
         '<div class="tt-modal" style="max-width:460px;">' +
           '<h2>Send "'+escapeHTML(item.name)+'" to Holding</h2>' +
           '<p class="sub">Use this when the item is pulled out of service and sent out for calibration.</p>' +
+          cascadeNote +
           '<div class="field-grid">' +
             '<div class="field"><label>Date Sent</label><input id="hSentDate" type="date" value="'+todayISO()+'"></div>' +
             '<div class="field span2"><label>Note (vendor, PO#, etc.)</label><input id="hNote" placeholder="optional"></div>' +
@@ -1651,7 +1664,13 @@
     document.getElementById('ttModalRoot').innerHTML = html;
     document.getElementById('ttHoldCancel').onclick = closeModal;
     document.getElementById('ttHoldConfirm').onclick = async ()=>{
-      item.holding = { active:true, sentDate: document.getElementById('hSentDate').value || todayISO(), note: document.getElementById('hNote').value.trim() };
+      const sentDate = document.getElementById('hSentDate').value || todayISO();
+      const note = document.getElementById('hNote').value.trim();
+      item.holding = { active:true, sentDate, note };
+      // Cascade to the assembly's sub-items -- same sent date/note, tagged viaParent so the
+      // Complete/Return flow knows these came along automatically rather than being sent
+      // individually (see openCompleteHolding).
+      cascadeChildren.forEach(c => { c.holding = { active:true, sentDate, note, viaParent:true }; });
       closeModal();
       renderAll();
       await persist();
@@ -1659,11 +1678,24 @@
   }
 
   function openCompleteHolding(item){
+    // Sub-items currently in Holding alongside this assembly (whether they were cascaded in
+    // automatically by openSendToHolding or sent individually) -- offered back as a group so a
+    // single "it's back from the vendor" event doesn't need to be repeated per sub-item, while
+    // still leaving it as a choice, since inspection/overhaul work on the same assembly can
+    // genuinely wrap up on different dates with separate paperwork.
+    const heldChildren = item.parentId ? [] : ITEMS.filter(i => i.parentId === item.id && i.holding && i.holding.active);
+    const childrenNote = heldChildren.length
+      ? '<label class="tt-cat-check" style="display:flex;gap:7px;align-items:center;margin:2px 0 4px;">' +
+          '<input type="checkbox" id="cIncludeChildren" checked> ' +
+          'Also return/complete '+heldChildren.length+' linked sub-item'+(heldChildren.length===1?'':'s')+': '+heldChildren.map(c=>escapeHTML(c.name)).join(', ') +
+        '</label>'
+      : '';
     const html =
       '<div class="tt-modal-backdrop" id="ttModalBackdrop">' +
         '<div class="tt-modal" style="max-width:520px;">' +
           '<h2>Complete Calibration — "'+escapeHTML(item.name)+'"</h2>' +
           '<p class="sub">Record the completion, attach the receiving report / certificate, and this item returns to Active with a fresh due date.</p>' +
+          childrenNote +
           '<div class="field-grid">' +
             '<div class="field"><label>Completion Date</label><input id="cDate" type="date" value="'+todayISO()+'"></div>' +
             '<div class="field"><label>Update Time Limit (months)</label><input id="cLimit" type="number" min="0" step="1" value="'+(item.limitMonths==null?'':item.limitMonths)+'"></div>' +
@@ -1708,6 +1740,9 @@
 
     document.getElementById('ttHoldReturn').onclick = async ()=>{
       item.holding = null;
+      if(heldChildren.length && document.getElementById('cIncludeChildren') && document.getElementById('cIncludeChildren').checked){
+        heldChildren.forEach(c => { c.holding = null; });
+      }
       closeModal();
       renderAll();
       await persist();
@@ -1719,6 +1754,12 @@
       if(cLimit !== '') item.limitMonths = Number(cLimit);
       item.manualNextDue = null;
       item.holding = null;
+      // Sub-items keep their own time limit/action -- only the completion date and Holding
+      // status are shared, since the parent's "Update Time Limit" field is specific to the
+      // parent's own action (e.g. Overhaul) and shouldn't overwrite a child's Inspection interval.
+      if(heldChildren.length && document.getElementById('cIncludeChildren') && document.getElementById('cIncludeChildren').checked){
+        heldChildren.forEach(c => { c.lastPerformed = cDate; c.manualNextDue = null; c.holding = null; });
+      }
       closeModal();
       renderAll();
       await persist();
