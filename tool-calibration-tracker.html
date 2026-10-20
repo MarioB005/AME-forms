@@ -117,6 +117,11 @@
   table.wa-table tbody tr.item-row.notinstalled{opacity:.55;}
   table.wa-table tbody tr.item-row.holding{background:var(--hold-bg);}
   table.wa-table td{padding:7px 10px;vertical-align:middle;}
+  /* row buttons (duplicate, sub-item, holding) stay visible at the right edge even when the table scrolls sideways */
+  table.wa-table td.act-cell{position:sticky;right:0;background:var(--panel);white-space:nowrap;box-shadow:-6px 0 6px -6px rgba(0,0,0,.25);}
+  table.wa-table thead th:last-child{position:sticky;right:0;z-index:3;}
+  table.wa-table tbody tr.item-row:hover td.act-cell{background:#f4f8fb;}
+  table.wa-table tbody tr.item-row.holding td.act-cell{background:var(--hold-bg);}
   table.wa-table tr.grp-row td{background:#eef1ea;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink);}
   .grp-files-btn{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:3px 10px;cursor:pointer;font-size:10.5px;font-weight:700;text-transform:none;letter-spacing:normal;color:var(--grey-strong);white-space:nowrap;}
   .grp-files-btn:hover{border-color:var(--accent);color:var(--ink);}
@@ -297,10 +302,11 @@
 (function(){
   'use strict';
 
-  // ---------- storage: same Supabase project/table as the main AME Forms app, own key prefix ----------
-  const SUPABASE_URL = 'https://frlehxadkvgwzyxovwua.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_ioAPLi8DWuC0HCUUYEeQ3Q_dildZYKI';
-  const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
+  // ---------- storage: kept by the Inventory Manager app (this page is shown inside it) ----------
+  // Same sign-in, sync and backups as the inventory. Attached files are stored separately by the
+  // Inventory Manager (documents storage) and the item list only keeps { name, type, fileId }.
+  const TS = (function(){ try{ return (window.parent !== window && window.parent.TrackerStore) || null; }catch(e){ return null; } })();
+  if(!TS){ location.replace('./#ws-tool'); return; }
   const DATA_KEY = 'tooltracker:items:v1';
   const CATMETA_KEY = 'tooltracker:catmeta:v1';
   // Default section assignment for categories seen for the first time -- Tool Crib Checks and Servo
@@ -311,60 +317,25 @@
 
   window.__storageLastError = null;
 
-  async function storageGet(key){
-    if(SUPABASE_CONFIGURED){
-      try{
-        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?key=eq.' + encodeURIComponent(key) + '&select=value', {
-          headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }
-        });
-        if(res.ok){
-          const rows = await res.json();
-          if(rows && rows.length){
-            try{ localStorage.setItem('cache:'+key, rows[0].value); }catch(e){}
-            return rows[0].value;
-          }
-        } else {
-          window.__storageLastError = 'GET ' + key + ': HTTP ' + res.status;
-        }
-      }catch(e){ window.__storageLastError = 'GET ' + key + ': ' + e; }
-    }
-    try{ return localStorage.getItem('cache:'+key); }catch(e){ return null; }
-  }
-
-  let __storageWriteQueue = Promise.resolve();
+  async function storageGet(key){ return TS.get(key); }
   async function storageSet(key, value){
-    try{ localStorage.setItem('cache:'+key, value); }catch(e){}
-    if(!SUPABASE_CONFIGURED) return true;
-    let ok = true;
-    const doWrite = async ()=>{
-      try{
-        const res = await fetch(SUPABASE_URL + '/rest/v1/app_data?on_conflict=key', {
-          method: 'POST',
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=merge-duplicates,return=minimal'
-          },
-          body: JSON.stringify({ key: key, value: value })
-        });
-        if(!res.ok){
-          ok = false;
-          let detail = '';
-          try{ detail = await res.text(); }catch(e2){}
-          window.__storageLastError = 'PUT ' + key + ': HTTP ' + res.status + (detail?(' — '+detail.slice(0,300)):'');
-          console.error('storageSet failed', key, res.status, detail);
-        }
-      }catch(e){
-        ok = false;
-        window.__storageLastError = 'PUT ' + key + ': ' + e;
-        console.error('storageSet failed', key, e);
-      }
-    };
-    __storageWriteQueue = __storageWriteQueue.then(doWrite, doWrite);
-    await __storageWriteQueue;
+    let ok = false;
+    try{ ok = await TS.set(key, value); }catch(e){ window.__storageLastError = String((e && e.message) || e); return false; }
+    if(!ok) window.__storageLastError = TS.lastError();
     return ok;
   }
+  // stored files: open through the Inventory Manager, thumbnails filled in when they appear
+  document.addEventListener('click', function(e){
+    const a = e.target.closest && e.target.closest('a[data-fid]'); if(!a) return;
+    e.preventDefault(); e.stopPropagation(); TS.openFile(a.dataset.fid, a.dataset.fname, a.dataset.ftype);
+  }, true);
+  function fillThumbs(){
+    document.querySelectorAll('img[data-fid]:not([data-loading])').forEach(function(img){
+      img.setAttribute('data-loading','1');
+      TS.fileData(img.dataset.fid, img.dataset.ftype).then(function(u){ img.src = u; }).catch(function(){ img.alt = '(file not available)'; });
+    });
+  }
+  new MutationObserver(fillThumbs).observe(document.documentElement, {childList:true, subtree:true});
 
   // ---------- utils ----------
   function escapeHTML(s){
@@ -845,7 +816,7 @@
     // Edit and Delete each have their own dedicated row/modal buttons elsewhere (clicking
     // anywhere on the row opens Edit; the edit form itself has its own Delete button), so they
     // aren't duplicated here as separate row icons.
-    let html = '<button type="button" class="row-icon-btn" title="Duplicate (clears Serial No., Tracking No. &amp; Date Performed)" data-act="duplicate" data-id="'+item.id+'">📋</button>';
+    let html = '<button type="button" class="row-icon-btn" title="Duplicate (copy without Serial No. &amp; Tracking No.)" data-act="duplicate" data-id="'+item.id+'">📋</button>';
     // "Add Sub-Item" -- only on a top-level (non-child) row, only in the Tool & Calibration
     // Tracker section, and only from the active list (not holding, not a search/filter view
     // where the parent itself might not even be showing).
@@ -1185,8 +1156,8 @@
     delete draft.id;
     draft.serialNo = '';
     draft.trackingNo = '';
-    draft.lastPerformed = null;
     draft.holding = null;
+    draft.calReportAttachments = [];   // a certificate belongs to one serial number -- not copied
     draft.__isDuplicate = true;
     openItemForm(null, draft);
   }
@@ -1232,8 +1203,8 @@
         // clicking it always saves the file under its original name (rather than doing nothing, or
         // trying to navigate the whole tab to a giant base64 URL) -- this is what actually lets
         // someone open a saved photo, PDF, or any other attached file afterwards.
-        '<a class="tt-att-open" href="'+att.dataUrl+'" download="'+fname+'" target="_blank" rel="noopener" title="Open / download '+fname+'">' +
-          (isImg ? '<img src="'+att.dataUrl+'">' : '<div class="file-chip">📄</div>') +
+        '<a class="tt-att-open" href="'+(att.dataUrl||'#')+'"'+(att.dataUrl ? '' : ' data-fid="'+escapeHTML(att.fileId||'')+'" data-fname="'+fname+'" data-ftype="'+escapeHTML(att.type||'')+'"')+' download="'+fname+'" target="_blank" rel="noopener" title="Open / download '+fname+'">' +
+          (isImg ? (att.dataUrl ? '<img src="'+att.dataUrl+'">' : '<img data-fid="'+escapeHTML(att.fileId||'')+'" data-ftype="'+escapeHTML(att.type||'')+'" alt="">') : '<div class="file-chip">📄</div>') +
           '<div class="fn">'+fname+'</div>' +
         '</a>' +
         '<button type="button" class="rm" data-rm-kind="'+kind+'" data-rm-idx="'+idx+'">×</button>' +
@@ -1378,7 +1349,7 @@
         '<div class="tt-modal tt-item-form">' +
           '<button class="tt-modal-close" id="ttModalClose">&times;</button>' +
           '<h2>'+(editing?'Edit Item':(isDuplicate?'Duplicate Item':'Add Item'))+'</h2>' +
-          '<p class="sub">'+(editing?'Update the details, interval, or due-date override for this item.':(isDuplicate?'This is a copy -- Serial No., Tracking No., and Date Performed were cleared. Fill those in and Save when ready.':'Add a new tool, piece of equipment, or recurring check to track.'))+'</p>' +
+          '<p class="sub">'+(editing?'Update the details, interval, or due-date override for this item.':(isDuplicate?'This is a copy -- Serial No., Tracking No. and certificates were not copied. Fill in the new Serial No. / Tracking No. (and check the Date Performed), then Save.':'Add a new tool, piece of equipment, or recurring check to track.'))+'</p>' +
           '<div class="field-grid">' +
             '<div class="field span2"><label>Name</label><input id="fName" value="'+escapeHTML(FORM_STATE.name)+'" placeholder="e.g. Torque Wrench"></div>' +
             '<div class="field"><label>Category</label><input id="fCategory" list="ttCatList" value="'+escapeHTML(FORM_STATE.category)+'" placeholder="e.g. Torque Wrenches"></div>' +
@@ -1422,7 +1393,7 @@
           '</div>' +
 
           '<div class="tt-modal-footer">' +
-            '<div>'+(editing?'<button class="btn danger" id="ttFormDelete">Delete Item</button>':'')+'</div>' +
+            '<div>'+(editing?'<button class="btn danger" id="ttFormDelete">Delete Item</button> <button class="btn" id="ttFormDup" title="New item with the same details, without Serial No. &amp; Tracking No.">📋 Duplicate</button>':'')+'</div>' +
             '<div class="btn-row">' +
               '<button class="btn" id="ttFormCancel">Cancel</button>' +
               '<button class="btn primary" id="ttFormSave">Save</button>' +
@@ -1478,6 +1449,7 @@
 
     if(editing){
       document.getElementById('ttFormDelete').onclick = ()=>{ closeModal(); openDeleteConfirm(item); };
+      document.getElementById('ttFormDup').onclick = ()=>{ closeModal(); duplicateItem(item); };
     }
 
     document.getElementById('ttFormSave').onclick = async ()=>{
