@@ -23,6 +23,11 @@ header.top{grid-column:1/3;background:var(--navy);color:#fff;display:flex;align-
 header.top .brand{font-weight:600;font-size:16px;letter-spacing:.2px;display:flex;align-items:center}
 header.top .brand small{font-weight:400;opacity:.7;margin-left:8px;font-size:12px}
 header.top .sp{flex:1}
+#spacePill{cursor:pointer}
+#spacePill .sbar{width:46px;height:8px;border-radius:4px;background:rgba(255,255,255,.25);overflow:hidden;display:inline-block}
+#spacePill .sbar i{display:block;height:100%;width:0;background:#46c37b;border-radius:4px}
+#spacePill.warn .sbar i{background:#f1c40f}#spacePill.bad .sbar i{background:#ff6b5b}
+#spacePill.bad{background:#c0392b}
 #wsTabs{display:flex;gap:4px;align-self:stretch;align-items:flex-end;margin-left:10px}
 #wsTabs button{background:rgba(255,255,255,.10);color:#fff;border:0;border-radius:8px 8px 0 0;padding:8px 16px 9px;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}
 #wsTabs button:hover{background:rgba(255,255,255,.2)}
@@ -235,6 +240,7 @@ body.locked #app{display:none}
     <div class="brand" id="brand"><img id="brandLogo" alt="" class="hide"><span id="brandTxt">Inventory Manager</span><small id="brandCo"></small></div>
     <div id="wsTabs"></div>
     <div class="sp"></div>
+    <span class="pill hide" id="spacePill" title="Database space used"><span class="sbar"><i id="spaceFill"></i></span><span id="spaceTxt"></span></span>
     <span class="pill" id="syncPill"><span class="dot"></span><span id="syncTxt">Local only</span></span>
     <button class="user" id="userBtn" title="Change user name">👤 <span id="userName"></span></button>
   </header>
@@ -3433,6 +3439,45 @@ const Cloud = {
   async get(day) { const r = await fetch(Cloud.base('inv_backups?select=day,data&day=eq.' + day), { headers: Sync.headers() }); if (!r.ok) throw new Error('Supabase ' + r.status); const rows = await r.json(); if (!rows[0]) throw new Error('Backup not found'); return rows[0].data; },
   async now() { const r = await fetch(Cloud.base('rpc/inv_backup_now'), { method: 'POST', headers: Sync.headers(), body: '{}' }); if (!r.ok) throw new Error(r.status === 404 ? 'Backup function not found — run the backup setup SQL' : 'Supabase ' + r.status + ': ' + (await r.text()).slice(0, 140)); return r.json(); }
 };
+// read-only: how much database space is used (for the space gauge in the top bar)
+const SPACE_SQL = `-- space gauge (read-only)
+create or replace function public.inv_space() returns jsonb
+language sql security definer set search_path = public as $$
+  select jsonb_build_object(
+    'db', pg_database_size(current_database()),
+    'store', coalesce(pg_total_relation_size(to_regclass('public.inv_store')), 0),
+    'backups', coalesce(pg_total_relation_size(to_regclass('public.inv_backups')), 0),
+    'files', coalesce(pg_total_relation_size(to_regclass('public.inv_files')), 0))
+$$;
+grant execute on function public.inv_space() to anon;`;
+// Oct 2026 update for an existing set-up: shorter cloud-backup retention + space gauge.
+// Does NOT touch the backup schedule (cron) — the daily backup keeps running at its current time.
+function backupUpdateSQL() {
+  const t = Sync.cfg().table || 'inv_store';
+  return `-- Inventory Manager — update (run once): keep 14 daily + 8 weekly cloud backups, add the space gauge.
+-- Your backup schedule is NOT changed.
+create or replace function public.inv_backup_now() returns text
+language plpgsql security definer set search_path = public as $$
+declare d jsonb;
+begin
+  select jsonb_object_agg(id, data) into d from public.${t};
+  if d is null then return 'nothing to back up'; end if;
+  insert into public.inv_backups(day, created_at, data, size_kb)
+    values (current_date, now(), d, octet_length(d::text) / 1024)
+    on conflict (day) do update set created_at = now(), data = excluded.data, size_kb = excluded.size_kb;
+  -- keep every day for 14 days, then one per week (Sundays) for 8 more weeks
+  delete from public.inv_backups
+   where day < current_date - 14
+     and not (extract(dow from day) = 0 and day >= current_date - 70);
+  return 'ok';
+end $$;
+grant execute on function public.inv_backup_now() to anon;
+
+${SPACE_SQL}
+
+-- apply the new retention right away (removes the older backups)
+select public.inv_backup_now();`;
+}
 function backupSQL() {
   const t = Sync.cfg().table || 'inv_store';
   return `-- Inventory Manager: daily cloud backup (run once in Supabase > SQL Editor)
@@ -3458,13 +3503,15 @@ begin
   insert into public.inv_backups(day, created_at, data, size_kb)
     values (current_date, now(), d, octet_length(d::text) / 1024)
     on conflict (day) do update set created_at = now(), data = excluded.data, size_kb = excluded.size_kb;
-  -- keep every day for 30 days, then one per week (Sundays) for 1 year
+  -- keep every day for 14 days, then one per week (Sundays) for 8 more weeks
   delete from public.inv_backups
-   where day < current_date - 30
-     and not (extract(dow from day) = 0 and day >= current_date - 365);
+   where day < current_date - 14
+     and not (extract(dow from day) = 0 and day >= current_date - 70);
   return 'ok';
 end $$;
 grant execute on function public.inv_backup_now() to anon;
+
+${SPACE_SQL}
 
 ${FILES_SQL}
 
@@ -3556,7 +3603,7 @@ function backupPanel(el) {
     <h2 style="margin-top:0">How your data is protected</h2>
     <div class="grid g3" style="margin-bottom:12px">
       <div class="card"><b>1 · Shared database</b><div class="small muted">Every change is saved to Supabase within seconds, and every station also keeps a full copy in its browser.</div></div>
-      <div class="card"><b>2 · Daily cloud backup</b><div class="small muted">Supabase takes a snapshot every night at 3:00 AM by itself — even if nobody opens the app. Kept 30 days, then one per week for a year. The app cannot delete them.</div></div>
+      <div class="card"><b>2 · Daily cloud backup</b><div class="small muted">Supabase takes a snapshot every night at 3:00 AM by itself — even if nobody opens the app. Kept 14 days, then one per week for 8 more weeks. The app cannot delete them.</div></div>
       <div class="card"><b>3 · Daily copy on your PC</b><div class="small muted">A Windows task downloads the newest snapshot every morning to <i>Documents\\Inventory Manager Backups</i> and keeps 90 days.</div></div>
     </div>
     ${Sync.enabled() ? '' : '<div class="note" style="margin-bottom:12px">Connect Supabase first (Sharing tab) — cloud and PC backups need it.</div>'}
@@ -3570,12 +3617,18 @@ function backupPanel(el) {
     <div class="card" style="margin-bottom:10px"><b>Step A — turn on the daily cloud backup.</b> In Supabase open <b>SQL Editor → New query</b>, paste this, click <b>Run</b>. You should see "ok" at the bottom.
       <textarea readonly id="bkSql" style="font-family:Consolas,monospace;font-size:11.5px;min-height:150px;margin-top:8px"></textarea>
       <div class="bar" style="margin-top:6px"><button class="btn sm" id="bkCopySql">Copy SQL</button></div></div>
+    <div class="card" style="margin-bottom:10px;border-color:var(--accent)"><b>Update (Oct 2026) — already set up before? Run this once.</b> Shortens the cloud-backup retention to <b>14 daily + 8 weekly</b> (saves database space) and turns on the <b>space gauge</b> in the top bar. Your backup schedule is not changed. Supabase → <b>SQL Editor → New query</b>, paste, <b>Run</b> — you should see "ok".
+      <textarea readonly id="bkUpd" style="font-family:Consolas,monospace;font-size:11.5px;min-height:110px;margin-top:8px"></textarea>
+      <div class="bar" style="margin-top:6px"><button class="btn sm" id="bkCopyUpd">Copy SQL</button></div>
+      <p class="small muted" style="margin:6px 0 0">Deleted backups free their space for new data, but the database only reports the smaller size after it is compacted. To do that, in a <b>new</b> query run this single line on its own: <code>vacuum full public.inv_backups;</code></p></div>
     <div class="card"><b>Step B — daily copy on your computer.</b> Download the script, then in your Downloads folder <b>right-click it → Run with PowerShell</b> (once). It installs a Windows task named "Inventory Manager Backup" that runs every day at 7:00 AM (or when the PC is next turned on) and saves the files to <i>Documents\\Inventory Manager Backups</i>. A log file there shows each run.
       <div class="bar" style="margin-top:8px"><button class="btn pri" id="bkPs" ${Sync.enabled() ? '' : 'disabled'}>Download PC backup script</button><span class="small muted">The script contains your Supabase address and key — don't share it outside the company.</span></div></div>
     <h2>Manual backup / restore</h2>
     <div class="bar"><button class="btn" id="bkLocal">Download a backup of the current data now</button><label class="btn">Restore from a backup file… <input type="file" id="bkFile" accept=".json" class="hide"></label><span class="small muted">${local ? 'Last manual download: ' + fmtDT(local) : ''}</span></div>
     <p class="small muted">Restoring rolls the whole inventory back to the moment of that backup on every station (anything entered after it is removed). A safety copy of the current data is kept in this browser first.</p>`;
   $('#bkSql', el).value = backupSQL();
+  $('#bkUpd', el).value = backupUpdateSQL();
+  $('#bkCopyUpd', el).onclick = async () => { try { await navigator.clipboard.writeText(backupUpdateSQL()); toast('SQL copied'); } catch (e) { $('#bkUpd', el).select(); } };
   $('#docZip', el).onclick = () => downloadAllDocs($('#docRm', el).checked);
   $('#bkCopySql', el).onclick = async () => { try { await navigator.clipboard.writeText(backupSQL()); toast('SQL copied'); } catch (e) { $('#bkSql', el).select(); } };
   $('#bkPs', el).onclick = () => { saveBlob(new Blob([pcScript().replace(/\n/g, '\r\n')], { type: 'text/plain' }), 'Install-Inventory-Backup.ps1'); toast('Script downloaded — right-click it in Downloads → Run with PowerShell'); };
@@ -3598,7 +3651,7 @@ function backupPanel(el) {
     if (dl) { dl.disabled = true; try { const d = await Cloud.get(dl.dataset.dl); saveBlob(backupFileBlob(d, 'cloud ' + dl.dataset.dl), `inventory_backup_${dl.dataset.dl}.json`); } catch (err) { toast(err.message, true); } dl.disabled = false; }
     if (rs) { try { const d = await Cloud.get(rs.dataset.rs); await confirmRestore(d, 'the cloud backup of ' + fmtDate(rs.dataset.rs)); } catch (err) { toast(err.message, true); } }
   });
-  $('#bkNow', el).onclick = async () => { $('#bkNow', el).disabled = true; try { await flush(); const r = await Cloud.now(); toast(r === 'ok' ? 'Cloud backup taken' : String(r)); await load(); } catch (e) { toast(e.message, true); } $('#bkNow', el).disabled = false; };
+  $('#bkNow', el).onclick = async () => { $('#bkNow', el).disabled = true; try { await flush(); const r = await Cloud.now(); toast(r === 'ok' ? 'Cloud backup taken' : String(r)); await load(); Space.check(); } catch (e) { toast(e.message, true); } $('#bkNow', el).disabled = false; };
   $('#bkRefresh', el).onclick = load;
   load();
 }
@@ -3610,6 +3663,42 @@ async function confirmRestore(shards, from) {
   await restoreShards(shards);
   toast('Restore complete'); Render.full();
 }
+
+/* ---------- space gauge (top bar): database space used vs. the Supabase plan limit ---------- */
+const Space = {
+  info: null, err: null,
+  limitMB() { return Math.max(1, num(S().spaceLimitMB) || 500); },
+  async check() {
+    const p = $('#spacePill'); if (!p) return;
+    if (!Sync.enabled() || !isAdmin()) { p.classList.add('hide'); return; }
+    try {
+      const r = await fetch(Sync.cfg().url.replace(/\/+$/, '') + '/rest/v1/rpc/inv_space', { method: 'POST', headers: Sync.headers(), body: '{}' });
+      if (!r.ok) throw new Error(r.status === 404 ? 'not set up' : 'HTTP ' + r.status);
+      Space.info = await r.json(); Space.err = null;
+    } catch (e) { Space.info = null; Space.err = e.message; }
+    Space.draw();
+  },
+  pct() { return Space.info ? Space.info.db / (Space.limitMB() * 1048576) * 100 : null; },
+  draw() {
+    const p = $('#spacePill'); p.classList.remove('hide', 'warn', 'bad');
+    const pc = Space.pct();
+    if (pc == null) { $('#spaceFill').style.width = '0'; $('#spaceTxt').textContent = 'Space ?'; p.title = 'Space gauge not set up — click for details'; return; }
+    p.classList.toggle('warn', pc >= 75 && pc < 90); p.classList.toggle('bad', pc >= 90);
+    $('#spaceFill').style.width = Math.min(100, pc).toFixed(0) + '%';
+    $('#spaceTxt').textContent = pc.toFixed(0) + '%';
+    p.title = `Database space: ${fmtSize(Space.info.db)} of ${Space.limitMB()} MB used (${pc.toFixed(0)}%) — click for details`;
+  }
+};
+document.addEventListener('click', e => {
+  if (!e.target.closest('#spacePill')) return;
+  const i = Space.info, pc = Space.pct(), L = Space.limitMB();
+  const row = (l, v) => `<tr><td>${l}</td><td class="r">${fmtSize(v)}</td><td class="r">${(v / (L * 1048576) * 100).toFixed(1)}%</td></tr>`;
+  const body = !i ? `<p>The space gauge needs a small read-only function in Supabase.</p><p class="small">Go to <b>Settings → Backups</b> and run the <b>"Update (Oct 2026)"</b> SQL once.</p>${Space.err ? `<p class="small muted">(${esc(Space.err)})</p>` : ''}`
+    : `<p><b>${fmtSize(i.db)}</b> of <b>${L} MB</b> used — <b style="color:${pc >= 90 ? 'var(--bad)' : pc >= 75 ? 'var(--warn)' : 'var(--ok, #2e9d5b)'}">${pc.toFixed(0)}%</b></p>
+      <table class="t"><tr><th>Part</th><th class="r">Size</th><th class="r">of limit</th></tr>${row('Inventory & tracker data', i.store)}${row('Daily cloud backups', i.backups)}${row('Attached documents', i.files)}${row('Supabase system & other', Math.max(0, i.db - i.store - i.backups - i.files))}</table>
+      <p class="small muted" style="margin-top:8px">Yellow from 75%, red from 90%. Cloud backups are kept 14 days + 8 weekly. The plan limit (${L} MB, Supabase Free) can be changed in Settings → Options.</p>`;
+  modal({ title: 'Database space', size: 'narrow', body, buttons: [{ label: 'Refresh', close: false, onClick: async m => { await Space.check(); m.close(); $('#spacePill').click(); } }, { label: 'Close', cls: 'pri' }] });
+});
 /* ===================== Documents (attachments on suppliers & POs) ===================== */
 // File contents live in their own Supabase table (inv_files) — never in the synced data — and are
 // only fetched when opened. The app can add files but cannot delete them from the cloud: "Remove"
@@ -3843,7 +3932,7 @@ VIEWS.set = (main, st) => {
   <div data-p="opt" class="card"><div class="grid g4">
     ${fld('Retail markup over cost (%)', 'markup', s.markup, { type: 'number', step: 'any' })}${fld('Expiry warning (days)', 'expiryWarnDays', s.expiryWarnDays, { type: 'number' })}
     ${fld('Repair order receipt — default cost treatment', 'psPricing', s.psPricing, { opts: [{ v: 'add', l: 'Add repair cost to item cost' }, { v: 'replace', l: 'Repair cost replaces item cost' }, { v: 'keep', l: 'Keep original item price' }], cls: 'span2' })}
-    ${fld('New tracking #s start at', 'tnStart', s.tnStart || 20000, { type: 'number' })}${fld('Requisition prefix', 'reqPrefix', s.reqPrefix)}${fld('PO prefix (can be blank)', 'poPrefix', s.poPrefix)}${fld('First PO number', 'poStart', s.poStart || 4000, { type: 'number' })}${fld('First packing slip / RO number', 'psStart', s.psStart || 2000, { type: 'number' })}<div></div>
+    ${fld('New tracking #s start at', 'tnStart', s.tnStart || 20000, { type: 'number' })}${fld('Requisition prefix', 'reqPrefix', s.reqPrefix)}${fld('PO prefix (can be blank)', 'poPrefix', s.poPrefix)}${fld('First PO number', 'poStart', s.poStart || 4000, { type: 'number' })}${fld('First packing slip / RO number', 'psStart', s.psStart || 2000, { type: 'number' })}${fld('Supabase database limit (MB) — space gauge', 'spaceLimitMB', s.spaceLimitMB || 500, { type: 'number' })}
     ${fld('Op-cost prefix', 'opPrefix', s.opPrefix)}${fld('Invoice prefix', 'invPrefix', s.invPrefix)}<div class="f span2"><span>Invoices (customer billing)</span>${fld('Use Invoices — untick to hide the Invoices page and option everywhere', 'invoicesEnabled', !!s.invoicesEnabled, { type: 'checkbox' })}</div>
     <div class="f span2"><span>Labour on op-costs / invoices</span>${fld('Show the "Add labour" section (hours × rate)', 'laborEnabled', !!s.laborEnabled, { type: 'checkbox' })}</div>
     <div class="f span2"><span>Authorization # on op-costs</span>${fld('Show the "Authorization #" field on op-costs and their PDF', 'opAuthEnabled', !!s.opAuthEnabled, { type: 'checkbox' })}</div>
@@ -3898,7 +3987,7 @@ VIEWS.set = (main, st) => {
     saveSettings(); toast('Lists saved');
     refreshListSelects('shipTo'); for (const k of ['defaultShipTo', 'defaultBillTo']) { const el = $(`[data-k=${k}]`, P('lists')); el.value = s[k]; el.dispatchEvent(new Event('change', { bubbles: true })); }
   };
-  $('#saveOpt').onclick = () => { const f = readForm(P('opt')); Object.assign(s, f); s.markup = num(f.markup); s.tnStart = Math.max(1, Math.floor(num(f.tnStart) || 20000)); s.poStart = Math.max(1, Math.floor(num(f.poStart) || 4000)); s.psStart = Math.max(1, Math.floor(num(f.psStart) || 2000)); s.expiryWarnDays = num(f.expiryWarnDays); saveSettings(); drawNav(); toast('Options saved'); };
+  $('#saveOpt').onclick = () => { const f = readForm(P('opt')); Object.assign(s, f); s.markup = num(f.markup); s.spaceLimitMB = Math.max(1, num(f.spaceLimitMB) || 500); if (typeof Space !== 'undefined') Space.draw && Space.info && Space.draw(); s.tnStart = Math.max(1, Math.floor(num(f.tnStart) || 20000)); s.poStart = Math.max(1, Math.floor(num(f.poStart) || 4000)); s.psStart = Math.max(1, Math.floor(num(f.psStart) || 2000)); s.expiryWarnDays = num(f.expiryWarnDays); saveSettings(); drawNav(); toast('Options saved'); };
   const sbRead = () => ({ url: $('[data-k=sb_url]').value.trim(), key: $('[data-k=sb_key]').value.trim(), table: $('[data-k=sb_table]').value.trim() || 'inv_store' });
   $('#sbTest').onclick = async () => { const c = sbRead(); try { const r = await fetch(c.url.replace(/\/+$/, '') + '/rest/v1/' + c.table + '?select=id&limit=1', { headers: /^sb_/.test(c.key) ? { apikey: c.key } : { apikey: c.key, Authorization: 'Bearer ' + c.key } }); if (r.ok) toast('Connection OK — table found'); else toast('Failed: ' + r.status + ' ' + (await r.text()).slice(0, 140), true); } catch (e) { toast('Failed: ' + e.message, true); } };
   $('#sbLink').onclick = async () => { const l = setupLink(); try { await navigator.clipboard.writeText(l); toast('Setup link copied — paste it in an email or Teams message'); } catch (e) { promptBox('Station setup link', 'Copy this link:', l); } };
@@ -4111,7 +4200,7 @@ $('#syncPill').onclick = () => {
   document.body.classList.remove('locked');
   updateHeader(); migrate(); migrateRoles(); migratePoLock(); migrateBinsPerm(); migratePickPerm(); seedPickLists(); renumberPickLists(); renumberOpCosts(); renumberPS();
   const h = location.hash.replace('#', ''); if (VIEWS[h]) currentView = h;
-  Render.full(); wsInit();
+  Render.full(); wsInit(); Space.check(); setInterval(() => { if (!document.hidden) Space.check(); }, 30 * 60000);
   if (isAdmin() && spaceScan(false).parts.length) setTimeout(() => spaceCleanupModal(true), 800);
   if (Sync.enabled()) setInterval(() => { if (!document.hidden) Sync.pull(true); }, 20000);
   window.addEventListener('hashchange', () => { const h = location.hash.replace('#', ''); if (VIEWS[h] && h !== currentView) { currentView = h; viewState = {}; Render.full(); } });
